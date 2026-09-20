@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 const categoryData = {
   'house-rent': { name: 'বাসা ভাড়া', icon: '🏠', type: 'listing' },
   'mess-rent': { name: 'মেস ভাড়া', icon: '🛏️', type: 'listing' },
