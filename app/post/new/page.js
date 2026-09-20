@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
+import ImageCropper from '../../../components/ImageCropper';
 
 function NewPostForm() {
   const searchParams = useSearchParams();
@@ -14,8 +15,11 @@ function NewPostForm() {
   const [form, setForm] = useState({
     title: '', name: '', area: '', phone: '', priceOrSalary: '', description: '',
   });
-  const [photoFile, setPhotoFile] = useState(null);
-  const [photoFiles, setPhotoFiles] = useState([]);
+
+  const [pendingFile, setPendingFile] = useState(null); // ক্রপার-এ থাকা ছবি
+  const [providerPhoto, setProviderPhoto] = useState(null); // ক্রপ শেষ হওয়া একটা ছবি (Blob)
+  const [listingPhotos, setListingPhotos] = useState([]); // ক্রপ শেষ হওয়া একাধিক ছবি (Blob[])
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -44,10 +48,30 @@ function NewPostForm() {
     setForm((f) => ({ ...f, [field]: value }));
   }
 
-  async function uploadFile(file) {
-    const ext = file.name.split('.').pop();
-    const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error: uploadError } = await supabase.storage.from('images').upload(path, file);
+  function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (file) setPendingFile(file);
+    e.target.value = ''; // যাতে একই ফাইল আবার সিলেক্ট করা যায়
+  }
+
+  function handleCropComplete(blob) {
+    if (category?.type === 'service') {
+      setProviderPhoto(blob);
+    } else {
+      setListingPhotos((prev) => (prev.length >= 3 ? prev : [...prev, blob]));
+    }
+    setPendingFile(null);
+  }
+
+  function removeListingPhoto(index) {
+    setListingPhotos((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function uploadBlob(blob) {
+    const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+    const { error: uploadError } = await supabase.storage.from('images').upload(path, blob, {
+      contentType: 'image/jpeg',
+    });
     if (uploadError) throw uploadError;
     const { data } = supabase.storage.from('images').getPublicUrl(path);
     return data.publicUrl;
@@ -64,7 +88,7 @@ function NewPostForm() {
 
       if (isService) {
         let photoUrl = null;
-        if (photoFile) photoUrl = await uploadFile(photoFile);
+        if (providerPhoto) photoUrl = await uploadBlob(providerPhoto);
 
         const { error } = await supabase.from('providers').insert({
           user_id: user.id,
@@ -78,9 +102,8 @@ function NewPostForm() {
         if (error) throw error;
       } else {
         let photoUrls = [];
-        if (photoFiles.length > 0) {
-          const uploads = await Promise.all(photoFiles.slice(0, 3).map(uploadFile));
-          photoUrls = uploads;
+        if (listingPhotos.length > 0) {
+          photoUrls = await Promise.all(listingPhotos.map(uploadBlob));
         }
 
         const { error } = await supabase.from('listings').insert({
@@ -141,6 +164,14 @@ function NewPostForm() {
 
   return (
     <main className="max-w-xl mx-auto px-4 py-10">
+      {pendingFile && (
+        <ImageCropper
+          file={pendingFile}
+          onCancel={() => setPendingFile(null)}
+          onComplete={handleCropComplete}
+        />
+      )}
+
       <header className="flex items-center justify-between mb-8">
         <a href="/"><img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-9 w-auto" /></a>
       </header>
@@ -219,26 +250,55 @@ function NewPostForm() {
           />
         </div>
 
+        {/* ছবি আপলোড সেকশন */}
         {isService ? (
           <div>
-            <label className="block text-sm mb-1.5 text-ink/70">ছবি (ঐচ্ছিক, সর্বোচ্চ ২MB)</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setPhotoFile(e.target.files[0] || null)}
-              className="w-full text-sm"
-            />
+            <label className="block text-sm mb-1.5 text-ink/70">ছবি (ঐচ্ছিক)</label>
+            {providerPhoto ? (
+              <div className="flex items-center gap-3">
+                <img
+                  src={URL.createObjectURL(providerPhoto)}
+                  alt="প্রিভিউ"
+                  className="w-20 h-20 object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => setProviderPhoto(null)}
+                  className="text-sm text-red-600 border border-red-300 px-3 py-1.5"
+                >
+                  সরান
+                </button>
+              </div>
+            ) : (
+              <label className="inline-block text-sm border border-ink/20 px-4 py-2 cursor-pointer hover:bg-paper">
+                + ছবি বাছাই করুন
+                <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+              </label>
+            )}
           </div>
         ) : (
           <div>
-            <label className="block text-sm mb-1.5 text-ink/70">ছবি (ঐচ্ছিক, সর্বোচ্চ ৩টা, প্রতিটা ২MB)</label>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => setPhotoFiles(Array.from(e.target.files).slice(0, 3))}
-              className="w-full text-sm"
-            />
+            <label className="block text-sm mb-1.5 text-ink/70">ছবি (ঐচ্ছিক, সর্বোচ্চ ৩টা)</label>
+            <div className="flex gap-2 flex-wrap">
+              {listingPhotos.map((blob, i) => (
+                <div key={i} className="relative">
+                  <img src={URL.createObjectURL(blob)} alt={`ছবি ${i + 1}`} className="w-20 h-20 object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeListingPhoto(i)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white w-5 h-5 text-xs rounded-full"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              {listingPhotos.length < 3 && (
+                <label className="w-20 h-20 border border-dashed border-ink/30 flex items-center justify-center text-xs text-ink/50 cursor-pointer hover:bg-paper">
+                  + যোগ করুন
+                  <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                </label>
+              )}
+            </div>
           </div>
         )}
 
