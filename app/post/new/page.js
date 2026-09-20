@@ -14,6 +14,8 @@ function NewPostForm() {
   const [form, setForm] = useState({
     title: '', name: '', area: '', phone: '', priceOrSalary: '', description: '',
   });
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoFiles, setPhotoFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -42,38 +44,60 @@ function NewPostForm() {
     setForm((f) => ({ ...f, [field]: value }));
   }
 
+  async function uploadFile(file) {
+    const ext = file.name.split('.').pop();
+    const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: uploadError } = await supabase.storage.from('images').upload(path, file);
+    if (uploadError) throw uploadError;
+    const { data } = supabase.storage.from('images').getPublicUrl(path);
+    return data.publicUrl;
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!user || !category) return;
     setSubmitting(true);
     setError(null);
 
-    const isService = category.type === 'service';
-    const table = isService ? 'providers' : 'listings';
-    const payload = isService
-      ? {
+    try {
+      const isService = category.type === 'service';
+
+      if (isService) {
+        let photoUrl = null;
+        if (photoFile) photoUrl = await uploadFile(photoFile);
+
+        const { error } = await supabase.from('providers').insert({
           user_id: user.id,
           category_id: category.id,
           name: form.name,
           area: form.area,
           phone: form.phone,
           description: form.description,
+          photo_url: photoUrl,
+        });
+        if (error) throw error;
+      } else {
+        let photoUrls = [];
+        if (photoFiles.length > 0) {
+          const uploads = await Promise.all(photoFiles.slice(0, 3).map(uploadFile));
+          photoUrls = uploads;
         }
-      : {
+
+        const { error } = await supabase.from('listings').insert({
           user_id: user.id,
           category_id: category.id,
           title: form.title,
           area: form.area,
           price_or_salary: form.priceOrSalary,
           description: form.description,
-        };
+          photos: photoUrls,
+        });
+        if (error) throw error;
+      }
 
-    const { error } = await supabase.from(table).insert(payload);
-
-    if (error) {
-      setError(error.message);
-    } else {
       setSuccess(true);
+    } catch (err) {
+      setError(err.message);
     }
     setSubmitting(false);
   }
@@ -194,6 +218,29 @@ function NewPostForm() {
             placeholder="বিস্তারিত লিখুন..."
           />
         </div>
+
+        {isService ? (
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">ছবি (ঐচ্ছিক, সর্বোচ্চ ২MB)</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setPhotoFile(e.target.files[0] || null)}
+              className="w-full text-sm"
+            />
+          </div>
+        ) : (
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">ছবি (ঐচ্ছিক, সর্বোচ্চ ৩টা, প্রতিটা ২MB)</label>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => setPhotoFiles(Array.from(e.target.files).slice(0, 3))}
+              className="w-full text-sm"
+            />
+          </div>
+        )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
