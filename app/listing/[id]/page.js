@@ -28,7 +28,7 @@ export async function generateMetadata({ params }) {
 export default async function ListingDetailPage({ params }) {
   const { data: listing } = await supabase
     .from('listings')
-    .select('id, title, area, price_or_salary, description, categories(name, slug)')
+    .select('id, title, area, price_or_salary, description, photos, categories(name, slug)')
     .eq('id', params.id)
     .eq('status', 'active')
     .single();
@@ -54,6 +54,13 @@ export default async function ListingDetailPage({ params }) {
       </a>
 
       <div className="bg-white border border-ink/10 p-6 mt-4">
+        {listing.photos && listing.photos.length > 0 && (
+          <div className="grid grid-cols-3 gap-1 mb-4 -mt-6 -mx-6" style={{ width: 'calc(100% + 3rem)' }}>
+            {listing.photos.map((url, i) => (
+              <img key={i} src={url} alt={`ছবি ${i + 1}`} className="w-full h-32 object-cover" />
+            ))}
+          </div>
+        )}
         <h1 className="text-xl font-semibold">{listing.title}</h1>
         <p className="text-ink/60 mt-1">{listing.categories?.name} · {listing.area}</p>
         <p className="text-green font-semibold text-lg mt-2">{listing.price_or_salary}</p>
