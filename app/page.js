@@ -23,15 +23,16 @@ export default function HomePage() {
 
       <section className="py-10 md:py-16">
         <h1 className="text-3xl md:text-5xl font-semibold leading-tight text-ink max-w-xl">
-          শেরপুরে যা খুঁজছেন, এক জায়গায় খুঁজে নিন
+          শেরপুরে যা খুঁজছেন, এক জায়গায় খুঁজুন
         </h1>
         <p className="mt-4 text-ink/70 max-w-md">
           বাসা ভাড়া, চাকরি, নাকি বিশ্বস্ত মিস্ত্রি — যা দরকার সবই পাবেন এখানে।
         </p>
 
-        <form className="mt-8 flex gap-2 max-w-xl bg-white border-2 border-ink/10 p-2">
+        <form action="/search" method="GET" className="mt-8 flex gap-2 max-w-xl bg-white border-2 border-ink/10 p-2">
           <input
             type="text"
+            name="q"
             placeholder="যেমন: বাসা ভাড়া, ইলেকট্রিশিয়ান..."
             className="flex-1 bg-transparent outline-none px-3 py-2 text-base placeholder:text-ink/40"
           />
