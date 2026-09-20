@@ -65,11 +65,20 @@ export default function HomePage() {
       </section>
 
       <footer className="border-t border-ink/10 py-6 text-sm text-ink/60 flex flex-col items-center gap-2">
-        <div className="flex gap-4">
+        <div className="flex gap-4 flex-wrap justify-center">
           <a href="/terms" className="hover:text-ink">শর্তাবলি</a>
           <a href="/privacy" className="hover:text-ink">প্রাইভেসি পলিসি</a>
+          <a href="/disclaimer" className="hover:text-ink">দায়বদ্ধতা</a>
         </div>
         <p>© ২০২৬ খুঁজি শেরপুর</p>
+        <a
+          href="https://www.facebook.com/share/1CDYwoqn57/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-ink/40 hover:text-ink"
+        >
+          Developed by ASRAFUL
+        </a>
       </footer>
     </main>
   );
