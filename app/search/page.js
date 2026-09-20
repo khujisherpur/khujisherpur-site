@@ -8,18 +8,25 @@ export default async function SearchPage({ searchParams }) {
   let listings = [];
 
   if (query) {
+    const { data: matchedCategories } = await supabase
+      .from('categories')
+      .select('id')
+      .ilike('name', `%${query}%`);
+    const categoryIds = (matchedCategories || []).map((c) => c.id);
+    const categoryFilter = categoryIds.length > 0 ? `,category_id.in.(${categoryIds.join(',')})` : '';
+
     const { data: p } = await supabase
       .from('providers')
       .select('id, name, area, categories(name, slug)')
       .eq('status', 'approved')
-      .or(`name.ilike.%${query}%,area.ilike.%${query}%`);
+      .or(`name.ilike.%${query}%,area.ilike.%${query}%${categoryFilter}`);
     providers = p || [];
 
     const { data: l } = await supabase
       .from('listings')
       .select('id, title, area, price_or_salary, categories(name, slug)')
       .eq('status', 'active')
-      .or(`title.ilike.%${query}%,area.ilike.%${query}%`);
+      .or(`title.ilike.%${query}%,area.ilike.%${query}%${categoryFilter}`);
     listings = l || [];
   }
 
