@@ -1,6 +1,30 @@
 export const runtime = 'edge';
 import { supabase } from '../../../lib/supabaseClient';
 
+export async function generateMetadata({ params }) {
+  const { data: listing } = await supabase
+    .from('listings')
+    .select('title, area, price_or_salary, description, categories(name)')
+    .eq('id', params.id)
+    .eq('status', 'active')
+    .single();
+
+  if (!listing) {
+    return { title: 'পোস্ট পাওয়া যায়নি | খুঁজি শেরপুর' };
+  }
+
+  const title = `${listing.title} - ${listing.price_or_salary} | খুঁজি শেরপুর`;
+  const description = listing.description
+    ? listing.description.slice(0, 150)
+    : `শেরপুরের ${listing.area} এলাকায় ${listing.categories?.name}। এখনই দেখুন খুঁজি শেরপুরে।`;
+
+  return {
+    title,
+    description,
+    openGraph: { title, description },
+  };
+}
+
 export default async function ListingDetailPage({ params }) {
   const { data: listing } = await supabase
     .from('listings')
@@ -39,6 +63,18 @@ export default async function ListingDetailPage({ params }) {
           <p className="text-ink/70 text-sm">{listing.description || 'কোনো বিবরণ দেওয়া হয়নি।'}</p>
         </div>
       </div>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': listing.categories?.name === 'চাকরি বিজ্ঞপ্তি' ? 'JobPosting' : 'Product',
+            name: listing.title,
+            description: listing.description,
+          }),
+        }}
+      />
     </main>
   );
 }
