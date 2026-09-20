@@ -1,5 +1,6 @@
 export const runtime = 'edge';
 import { supabase } from '../../../lib/supabaseClient';
+import PhotoLightbox from '../../../components/PhotoLightbox';
 
 export async function generateMetadata({ params }) {
   const { data: provider } = await supabase
@@ -53,33 +54,51 @@ export default async function ProviderDetailPage({ params }) {
         ← তালিকায় ফিরে যান
       </a>
 
-      <div className="bg-white border border-ink/10 p-6 mt-4">
-        {provider.photo_url && (
-          <img
-            src={provider.photo_url}
-            alt={provider.name}
-            className="w-full h-48 object-cover mb-4 -mt-6 -mx-6"
-            style={{ width: 'calc(100% + 3rem)' }}
-          />
-        )}
-        <h1 className="text-2xl font-semibold">{provider.name}</h1>
-        <p className="text-ink/60 mt-1">{provider.categories?.name} · {provider.area}</p>
+      <div className="bg-white border border-ink/10 mt-4 overflow-hidden">
+        {/* কভার-স্টাইল ব্যাকগ্রাউন্ড, উপরে */}
+        <div className="h-20 bg-green/10" />
 
-        {!provider.is_available && (
-          <p className="text-sm text-red-500 mt-2">এই মুহূর্তে অনুপলব্ধ</p>
-        )}
+        <div className="px-6 pb-6">
+          {/* প্রোফাইল ছবি — কভারের উপরে ওভারল্যাপ করে বসানো, ঠিক Facebook-এর মতো */}
+          <div className="-mt-12 flex justify-center">
+            {provider.photo_url ? (
+              <div className="rounded-full border-4 border-white">
+                <PhotoLightbox src={provider.photo_url} alt={provider.name} size="w-24 h-24" />
+              </div>
+            ) : (
+              <div className="w-24 h-24 rounded-full bg-paper border-4 border-white flex items-center justify-center text-3xl text-ink/30">
+                {provider.name?.charAt(0)}
+              </div>
+            )}
+          </div>
 
-        <div className="mt-6 pt-6 border-t border-ink/10">
-          <h2 className="font-medium mb-2">বিবরণ</h2>
-          <p className="text-ink/70 text-sm">{provider.description || 'কোনো বিবরণ দেওয়া হয়নি।'}</p>
+          {/* নাম ও ট্যাগলাইন */}
+          <div className="text-center mt-3">
+            <h1 className="text-2xl font-semibold">{provider.name}</h1>
+            <p className="text-ink/60 mt-1">{provider.categories?.name} · {provider.area}</p>
+            {!provider.is_available && (
+              <span className="inline-block mt-2 text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-full">
+                এই মুহূর্তে অনুপলব্ধ
+              </span>
+            )}
+          </div>
+
+          {/* বায়ো / বিবরণ */}
+          <div className="mt-6 pt-6 border-t border-ink/10">
+            <h2 className="font-medium mb-2 text-sm text-ink/50 uppercase tracking-wide">সম্পর্কে</h2>
+            <p className="text-ink/80 text-sm leading-relaxed">
+              {provider.description || 'কোনো বিবরণ দেওয়া হয়নি।'}
+            </p>
+          </div>
+
+          {/* যোগাযোগ */}
+          <a
+            href={`tel:${provider.phone}`}
+            className="block text-center mt-6 bg-marigold text-ink font-semibold py-2.5 hover:bg-marigold/90 transition-colors"
+          >
+            📞 {provider.phone}
+          </a>
         </div>
-
-        <a
-          href={`tel:${provider.phone}`}
-          className="block text-center mt-6 bg-marigold text-ink font-semibold py-2.5 hover:bg-marigold/90 transition-colors"
-        >
-          📞 {provider.phone}
-        </a>
       </div>
 
       <script
