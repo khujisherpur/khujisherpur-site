@@ -2,8 +2,8 @@
 import { useRef, useState, useEffect } from 'react';
 
 const OUTPUT_SIZE = 800;
-const TARGET_BYTES = 400 * 1024; // ~400KB
-const BOX_SIZE = 280; // ডিসপ্লে বক্সের সাইজ (স্ক্রিনে যা দেখা যাবে)
+const TARGET_BYTES = 400 * 1024;
+const BOX_SIZE = 280;
 
 function clamp(val, min, max) {
   return Math.min(Math.max(val, min), max);
@@ -20,7 +20,6 @@ async function compressToTarget(canvas) {
 }
 
 export default function ImageCropper({ file, onCancel, onComplete }) {
-  const imgRef = useRef(null);
   const [img, setImg] = useState(null);
   const [baseScale, setBaseScale] = useState(1);
   const [zoom, setZoom] = useState(1);
@@ -35,6 +34,7 @@ export default function ImageCropper({ file, onCancel, onComplete }) {
       const bScale = Math.max(BOX_SIZE / image.width, BOX_SIZE / image.height);
       setBaseScale(bScale);
       setImg(image);
+      setZoom(1);
       setPos({
         x: (BOX_SIZE - image.width * bScale) / 2,
         y: (BOX_SIZE - image.height * bScale) / 2,
@@ -56,7 +56,7 @@ export default function ImageCropper({ file, onCancel, onComplete }) {
 
   function handlePointerDown(e) {
     dragState.current = { startX: e.clientX, startY: e.clientY, origPos: pos };
-    e.target.setPointerCapture(e.pointerId);
+    e.currentTarget.setPointerCapture(e.pointerId);
   }
 
   function handlePointerMove(e) {
@@ -75,11 +75,24 @@ export default function ImageCropper({ file, onCancel, onComplete }) {
     dragState.current = null;
   }
 
+  // জুম বদলালে বক্সের কেন্দ্রবিন্দুকে স্থির রেখে (চার দিক থেকে সমানভাবে) বড়/ছোট করে
   function handleZoomChange(e) {
+    if (!img) return;
     const newZoom = parseFloat(e.target.value);
-    const scale = baseScale * newZoom;
+    const oldScale = baseScale * zoom;
+    const newScale = baseScale * newZoom;
+
+    const center = BOX_SIZE / 2;
+    const imgPointX = (center - pos.x) / oldScale;
+    const imgPointY = (center - pos.y) / oldScale;
+
+    const newPos = {
+      x: center - imgPointX * newScale,
+      y: center - imgPointY * newScale,
+    };
+
     setZoom(newZoom);
-    setPos((p) => clampPos(p, scale));
+    setPos(clampPos(newPos, newScale));
   }
 
   async function handleConfirm() {
@@ -105,21 +118,21 @@ export default function ImageCropper({ file, onCancel, onComplete }) {
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-white p-5 max-w-sm w-full">
-        <p className="text-sm font-medium mb-3">ছবি সমন্বয় করুন</p>
+        <p className="text-sm font-medium mb-1">ছবি সমন্বয় করুন</p>
+        <p className="text-xs text-ink/50 mb-3">টেনে সরান বা স্লাইডার দিয়ে জুম করুন</p>
 
         <div
-          className="mx-auto overflow-hidden bg-ink/5 touch-none select-none relative"
+          className="mx-auto overflow-hidden bg-ink/5 touch-none select-none relative rounded-full"
           style={{ width: BOX_SIZE, height: BOX_SIZE }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
         >
           {img && (
             <img
-              ref={imgRef}
               src={img.src}
               draggable={false}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
               style={{
                 position: 'absolute',
                 left: pos.x,
@@ -128,11 +141,11 @@ export default function ImageCropper({ file, onCancel, onComplete }) {
                 height: img.height * baseScale * zoom,
                 cursor: 'grab',
                 touchAction: 'none',
+                pointerEvents: 'none',
               }}
             />
           )}
-          {/* গোল গাইড অভারলে, যেন বোঝা যায় স্কয়ারের ভেতর কতটুকু দেখাবে */}
-          <div className="absolute inset-0 pointer-events-none border-2 border-marigold" />
+          <div className="absolute inset-0 pointer-events-none border-2 border-marigold rounded-full" />
         </div>
 
         <div className="mt-4 flex items-center gap-3">
@@ -141,7 +154,7 @@ export default function ImageCropper({ file, onCancel, onComplete }) {
             type="range"
             min={1}
             max={3}
-            step={0.05}
+            step={0.02}
             value={zoom}
             onChange={handleZoomChange}
             className="flex-1"
