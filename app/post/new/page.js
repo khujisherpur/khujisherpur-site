@@ -167,6 +167,7 @@ function NewPostForm() {
       {pendingFile && (
         <ImageCropper
           file={pendingFile}
+          shape={category?.type === 'service' ? 'circle' : 'square'}
           onCancel={() => setPendingFile(null)}
           onComplete={handleCropComplete}
         />
@@ -259,7 +260,7 @@ function NewPostForm() {
                 <img
                   src={URL.createObjectURL(providerPhoto)}
                   alt="প্রিভিউ"
-                  className="w-20 h-20 object-cover"
+                  className="w-20 h-20 object-cover rounded-full"
                 />
                 <button
                   type="button"
