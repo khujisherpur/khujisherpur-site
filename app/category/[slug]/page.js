@@ -1,27 +1,12 @@
 export const runtime = 'edge';
+import { supabase } from '../../../lib/supabaseClient';
 
-const categoryData = {
-  'house-rent': { name: 'বাসা ভাড়া', icon: '🏠', type: 'listing' },
-  'mess-rent': { name: 'মেস ভাড়া', icon: '🛏️', type: 'listing' },
-  'job': { name: 'চাকরি বিজ্ঞপ্তি', icon: '💼', type: 'listing' },
-  'electrician': { name: 'ইলেকট্রিশিয়ান', icon: '⚡', type: 'service' },
-  'sanitary-mistri': { name: 'প্লাম্বার', icon: '🚰', type: 'service' },
-};
-
-const dummyListings = [
-  { id: '1', title: '২ বেডরুম বাসা, শেরপুর সদর', area: 'শেরপুর সদর', price: '৮,০০০ টাকা/মাস' },
-  { id: '2', title: '১ বেডরুম বাসা, নালিতাবাড়ী রোড', area: 'নালিতাবাড়ী', price: '৫,৫০০ টাকা/মাস' },
-  { id: '3', title: 'সিঙ্গেল রুম মেস, কলেজ রোড', area: 'শেরপুর সদর', price: '২,৫০০ টাকা/মাস' },
-];
-
-const dummyProviders = [
-  { id: '1', name: 'রহিম উদ্দিন', area: 'শেরপুর সদর', rating: 4.8, reviews: 23 },
-  { id: '2', name: 'করিম মিয়া', area: 'নালিতাবাড়ী', rating: 4.5, reviews: 15 },
-  { id: '3', name: 'জসিম উদ্দিন', area: 'শ্রীবরদী', rating: 4.9, reviews: 31 },
-];
-
-export default function CategoryPage({ params }) {
-  const category = categoryData[params.slug];
+export default async function CategoryPage({ params }) {
+  const { data: category } = await supabase
+    .from('categories')
+    .select('id, name, slug, icon, type')
+    .eq('slug', params.slug)
+    .single();
 
   if (!category) {
     return (
@@ -33,7 +18,25 @@ export default function CategoryPage({ params }) {
   }
 
   const isService = category.type === 'service';
-  const items = isService ? dummyProviders : dummyListings;
+
+  let items = [];
+  if (isService) {
+    const { data } = await supabase
+      .from('providers')
+      .select('id, name, area, is_available')
+      .eq('category_id', category.id)
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false });
+    items = data || [];
+  } else {
+    const { data } = await supabase
+      .from('listings')
+      .select('id, title, area, price_or_salary')
+      .eq('category_id', category.id)
+      .eq('status', 'active')
+      .order('posted_at', { ascending: false });
+    items = data || [];
+  }
 
   return (
     <main className="max-w-4xl mx-auto px-4">
@@ -53,7 +56,7 @@ export default function CategoryPage({ params }) {
           <h1 className="text-2xl md:text-3xl font-semibold">{category.name}</h1>
         </div>
         <a
-          href={`/post/new?category=${params.slug}`}
+          href={`/post/new?category=${category.slug}`}
           className="inline-block mt-4 bg-marigold text-ink font-semibold px-5 py-2.5 hover:bg-marigold/90 transition-colors"
         >
           {isService ? '+ আপনার প্রোফাইল যুক্ত করুন' : '+ নতুন পোস্ট দিন'}
@@ -61,8 +64,13 @@ export default function CategoryPage({ params }) {
       </div>
 
       <section className="pb-16 space-y-3">
+        {items.length === 0 && (
+          <p className="text-ink/50 text-sm py-10 text-center">
+            এখনো কোনো {isService ? 'প্রোভাইডার' : 'পোস্ট'} নেই। প্রথম হিসেবে আপনি যোগ করতে পারেন!
+          </p>
+        )}
         {isService
-          ? dummyProviders.map((p) => (
+          ? items.map((p) => (
               <a
                 key={p.id}
                 href={`/provider/${p.id}`}
@@ -70,10 +78,12 @@ export default function CategoryPage({ params }) {
               >
                 <p className="font-medium">{p.name}</p>
                 <p className="text-sm text-ink/60 mt-1">{p.area}</p>
-                <p className="text-sm text-marigold mt-1">★ {p.rating} ({p.reviews} রিভিউ)</p>
+                {!p.is_available && (
+                  <p className="text-xs text-red-500 mt-1">এই মুহূর্তে অনুপলব্ধ</p>
+                )}
               </a>
             ))
-          : dummyListings.map((l) => (
+          : items.map((l) => (
               <a
                 key={l.id}
                 href={`/listing/${l.id}`}
@@ -81,7 +91,7 @@ export default function CategoryPage({ params }) {
               >
                 <p className="font-medium">{l.title}</p>
                 <p className="text-sm text-ink/60 mt-1">{l.area}</p>
-                <p className="text-sm text-green font-medium mt-1">{l.price}</p>
+                <p className="text-sm text-green font-medium mt-1">{l.price_or_salary}</p>
               </a>
             ))}
       </section>
