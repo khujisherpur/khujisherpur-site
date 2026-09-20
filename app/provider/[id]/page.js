@@ -28,7 +28,7 @@ export async function generateMetadata({ params }) {
 export default async function ProviderDetailPage({ params }) {
   const { data: provider } = await supabase
     .from('providers')
-    .select('id, name, area, phone, description, is_available, categories(name, slug)')
+    .select('id, name, area, phone, description, is_available, photo_url, categories(name, slug)')
     .eq('id', params.id)
     .eq('status', 'approved')
     .single();
@@ -54,6 +54,14 @@ export default async function ProviderDetailPage({ params }) {
       </a>
 
       <div className="bg-white border border-ink/10 p-6 mt-4">
+        {provider.photo_url && (
+          <img
+            src={provider.photo_url}
+            alt={provider.name}
+            className="w-full h-48 object-cover mb-4 -mt-6 -mx-6"
+            style={{ width: 'calc(100% + 3rem)' }}
+          />
+        )}
         <h1 className="text-2xl font-semibold">{provider.name}</h1>
         <p className="text-ink/60 mt-1">{provider.categories?.name} · {provider.area}</p>
 
