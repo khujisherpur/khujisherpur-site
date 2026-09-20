@@ -52,14 +52,12 @@ export default function CategoryPage({ params }) {
           <span className="text-3xl">{category.icon}</span>
           <h1 className="text-2xl md:text-3xl font-semibold">{category.name}</h1>
         </div>
-        {!isService && (
-          <a
-            href={`/post/new?category=${params.slug}`}
-            className="inline-block mt-4 bg-marigold text-ink font-semibold px-5 py-2.5 hover:bg-marigold/90 transition-colors"
-          >
-            + নতুন পোস্ট দিন
-          </a>
-        )}
+        <a
+          href={`/post/new?category=${params.slug}`}
+          className="inline-block mt-4 bg-marigold text-ink font-semibold px-5 py-2.5 hover:bg-marigold/90 transition-colors"
+        >
+          {isService ? '+ আপনার প্রোফাইল যুক্ত করুন' : '+ নতুন পোস্ট দিন'}
+        </a>
       </div>
 
       <section className="pb-16 space-y-3">
