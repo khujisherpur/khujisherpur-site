@@ -19,8 +19,9 @@ async function compressToTarget(canvas) {
   return blob;
 }
 
-export default function ImageCropper({ file, onCancel, onComplete }) {
+export default function ImageCropper({ file, onCancel, onComplete, shape = 'circle' }) {
   const [img, setImg] = useState(null);
+  const [naturalSize, setNaturalSize] = useState({ w: 0, h: 0 });
   const [baseScale, setBaseScale] = useState(1);
   const [zoom, setZoom] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -31,23 +32,25 @@ export default function ImageCropper({ file, onCancel, onComplete }) {
     const url = URL.createObjectURL(file);
     const image = new Image();
     image.onload = () => {
-      const bScale = Math.max(BOX_SIZE / image.width, BOX_SIZE / image.height);
+      const w = image.naturalWidth;
+      const h = image.naturalHeight;
+      const bScale = Math.max(BOX_SIZE / w, BOX_SIZE / h);
+      setNaturalSize({ w, h });
       setBaseScale(bScale);
-      setImg(image);
       setZoom(1);
       setPos({
-        x: (BOX_SIZE - image.width * bScale) / 2,
-        y: (BOX_SIZE - image.height * bScale) / 2,
+        x: (BOX_SIZE - w * bScale) / 2,
+        y: (BOX_SIZE - h * bScale) / 2,
       });
+      setImg(image);
     };
     image.src = url;
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
   function clampPos(p, scale) {
-    if (!img) return p;
-    const w = img.width * scale;
-    const h = img.height * scale;
+    const w = naturalSize.w * scale;
+    const h = naturalSize.h * scale;
     return {
       x: clamp(p.x, BOX_SIZE - w, 0),
       y: clamp(p.y, BOX_SIZE - h, 0),
@@ -75,9 +78,7 @@ export default function ImageCropper({ file, onCancel, onComplete }) {
     dragState.current = null;
   }
 
-  // জুম বদলালে বক্সের কেন্দ্রবিন্দুকে স্থির রেখে (চার দিক থেকে সমানভাবে) বড়/ছোট করে
   function handleZoomChange(e) {
-    if (!img) return;
     const newZoom = parseFloat(e.target.value);
     const oldScale = baseScale * zoom;
     const newScale = baseScale * newZoom;
@@ -115,6 +116,9 @@ export default function ImageCropper({ file, onCancel, onComplete }) {
     onComplete(blob);
   }
 
+  const scale = baseScale * zoom;
+  const maskShapeClass = shape === 'circle' ? 'rounded-full' : '';
+
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-white p-5 max-w-sm w-full">
@@ -122,30 +126,33 @@ export default function ImageCropper({ file, onCancel, onComplete }) {
         <p className="text-xs text-ink/50 mb-3">টেনে সরান বা স্লাইডার দিয়ে জুম করুন</p>
 
         <div
-          className="mx-auto overflow-hidden bg-ink/5 touch-none select-none relative rounded-full"
+          className={`mx-auto overflow-hidden bg-ink/5 touch-none select-none relative ${maskShapeClass}`}
           style={{ width: BOX_SIZE, height: BOX_SIZE }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
         >
-          {img && (
+          {img && naturalSize.w > 0 && (
             <img
               src={img.src}
               draggable={false}
               style={{
                 position: 'absolute',
-                left: pos.x,
-                top: pos.y,
-                width: img.width * baseScale * zoom,
-                height: img.height * baseScale * zoom,
+                left: 0,
+                top: 0,
+                width: naturalSize.w,
+                height: naturalSize.h,
+                transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})`,
+                transformOrigin: '0 0',
                 cursor: 'grab',
                 touchAction: 'none',
                 pointerEvents: 'none',
+                maxWidth: 'none',
               }}
             />
           )}
-          <div className="absolute inset-0 pointer-events-none border-2 border-marigold rounded-full" />
+          <div className={`absolute inset-0 pointer-events-none border-2 border-marigold ${maskShapeClass}`} />
         </div>
 
         <div className="mt-4 flex items-center gap-3">
