@@ -1,6 +1,30 @@
 export const runtime = 'edge';
 import { supabase } from '../../../lib/supabaseClient';
 
+export async function generateMetadata({ params }) {
+  const { data: provider } = await supabase
+    .from('providers')
+    .select('name, area, description, categories(name)')
+    .eq('id', params.id)
+    .eq('status', 'approved')
+    .single();
+
+  if (!provider) {
+    return { title: 'প্রোফাইল পাওয়া যায়নি | খুঁজি শেরপুর' };
+  }
+
+  const title = `${provider.name} - ${provider.categories?.name} ${provider.area} | খুঁজি শেরপুর`;
+  const description = provider.description
+    ? provider.description.slice(0, 150)
+    : `শেরপুরের ${provider.area} এলাকায় বিশ্বস্ত ${provider.categories?.name}। যোগাযোগ করুন খুঁজি শেরপুরের মাধ্যমে।`;
+
+  return {
+    title,
+    description,
+    openGraph: { title, description },
+  };
+}
+
 export default async function ProviderDetailPage({ params }) {
   const { data: provider } = await supabase
     .from('providers')
@@ -49,6 +73,20 @@ export default async function ProviderDetailPage({ params }) {
           📞 {provider.phone}
         </a>
       </div>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'LocalBusiness',
+            name: provider.name,
+            areaServed: provider.area,
+            telephone: provider.phone,
+            description: provider.description,
+          }),
+        }}
+      />
     </main>
   );
 }
