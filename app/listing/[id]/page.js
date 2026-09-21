@@ -64,9 +64,11 @@ export default async function ListingDetailPage({ params }) {
           </div>
         )}
         <h1 className="text-xl font-semibold">{listing.title}</h1>
-        <p className="text-ink/60 mt-1">{listing.categories?.name} · {listing.area}</p>
-        <p className="text-green font-semibold text-lg mt-2">{listing.price_or_salary}</p>
-
+          <p className="text-ink/60 mt-1">{listing.categories?.name} · {listing.area}</p>
+          <p className="text-green font-semibold text-lg mt-2">{listing.price_or_salary}</p>
+          <div className="mt-2">
+            <ReportButton targetType="listing" targetId={listing.id} />
+          </div>
         <div className="mt-6 pt-6 border-t border-ink/10">
           <h2 className="font-medium mb-2">বিবরণ</h2>
           <p className="text-ink/70 text-sm">{listing.description || 'কোনো বিবরণ দেওয়া হয়নি।'}</p>
