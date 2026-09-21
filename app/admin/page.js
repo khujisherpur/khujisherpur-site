@@ -8,6 +8,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [providers, setProviders] = useState([]);
   const [listings, setListings] = useState([]);
+  const [reports, setReports] = useState([]);
 
   useEffect(() => {
     init();
@@ -31,6 +32,7 @@ export default function AdminPage() {
 
     if (profile?.role === 'admin' || profile?.role === 'moderator') {
       await loadPending();
+      await loadReports();
     }
     setLoading(false);
   }
@@ -47,6 +49,15 @@ export default function AdminPage() {
       .select('id, title, area, price_or_salary, description, status, categories(name)')
       .eq('status', 'pending');
     setListings(l || []);
+  }
+
+  async function loadReports() {
+    const { data } = await supabase
+      .from('reports')
+      .select('id, target_type, target_id, reason, status, created_at, users(name)')
+      .eq('status', 'open')
+      .order('created_at', { ascending: false });
+    setReports(data || []);
   }
 
   async function approveProvider(id) {
@@ -67,6 +78,11 @@ export default function AdminPage() {
   async function rejectListing(id) {
     await supabase.from('listings').update({ status: 'rejected' }).eq('id', id);
     loadPending();
+  }
+
+  async function resolveReport(id, status) {
+    await supabase.from('reports').update({ status }).eq('id', id);
+    loadReports();
   }
 
   if (loading) return <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>;
@@ -95,6 +111,50 @@ export default function AdminPage() {
         <span className="text-sm bg-green text-white px-3 py-1 rounded-full">{role}</span>
       </header>
 
+      {/* রিপোর্ট সেকশন */}
+      <section className="mb-10">
+        <h1 className="text-2xl font-semibold mb-6">রিপোর্ট ({reports.length})</h1>
+        {reports.length === 0 && <p className="text-ink/50 text-sm">কোনো নতুন রিপোর্ট নেই।</p>}
+        <div className="space-y-3">
+          {reports.map((r) => (
+            <div key={r.id} className="bg-white border border-red-200 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">
+                  {r.target_type === 'provider' ? 'প্রোভাইডার' : 'লিস্টিং'}
+                </span>
+                <a
+                  href={`/${r.target_type}/${r.target_id}`}
+                  target="_blank"
+                  className="text-xs text-green underline"
+                >
+                  পেজ দেখুন →
+                </a>
+              </div>
+              <p className="text-sm mt-2">{r.reason}</p>
+              <p className="text-xs text-ink/40 mt-1">
+                রিপোর্টকারী: {r.users?.name || 'অজানা'} ·{' '}
+                {new Date(r.created_at).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
+              </p>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => resolveReport(r.id, 'reviewed')}
+                  className="bg-green text-white text-sm px-4 py-1.5"
+                >
+                  পর্যালোচনা সম্পন্ন
+                </button>
+                <button
+                  onClick={() => resolveReport(r.id, 'dismissed')}
+                  className="border border-ink/20 text-sm px-4 py-1.5"
+                >
+                  বাতিল করুন
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* অপেক্ষমান অনুমোদন */}
       <h1 className="text-2xl font-semibold mb-6">অপেক্ষমান অনুমোদন</h1>
 
       <section className="mb-10">
