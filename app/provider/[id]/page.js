@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import PhotoLightbox from '../../../components/PhotoLightbox';
 import ReviewSection from '../../../components/ReviewSection';
 import ReportButton from '../../../components/ReportButton';
+import FavoriteButton from '../../../components/FavoriteButton';
 
 export async function generateMetadata({ params }) {
   const { data: provider } = await supabase
