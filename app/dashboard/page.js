@@ -169,6 +169,7 @@ export default function DashboardPage() {
       <header className="flex items-center justify-between mb-8">
         <a href="/"><img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-9 w-auto" /></a>
         <div className="flex items-center gap-3">
+          <NotificationBell userId={user.id} />
           <div className="flex border border-ink/20 rounded-full overflow-hidden text-sm">
             <button
               onClick={() => setLang('bn')}
