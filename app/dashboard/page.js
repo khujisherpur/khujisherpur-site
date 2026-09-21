@@ -190,8 +190,12 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <h1 className="text-2xl font-semibold mb-1">{t.myPosts}</h1>
+<h1 className="text-2xl font-semibold mb-1">{t.myPosts}</h1>
       <p className="text-ink/60 text-sm mb-8">{user.email}</p>
+
+      <a href="/dashboard/favorites" className="inline-block mb-8 text-sm text-green underline">
+        ❤️ আমার ফেভারিট দেখুন
+      </a>
 
       {/* প্রোভাইডার প্রোফাইল */}
       <section className="mb-10">
