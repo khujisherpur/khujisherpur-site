@@ -1,6 +1,8 @@
 export const runtime = 'edge';
 import { supabase } from '../../../lib/supabaseClient';
 import PhotoLightbox from '../../../components/PhotoLightbox';
+import ReviewSection from '../../../components/ReviewSection';
+import ReportButton from '../../../components/ReportButton';
 
 export async function generateMetadata({ params }) {
   const { data: provider } = await supabase
@@ -55,11 +57,9 @@ export default async function ProviderDetailPage({ params }) {
       </a>
 
       <div className="bg-white border border-ink/10 mt-4 overflow-hidden">
-        {/* কভার-স্টাইল ব্যাকগ্রাউন্ড, উপরে */}
         <div className="h-20 bg-green/10" />
 
         <div className="px-6 pb-6">
-          {/* প্রোফাইল ছবি — কভারের উপরে ওভারল্যাপ করে বসানো, ঠিক Facebook-এর মতো */}
           <div className="-mt-12 flex justify-center">
             {provider.photo_url ? (
               <div className="rounded-full border-4 border-white">
@@ -72,7 +72,6 @@ export default async function ProviderDetailPage({ params }) {
             )}
           </div>
 
-          {/* নাম ও ট্যাগলাইন */}
           <div className="text-center mt-3">
             <h1 className="text-2xl font-semibold">{provider.name}</h1>
             <p className="text-ink/60 mt-1">{provider.categories?.name} · {provider.area}</p>
@@ -81,9 +80,11 @@ export default async function ProviderDetailPage({ params }) {
                 এই মুহূর্তে অনুপলব্ধ
               </span>
             )}
+            <div className="mt-2">
+              <ReportButton targetType="provider" targetId={provider.id} />
+            </div>
           </div>
 
-          {/* বায়ো / বিবরণ */}
           <div className="mt-6 pt-6 border-t border-ink/10">
             <h2 className="font-medium mb-2 text-sm text-ink/50 uppercase tracking-wide">সম্পর্কে</h2>
             <p className="text-ink/80 text-sm leading-relaxed">
@@ -91,13 +92,14 @@ export default async function ProviderDetailPage({ params }) {
             </p>
           </div>
 
-          {/* যোগাযোগ */}
           <a
             href={`tel:${provider.phone}`}
             className="block text-center mt-6 bg-marigold text-ink font-semibold py-2.5 hover:bg-marigold/90 transition-colors"
           >
             📞 {provider.phone}
           </a>
+
+          <ReviewSection providerId={provider.id} />
         </div>
       </div>
 
