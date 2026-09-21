@@ -1,5 +1,7 @@
 export const runtime = 'edge';
 import { supabase } from '../../../lib/supabaseClient';
+import PhotoLightbox from '../../../components/PhotoLightbox';
+import ReportButton from '../../../components/ReportButton';
 
 export async function generateMetadata({ params }) {
   const { data: listing } = await supabase
