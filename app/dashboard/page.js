@@ -251,10 +251,18 @@ export default function DashboardPage() {
                   {t.status[l.status]}
                 </span>
               </div>
-              <div className="flex gap-2 mt-3">
+              <div className="flex gap-2 mt-3 flex-wrap">
                 <a href={`/dashboard/listing/${l.id}`} className="text-sm border border-ink/20 px-3 py-1.5 hover:bg-paper">
                   {t.edit}
                 </a>
+                {l.status === 'expired' && (
+                  <button
+                    onClick={() => renewListing(l.id)}
+                    className="text-sm bg-green text-white px-3 py-1.5 hover:bg-green-dark"
+                  >
+                    {lang === 'bn' ? 'রিনিউ করুন (৩০ দিন)' : 'Renew (30 days)'}
+                  </button>
+                )}
                 <button
                   onClick={() => deleteListing(l.id, l.photos)}
                   className="text-sm border border-red-300 text-red-600 px-3 py-1.5 hover:bg-red-50"
