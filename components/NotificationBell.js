@@ -5,20 +5,31 @@ import { supabase } from '../lib/supabaseClient';
 export default function NotificationBell({ userId }) {
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
-  const menuRef = useRef(null);
+  const [panelStyle, setPanelStyle] = useState({});
+  const buttonRef = useRef(null);
+  const panelRef = useRef(null);
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 30000); // প্রতি ৩০ সেকেন্ডে রিফ্রেশ
+    const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
   }, [userId]);
 
   useEffect(() => {
     function handleClickOutside(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
+      if (
+        panelRef.current && !panelRef.current.contains(e.target) &&
+        buttonRef.current && !buttonRef.current.contains(e.target)
+      ) {
+        setOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   async function load() {
@@ -43,13 +54,35 @@ export default function NotificationBell({ userId }) {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   }
 
+  function toggleOpen() {
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const panelWidth = 288; // w-72
+      const margin = 12;
+      let right = window.innerWidth - rect.right;
+      // ডান দিকে জায়গা না থাকলে স্ক্রিনের ভেতরে থাকা নিশ্চিত করা
+      if (right + panelWidth > window.innerWidth - margin) {
+        right = margin;
+      }
+      setPanelStyle({
+        position: 'fixed',
+        top: rect.bottom + 8,
+        right,
+        width: panelWidth,
+        maxWidth: `calc(100vw - ${margin * 2}px)`,
+      });
+    }
+    setOpen((o) => !o);
+  }
+
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
-    <div className="relative" ref={menuRef}>
+    <>
       <button
-        onClick={() => setOpen((o) => !o)}
-        className="relative text-xl border border-ink/20 rounded-full w-9 h-9 flex items-center justify-center hover:bg-paper"
+        ref={buttonRef}
+        onClick={toggleOpen}
+        className="relative text-xl border border-ink/20 rounded-full w-9 h-9 flex items-center justify-center hover:bg-paper flex-shrink-0"
       >
         🔔
         {unreadCount > 0 && (
@@ -60,7 +93,11 @@ export default function NotificationBell({ userId }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-72 bg-white border border-ink/10 shadow-lg z-50 max-h-96 overflow-y-auto">
+        <div
+          ref={panelRef}
+          style={panelStyle}
+          className="bg-white border border-ink/10 shadow-lg z-50 max-h-96 overflow-y-auto"
+        >
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-ink/10">
             <span className="text-sm font-medium">নোটিফিকেশন</span>
             {unreadCount > 0 && (
@@ -91,6 +128,6 @@ export default function NotificationBell({ userId }) {
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }
