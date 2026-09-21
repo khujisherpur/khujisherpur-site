@@ -34,6 +34,7 @@ export default async function CategoryPage({ params }) {
       .select('id, title, area, price_or_salary')
       .eq('category_id', category.id)
       .eq('status', 'active')
+      .gt('expiry_date', new Date().toISOString())
       .order('posted_at', { ascending: false });
     items = data || [];
   }
