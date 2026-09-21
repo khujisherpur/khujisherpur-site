@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { supabase } from '../../../lib/supabaseClient';
 import PhotoLightbox from '../../../components/PhotoLightbox';
 import ReportButton from '../../../components/ReportButton';
+import FavoriteButton from '../../../components/FavoriteButton';
 
 export async function generateMetadata({ params }) {
   const { data: listing } = await supabase
@@ -66,7 +67,8 @@ export default async function ListingDetailPage({ params }) {
         <h1 className="text-xl font-semibold">{listing.title}</h1>
           <p className="text-ink/60 mt-1">{listing.categories?.name} · {listing.area}</p>
           <p className="text-green font-semibold text-lg mt-2">{listing.price_or_salary}</p>
-          <div className="mt-2">
+          <div className="mt-3 flex items-center gap-3">
+            <FavoriteButton targetType="listing" targetId={listing.id} />
             <ReportButton targetType="listing" targetId={listing.id} />
           </div>
         <div className="mt-6 pt-6 border-t border-ink/10">
