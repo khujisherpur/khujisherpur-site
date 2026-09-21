@@ -1,9 +1,13 @@
 export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
 import { supabase } from '../../../lib/supabaseClient';
 import PhotoLightbox from '../../../components/PhotoLightbox';
 import ReviewSection from '../../../components/ReviewSection';
 import ReportButton from '../../../components/ReportButton';
 import FavoriteButton from '../../../components/FavoriteButton';
+import LanguageToggle from '../../../components/LanguageToggle';
+import { getLang } from '../../../lib/getLang';
+import { categoryLabels } from '../../../lib/categoryLabels';
 
 export async function generateMetadata({ params }) {
   const { data: provider } = await supabase
@@ -29,10 +33,18 @@ export async function generateMetadata({ params }) {
   };
 }
 
+const text = {
+  bn: { login: 'লগইন', back: '← তালিকায় ফিরে যান', unavailable: 'এই মুহূর্তে অনুপলব্ধ', about: 'সম্পর্কে', noDesc: 'কোনো বিবরণ দেওয়া হয়নি।', notFound: 'এই প্রোফাইলটি খুঁজে পাওয়া যায়নি।', backHome: 'হোমপেজে ফিরে যান' },
+  en: { login: 'Login', back: '← Back to list', unavailable: 'Currently unavailable', about: 'About', noDesc: 'No description provided.', notFound: 'This profile was not found.', backHome: 'Back to Home' },
+};
+
 export default async function ProviderDetailPage({ params }) {
+  const lang = getLang();
+  const t = text[lang];
+
   const { data: provider } = await supabase
     .from('providers')
-    .select('id, name, area, phone, description, is_available, photo_url, categories(name, slug)')
+    .select('id, name, area, phone, description, is_available, photo_url, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'approved')
     .single();
@@ -40,21 +52,27 @@ export default async function ProviderDetailPage({ params }) {
   if (!provider) {
     return (
       <main className="max-w-2xl mx-auto px-4 py-20 text-center">
-        <p className="text-ink/70">এই প্রোফাইলটি খুঁজে পাওয়া যায়নি।</p>
-        <a href="/" className="text-green underline mt-2 inline-block">হোমপেজে ফিরে যান</a>
+        <p className="text-ink/70">{t.notFound}</p>
+        <a href="/" className="text-green underline mt-2 inline-block">{t.backHome}</a>
       </main>
     );
   }
 
+  const label = categoryLabels[provider.categories?.slug];
+  const categoryName = label ? label[lang].name : '';
+
   return (
     <main className="max-w-2xl mx-auto px-4">
-      <header className="flex items-center justify-between py-6">
+      <header className="flex items-center justify-between py-6 flex-wrap gap-3">
         <a href="/"><img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-10 w-auto" /></a>
-        <a href="/login" className="text-sm border border-ink/20 rounded-full px-4 py-1.5 hover:bg-white">লগইন</a>
+        <div className="flex items-center gap-2">
+          <LanguageToggle lang={lang} />
+          <a href="/login" className="text-sm border border-ink/20 rounded-full px-4 py-1.5 hover:bg-white">{t.login}</a>
+        </div>
       </header>
 
       <a href={`/category/${provider.categories?.slug}`} className="text-sm text-ink/50 hover:text-ink">
-        ← তালিকায় ফিরে যান
+        {t.back}
       </a>
 
       <div className="bg-white border border-ink/10 mt-4 overflow-hidden">
@@ -75,10 +93,10 @@ export default async function ProviderDetailPage({ params }) {
 
           <div className="text-center mt-3">
             <h1 className="text-2xl font-semibold">{provider.name}</h1>
-            <p className="text-ink/60 mt-1">{provider.categories?.name} · {provider.area}</p>
+            <p className="text-ink/60 mt-1">{categoryName} · {provider.area}</p>
             {!provider.is_available && (
               <span className="inline-block mt-2 text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-full">
-                এই মুহূর্তে অনুপলব্ধ
+                {t.unavailable}
               </span>
             )}
             <div className="mt-3 flex items-center justify-center gap-3">
@@ -88,9 +106,9 @@ export default async function ProviderDetailPage({ params }) {
           </div>
 
           <div className="mt-6 pt-6 border-t border-ink/10">
-            <h2 className="font-medium mb-2 text-sm text-ink/50 uppercase tracking-wide">সম্পর্কে</h2>
+            <h2 className="font-medium mb-2 text-sm text-ink/50 uppercase tracking-wide">{t.about}</h2>
             <p className="text-ink/80 text-sm leading-relaxed">
-              {provider.description || 'কোনো বিবরণ দেওয়া হয়নি।'}
+              {provider.description || t.noDesc}
             </p>
           </div>
 
