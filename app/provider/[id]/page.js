@@ -81,7 +81,8 @@ export default async function ProviderDetailPage({ params }) {
                 এই মুহূর্তে অনুপলব্ধ
               </span>
             )}
-            <div className="mt-2">
+            <div className="mt-3 flex items-center justify-center gap-3">
+              <FavoriteButton targetType="provider" targetId={provider.id} />
               <ReportButton targetType="provider" targetId={provider.id} />
             </div>
           </div>
