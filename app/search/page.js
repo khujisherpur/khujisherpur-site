@@ -26,6 +26,7 @@ export default async function SearchPage({ searchParams }) {
       .from('listings')
       .select('id, title, area, price_or_salary, categories(name, slug)')
       .eq('status', 'active')
+      .gt('expiry_date', new Date().toISOString())
       .or(`title.ilike.%${query}%,area.ilike.%${query}%${categoryFilter}`);
     listings = l || [];
   }
