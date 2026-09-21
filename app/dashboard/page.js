@@ -137,6 +137,16 @@ export default function DashboardPage() {
     loadMyPosts(user.id);
   }
 
+  async function renewListing(id) {
+    const newExpiry = new Date();
+    newExpiry.setDate(newExpiry.getDate() + 30);
+    await supabase
+      .from('listings')
+      .update({ status: 'active', expiry_date: newExpiry.toISOString() })
+      .eq('id', id);
+    loadMyPosts(user.id);
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut();
     window.location.href = '/';
