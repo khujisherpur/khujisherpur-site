@@ -265,6 +265,9 @@ export default async function HomePage() {
           </a>
         </footer>
       </main>
+
+      <BottomNav activeTab="home" />
+      <div className="h-16 md:hidden" /> {/* বটম নেভের জন্য জায়গা রাখা */}
     </div>
   );
 }
