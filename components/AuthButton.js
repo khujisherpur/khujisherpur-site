@@ -7,7 +7,8 @@ const text = {
   en: { login: 'Login', logout: 'Logout', dashboard: 'Dashboard', favorites: 'My Favorites' },
 };
 
-export default function AuthButton({ lang = 'bn' }) {
+export default function AuthButton({ lang = 'bn', variant = 'default' }) {
+  const isLight = variant === 'light';
   const [user, setUser] = useState(null);
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -78,14 +79,18 @@ export default function AuthButton({ lang = 'bn' }) {
   }
 
   if (loading) {
-    return <div className="w-9 h-9 rounded-full bg-ink/5" />;
+    return <div className={`w-9 h-9 rounded-full ${isLight ? 'bg-white/10' : 'bg-ink/5'}`} />;
   }
 
   if (!user) {
     return (
       <a
         href="/login"
-        className="text-sm border border-ink/20 rounded-full px-4 py-1.5 hover:bg-paper transition-colors"
+        className={`text-sm rounded-full px-4 py-1.5 transition-colors border ${
+          isLight
+            ? 'border-white/40 text-white hover:bg-white/10'
+            : 'border-ink/20 hover:bg-paper'
+        }`}
       >
         {t.login}
       </a>
@@ -99,33 +104,39 @@ export default function AuthButton({ lang = 'bn' }) {
       <button
         ref={buttonRef}
         onClick={toggleOpen}
-        className="flex items-center gap-2 border border-ink/20 rounded-full pl-1 pr-3 py-1 hover:bg-paper transition-colors"
+        className="flex flex-col items-center gap-0.5 px-1"
       >
-        <span className="w-7 h-7 rounded-full bg-green text-white text-sm flex items-center justify-center flex-shrink-0">
+        <span className={`w-8 h-8 rounded-full text-sm flex items-center justify-center flex-shrink-0 ${
+          isLight ? 'bg-white text-green font-semibold' : 'bg-green text-white'
+        }`}>
           {initial}
         </span>
-        <span className="text-sm font-medium max-w-[100px] truncate">{name || user.email}</span>
+        <span className={`text-[10px] font-medium max-w-[64px] truncate leading-none ${
+          isLight ? 'text-white/90' : 'text-ink/70'
+        }`}>
+          {name || user.email}
+        </span>
       </button>
 
       {open && (
         <div
           ref={panelRef}
           style={panelStyle}
-          className="bg-white border border-ink/10 shadow-lg z-50 overflow-hidden"
+          className="bg-white border border-ink/10 shadow-lg z-50 overflow-hidden rounded-md"
         >
           <div className="px-4 py-3 border-b border-ink/10">
-            <p className="text-sm font-medium truncate">{name}</p>
+            <p className="text-sm font-medium truncate text-ink">{name}</p>
             <p className="text-xs text-ink/50 truncate">{user.email}</p>
           </div>
           <a
             href="/dashboard"
-            className="block px-4 py-2.5 text-sm hover:bg-paper transition-colors"
+            className="block px-4 py-2.5 text-sm text-ink hover:bg-paper transition-colors"
           >
             {t.dashboard}
           </a>
           <a
             href="/dashboard/favorites"
-            className="block px-4 py-2.5 text-sm hover:bg-paper transition-colors"
+            className="block px-4 py-2.5 text-sm text-ink hover:bg-paper transition-colors"
           >
             ❤️ {t.favorites}
           </a>
