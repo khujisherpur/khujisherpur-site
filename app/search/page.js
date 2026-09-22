@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { getLang } from '../../lib/getLang';
 import { categoryLabels } from '../../lib/categoryLabels';
 import LanguageToggle from '../../components/LanguageToggle';
+import BottomNav from '../../components/BottomNav';
 
 const text = {
   bn: {
