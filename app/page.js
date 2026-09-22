@@ -5,6 +5,7 @@ import { getLang } from '../lib/getLang';
 import { categoryLabels } from '../lib/categoryLabels';
 import LanguageToggle from '../components/LanguageToggle';
 import AuthButton from '../components/AuthButton';
+import BottomNav from '../components/BottomNav';
 
 const text = {
   bn: {
