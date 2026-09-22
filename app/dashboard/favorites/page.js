@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
-
+import BottomNav from '../../../components/BottomNav';
 export default function FavoritesPage() {
   const [user, setUser] = useState(null);
   const [providers, setProviders] = useState([]);
@@ -100,6 +100,9 @@ export default function FavoritesPage() {
           </div>
         </section>
       )}
+
+      <BottomNav activeTab="favorites" />
+      <div className="h-16" />
     </main>
   );
 }
