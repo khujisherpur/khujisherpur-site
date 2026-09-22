@@ -4,22 +4,18 @@ import { supabase } from '../lib/supabaseClient';
 import { getLang } from '../lib/getLang';
 import { categoryLabels } from '../lib/categoryLabels';
 import LanguageToggle from '../components/LanguageToggle';
+import AuthButton from '../components/AuthButton';
 
 const text = {
   bn: {
-    login: 'লগইন',
-    postAd: '+ পোস্ট দিন',
     heroTitle: 'শেরপুরে যা খুঁজছেন, এক জায়গায় খুঁজে নিন',
     heroSub: 'বাসা ভাড়া, চাকরি, নাকি বিশ্বস্ত মিস্ত্রি — যা দরকার সবই পাবেন এখানে।',
     searchPlaceholder: 'যেমন: বাসা ভাড়া, ইলেকট্রিশিয়ান...',
     searchButton: 'খুঁজুন',
     liveStats: (n) => `শেরপুরে এখন ${n}টি সক্রিয় পোস্ট ও প্রোফাইল`,
     whatLooking: 'কী খুঁজছেন?',
-    listingsCount: (n) => `${n}টি পোস্ট`,
-    providersCount: (n) => `${n}জন প্রোভাইডার`,
+    postAd: '+ পোস্ট দিন',
     recentTitle: 'সাম্প্রতিক পোস্ট',
-    recentEmpty: 'এখনো কোনো পোস্ট নেই — প্রথম পোস্টটি আপনিই দিন!',
-    viewAll: 'সব দেখুন →',
     howTitle: 'কীভাবে কাজ করে',
     step1Title: 'খুঁজুন', step1Desc: 'ক্যাটাগরি বা সার্চ দিয়ে যা দরকার তা খুঁজে বের করুন',
     step2Title: 'যোগাযোগ করুন', step2Desc: 'সরাসরি ফোনে কল করে কথা বলুন',
@@ -29,19 +25,14 @@ const text = {
     justNow: 'এইমাত্র', minutesAgo: (n) => `${n} মিনিট আগে`, hoursAgo: (n) => `${n} ঘণ্টা আগে`, daysAgo: (n) => `${n} দিন আগে`,
   },
   en: {
-    login: 'Login',
-    postAd: '+ Post Ad',
     heroTitle: 'Find what you\u2019re looking for in Sherpur, all in one place',
     heroSub: 'House rent, jobs, or a trusted repairman — get everything you need here.',
     searchPlaceholder: 'e.g. house rent, electrician...',
     searchButton: 'Search',
     liveStats: (n) => `${n} active posts & profiles in Sherpur right now`,
     whatLooking: 'What are you looking for?',
-    listingsCount: (n) => `${n} posts`,
-    providersCount: (n) => `${n} providers`,
+    postAd: '+ Post Ad',
     recentTitle: 'Recent Posts',
-    recentEmpty: 'No posts yet — be the first to post!',
-    viewAll: 'View all →',
     howTitle: 'How It Works',
     step1Title: 'Search', step1Desc: 'Use categories or search to find what you need',
     step2Title: 'Contact', step2Desc: 'Call directly and talk to them',
@@ -69,7 +60,6 @@ export default async function HomePage() {
   const { data: dbCategories } = await supabase.from('categories').select('id, slug, type');
   const categories = (dbCategories || []).filter((c) => categoryLabels[c.slug]);
 
-  // প্রতিটা ক্যাটাগরির লাইভ সংখ্যা প্যারালালভাবে গণনা
   const counts = await Promise.all(
     categories.map(async (c) => {
       const table = c.type === 'service' ? 'providers' : 'listings';
@@ -85,7 +75,6 @@ export default async function HomePage() {
   const countMap = Object.fromEntries(counts.map((c) => [c.slug, c.count]));
   const totalActive = counts.reduce((s, c) => s + c.count, 0);
 
-  // সাম্প্রতিক প্রোভাইডার ও লিস্টিং একসাথে টেনে মার্জ করা
   const [{ data: recentProviders }, { data: recentListings }] = await Promise.all([
     supabase
       .from('providers')
@@ -117,26 +106,15 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen">
-      {/* Sticky Header */}
-      <header className="sticky top-0 z-40 bg-paper/95 backdrop-blur border-b border-ink/10">
+      {/* Sticky Header — সাদা, স্পষ্ট কন্ট্রাস্ট */}
+      <header className="sticky top-0 z-40 bg-white shadow-sm border-b border-ink/10">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <a href="/" className="flex items-center">
             <img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-9 w-auto" />
           </a>
           <div className="flex items-center gap-2">
             <LanguageToggle lang={lang} />
-            <a
-              href="#categories"
-              className="text-sm bg-marigold text-ink font-semibold rounded-full px-4 py-1.5 hover:bg-marigold/90 transition-colors"
-            >
-              {t.postAd}
-            </a>
-            <a
-              href="/login"
-              className="text-sm border border-ink/20 rounded-full px-4 py-1.5 hover:bg-white transition-colors"
-            >
-              {t.login}
-            </a>
+            <AuthButton lang={lang} />
           </div>
         </div>
       </header>
@@ -174,7 +152,15 @@ export default async function HomePage() {
 
         {/* Categories */}
         <section id="categories" className="pb-16 scroll-mt-20">
-          <h2 className="text-xl font-semibold mb-4">{t.whatLooking}</h2>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h2 className="text-xl font-semibold">{t.whatLooking}</h2>
+            <a
+              href="#categories"
+              className="text-sm bg-marigold text-ink font-semibold rounded-full px-4 py-1.5 hover:bg-marigold/90 transition-colors"
+            >
+              {t.postAd}
+            </a>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             {categories.map((c) => {
               const label = categoryLabels[c.slug];
@@ -208,9 +194,7 @@ export default async function HomePage() {
         {/* Recent Posts */}
         {recentItems.length > 0 && (
           <section className="pb-16">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">{t.recentTitle}</h2>
-            </div>
+            <h2 className="text-xl font-semibold mb-4">{t.recentTitle}</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {recentItems.map((item) => {
                 const label = categoryLabels[item.slug];
