@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { supabase } from '../../lib/supabaseClient';
 import NotificationBell from '../../components/NotificationBell';
 import BottomNav from '../../components/BottomNav';
 
