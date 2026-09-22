@@ -122,6 +122,9 @@ export default async function SearchPage({ searchParams }) {
           );
         })}
       </section>
+
+      <BottomNav activeTab="search" />
+      <div className="h-16 md:hidden" />
     </main>
   );
 }
