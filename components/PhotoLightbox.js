@@ -1,8 +1,9 @@
 'use client';
 import { useState } from 'react';
 
-export default function PhotoLightbox({ src, alt, size = 'w-28 h-28' }) {
+export default function PhotoLightbox({ src, alt, size = 'w-28 h-28', rounded = true }) {
   const [open, setOpen] = useState(false);
+  const shapeClass = rounded ? 'rounded-full' : '';
 
   return (
     <>
@@ -10,7 +11,7 @@ export default function PhotoLightbox({ src, alt, size = 'w-28 h-28' }) {
         src={src}
         alt={alt}
         onClick={() => setOpen(true)}
-        className={`${size} rounded-full object-cover cursor-pointer`}
+        className={`${size} ${shapeClass} object-cover cursor-pointer`}
       />
 
       {open && (
