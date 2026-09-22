@@ -1,7 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../../lib/supabaseClient';
 import NotificationBell from '../../components/NotificationBell';
+import BottomNav from '../../components/BottomNav';
 
 const text = {
   bn: {
@@ -278,8 +280,11 @@ export default function DashboardPage() {
               </div>
             </div>
           ))}
-        </div>
+      </div>
       </section>
+
+      <BottomNav activeTab="account" />
+      <div className="h-16" />
     </main>
   );
 }
