@@ -34,8 +34,8 @@ export async function generateMetadata({ params }) {
 }
 
 const text = {
-  bn: { login: 'লগইন', back: '← তালিকায় ফিরে যান', unavailable: 'এই মুহূর্তে অনুপলব্ধ', about: 'সম্পর্কে', noDesc: 'কোনো বিবরণ দেওয়া হয়নি।', notFound: 'এই প্রোফাইলটি খুঁজে পাওয়া যায়নি।', backHome: 'হোমপেজে ফিরে যান' },
-  en: { login: 'Login', back: '← Back to list', unavailable: 'Currently unavailable', about: 'About', noDesc: 'No description provided.', notFound: 'This profile was not found.', backHome: 'Back to Home' },
+  bn: { login: 'লগইন', back: '← তালিকায় ফিরে যান', unavailable: 'এই মুহূর্তে অনুপলব্ধ', about: 'সম্পর্কে', noDesc: 'কোনো বিবরণ দেওয়া হয়নি।', notFound: 'এই প্রোফাইলটি খুঁজে পাওয়া যায়নি।', backHome: 'হোমপেজে ফিরে যান', verified: 'যাচাইকৃত', experience: 'বছরের অভিজ্ঞতা' },
+  en: { login: 'Login', back: '← Back to list', unavailable: 'Currently unavailable', about: 'About', noDesc: 'No description provided.', notFound: 'This profile was not found.', backHome: 'Back to Home', verified: 'Verified', experience: 'years experience' },
 };
 
 export default async function ProviderDetailPage({ params }) {
@@ -44,7 +44,7 @@ export default async function ProviderDetailPage({ params }) {
 
   const { data: provider } = await supabase
     .from('providers')
-    .select('id, name, area, phone, description, is_available, photo_url, vehicle_type, categories(slug)')
+    .select('id, user_id, name, area, phone, description, is_available, photo_url, vehicle_type, experience_years, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'approved')
     .single();
@@ -57,6 +57,9 @@ export default async function ProviderDetailPage({ params }) {
       </main>
     );
   }
+
+  // ভিউ কাউন্ট বাড়ানো (নিরাপদে, ব্লক না করে)
+  await supabase.rpc('increment_provider_view', { pid: provider.id });
 
   const label = categoryLabels[provider.categories?.slug];
   const categoryName = label ? label[lang].name : '';
@@ -92,13 +95,21 @@ export default async function ProviderDetailPage({ params }) {
           </div>
 
           <div className="text-center mt-3">
-            <h1 className="text-2xl font-semibold">{provider.name}</h1>
+            <div className="flex items-center justify-center gap-1.5">
+              <h1 className="text-2xl font-semibold">{provider.name}</h1>
+              <span className="text-blue-500 text-lg" title={t.verified}>✓</span>
+            </div>
             <p className="text-ink/60 mt-1">{categoryName} · {provider.area}</p>
-            {provider.categories?.slug === 'ambulance' && provider.vehicle_type && (
-              <p className="text-sm text-ink/50 mt-1">
-                🚑 {provider.vehicle_type === 'ac' ? 'AC' : 'Non-AC'}
-              </p>
-            )}
+
+            <div className="flex items-center justify-center gap-2 mt-1 flex-wrap text-sm text-ink/50">
+              {provider.experience_years && (
+                <span>{provider.experience_years} {t.experience}</span>
+              )}
+              {provider.categories?.slug === 'ambulance' && provider.vehicle_type && (
+                <span>🚑 {provider.vehicle_type === 'ac' ? 'AC' : 'Non-AC'}</span>
+              )}
+            </div>
+
             {!provider.is_available && (
               <span className="inline-block mt-2 text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-full">
                 {t.unavailable}
@@ -121,10 +132,10 @@ export default async function ProviderDetailPage({ params }) {
             href={`tel:${provider.phone}`}
             className="block text-center mt-6 bg-marigold text-ink font-semibold py-2.5 hover:bg-marigold/90 transition-colors"
           >
-            📞 {provider.phone}
+            📞 <span className="font-numeric">{provider.phone}</span>
           </a>
 
-          <ReviewSection providerId={provider.id} />
+          <ReviewSection providerId={provider.id} ownerId={provider.user_id} />
         </div>
       </div>
 
