@@ -12,6 +12,7 @@ const text = {
     noProvider: 'এখনো কোনো প্রোভাইডার নেই। প্রথম হিসেবে আপনি যোগ করতে পারেন!',
     noListing: 'এখনো কোনো পোস্ট নেই। প্রথম হিসেবে আপনি যোগ করতে পারেন!',
     unavailable: 'এই মুহূর্তে অনুপলব্ধ', notFound: 'এই ক্যাটাগরি খুঁজে পাওয়া যায়নি।', backHome: 'হোমপেজে ফিরে যান',
+    all: 'সব', house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য',
   },
   en: {
     login: 'Login', home: '← Home',
@@ -19,13 +20,17 @@ const text = {
     noProvider: 'No providers yet. Be the first to add one!',
     noListing: 'No posts yet. Be the first to add one!',
     unavailable: 'Currently unavailable', notFound: 'Category not found.', backHome: 'Back to Home',
+    all: 'All', house: 'House', shop: 'Shop', mess: 'Mess', other: 'Other',
   },
 };
 
-export default async function CategoryPage({ params }) {
+const rentTypeTabs = ['house', 'shop', 'mess', 'other'];
+
+export default async function CategoryPage({ params, searchParams }) {
   const lang = getLang();
   const t = text[lang];
   const label = categoryLabels[params.slug];
+  const activeRentType = searchParams?.type || 'all';
 
   const { data: category } = await supabase
     .from('categories')
@@ -43,6 +48,7 @@ export default async function CategoryPage({ params }) {
   }
 
   const isService = category.type === 'service';
+  const isRent = category.slug === 'rent';
   const name = label[lang].name;
 
   let items = [];
@@ -55,13 +61,18 @@ export default async function CategoryPage({ params }) {
       .order('created_at', { ascending: false });
     items = data || [];
   } else {
-    const { data } = await supabase
+    let query = supabase
       .from('listings')
-      .select('id, title, area, price_or_salary')
+      .select('id, title, area, price_or_salary, rent_type')
       .eq('category_id', category.id)
       .eq('status', 'active')
-      .gt('expiry_date', new Date().toISOString())
-      .order('posted_at', { ascending: false });
+      .gt('expiry_date', new Date().toISOString());
+
+    if (isRent && activeRentType !== 'all') {
+      query = query.eq('rent_type', activeRentType);
+    }
+
+    const { data } = await query.order('posted_at', { ascending: false });
     items = data || [];
   }
 
@@ -93,6 +104,30 @@ export default async function CategoryPage({ params }) {
         </a>
       </div>
 
+      {isRent && (
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+          <a
+            href={`/category/rent`}
+            className={`text-sm px-4 py-1.5 rounded-full whitespace-nowrap flex-shrink-0 ${
+              activeRentType === 'all' ? 'bg-green text-white' : 'bg-white border border-ink/15 text-ink/60'
+            }`}
+          >
+            {t.all}
+          </a>
+          {rentTypeTabs.map((rt) => (
+            <a
+              key={rt}
+              href={`/category/rent?type=${rt}`}
+              className={`text-sm px-4 py-1.5 rounded-full whitespace-nowrap flex-shrink-0 ${
+                activeRentType === rt ? 'bg-green text-white' : 'bg-white border border-ink/15 text-ink/60'
+              }`}
+            >
+              {t[rt]}
+            </a>
+          ))}
+        </div>
+      )}
+
       <section className="pb-16 space-y-3">
         {items.length === 0 && (
           <p className="text-ink/50 text-sm py-10 text-center">
@@ -109,6 +144,11 @@ export default async function CategoryPage({ params }) {
             ))
           : items.map((l) => (
               <a key={l.id} href={`/listing/${l.id}`} className="block bg-white p-4 border border-ink/10 hover:border-green transition-colors">
+                {isRent && l.rent_type && (
+                  <span className="inline-block text-[10px] bg-paper text-ink/50 px-2 py-0.5 rounded-full mb-1.5">
+                    {t[l.rent_type] || l.rent_type}
+                  </span>
+                )}
                 <p className="font-medium">{l.title}</p>
                 <p className="text-sm text-ink/60 mt-1">{l.area}</p>
                 <p className="text-sm text-green font-medium mt-1">{l.price_or_salary}</p>
