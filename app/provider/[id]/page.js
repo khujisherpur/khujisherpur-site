@@ -44,7 +44,7 @@ export default async function ProviderDetailPage({ params }) {
 
   const { data: provider } = await supabase
     .from('providers')
-    .select('id, name, area, phone, description, is_available, photo_url, categories(slug)')
+    .select('id, name, area, phone, description, is_available, photo_url, vehicle_type, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'approved')
     .single();
@@ -94,6 +94,11 @@ export default async function ProviderDetailPage({ params }) {
           <div className="text-center mt-3">
             <h1 className="text-2xl font-semibold">{provider.name}</h1>
             <p className="text-ink/60 mt-1">{categoryName} · {provider.area}</p>
+            {provider.categories?.slug === 'ambulance' && provider.vehicle_type && (
+              <p className="text-sm text-ink/50 mt-1">
+                🚑 {provider.vehicle_type === 'ac' ? 'AC' : 'Non-AC'}
+              </p>
+            )}
             {!provider.is_available && (
               <span className="inline-block mt-2 text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-full">
                 {t.unavailable}
