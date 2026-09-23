@@ -194,9 +194,14 @@ export default function DashboardPage() {
 <h1 className="text-2xl font-semibold mb-1">{t.myPosts}</h1>
       <p className="text-ink/60 text-sm mb-8">{user.email}</p>
 
-      <a href="/dashboard/favorites" className="inline-block mb-8 text-sm text-green underline">
-        ❤️ আমার ফেভারিট দেখুন
-      </a>
+      <div className="flex gap-4 mb-8">
+        <a href="/dashboard/favorites" className="text-sm text-green underline">
+          ❤️ আমার ফেভারিট দেখুন
+        </a>
+        <a href="/dashboard/donor" className="text-sm text-red-500 underline">
+          🩸 ডোনার ড্যাশবোর্ড
+        </a>
+      </div>
 
       {/* প্রোভাইডার প্রোফাইল */}
       <section className="mb-10">
