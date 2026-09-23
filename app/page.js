@@ -54,15 +54,26 @@ function timeAgo(dateStr, t) {
   return t.daysAgo(Math.floor(hours / 24));
 }
 
+function categoryHref(cat) {
+  if (cat.type === 'external') return cat.external_url;
+  if (cat.type === 'blood') return '/blood';
+  if (cat.type === 'info') return '/emergency';
+  return `/category/${cat.slug}`;
+}
+
 export default async function HomePage() {
   const lang = getLang();
   const t = text[lang];
 
-  const { data: dbCategories } = await supabase.from('categories').select('id, slug, type');
+  const { data: dbCategories } = await supabase
+    .from('categories')
+    .select('id, slug, type, external_url');
   const categories = (dbCategories || []).filter((c) => categoryLabels[c.slug]);
 
+  // শুধু service/listing টাইপের জন্য কাউন্ট গণনা করা
+  const countable = categories.filter((c) => c.type === 'service' || c.type === 'listing');
   const counts = await Promise.all(
-    categories.map(async (c) => {
+    countable.map(async (c) => {
       const table = c.type === 'service' ? 'providers' : 'listings';
       const statusValue = c.type === 'service' ? 'approved' : 'active';
       const { count } = await supabase
@@ -107,7 +118,6 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen">
-      {/* Sticky Header — সবুজ গ্রাডিয়েন্ট, প্রফেশনাল লুক */}
       <header className="sticky top-0 z-40 bg-gradient-to-r from-green-dark to-green shadow-md">
         <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
           <a href="/" className="flex items-center bg-white rounded-md px-2.5 py-1.5 flex-shrink-0">
@@ -121,7 +131,6 @@ export default async function HomePage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4">
-        {/* Hero */}
         <section className="py-10 md:py-16">
           <h1 className="text-3xl md:text-5xl font-semibold leading-tight text-ink max-w-xl">
             {t.heroTitle}
@@ -151,7 +160,6 @@ export default async function HomePage() {
           )}
         </section>
 
-        {/* Categories */}
         <section id="categories" className="pb-16 scroll-mt-20">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <h2 className="text-xl font-semibold">{t.whatLooking}</h2>
@@ -162,17 +170,18 @@ export default async function HomePage() {
               {t.postAd}
             </a>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {categories.map((c) => {
               const label = categoryLabels[c.slug];
               const count = countMap[c.slug] || 0;
+              const isExternal = c.type === 'external';
               return (
                 <a
                   key={c.slug}
-                  href={`/category/${c.slug}`}
-                  className={`group block bg-white p-4 border-l-4 hover:shadow-md transition-shadow ${
-                    c.type === 'service' ? 'border-green' : 'border-marigold'
-                  }`}
+                  href={categoryHref(c)}
+                  target={isExternal ? '_blank' : undefined}
+                  rel={isExternal ? 'noopener noreferrer' : undefined}
+                  className={`group block bg-white p-4 border-l-4 hover:shadow-md transition-shadow ${label.color}`}
                 >
                   <div className="flex items-start justify-between">
                     <span className="text-2xl">{label.icon}</span>
@@ -181,6 +190,7 @@ export default async function HomePage() {
                         {count}
                       </span>
                     )}
+                    {isExternal && <span className="text-xs text-ink/30">↗</span>}
                   </div>
                   <p className="font-medium mt-2 group-hover:text-green transition-colors">
                     {label[lang].name}
@@ -192,7 +202,6 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* Recent Posts */}
         {recentItems.length > 0 && (
           <section className="pb-16">
             <h2 className="text-xl font-semibold mb-4">{t.recentTitle}</h2>
@@ -229,7 +238,6 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* How It Works */}
         <section className="pb-16">
           <h2 className="text-xl font-semibold mb-6">{t.howTitle}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -247,7 +255,6 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* Footer */}
         <footer className="border-t border-ink/10 py-6 text-sm text-ink/60 flex flex-col items-center gap-2">
           <div className="flex gap-4 flex-wrap justify-center">
             <a href="/terms" className="hover:text-ink">{t.terms}</a>
@@ -267,7 +274,7 @@ export default async function HomePage() {
       </main>
 
       <BottomNav activeTab="home" />
-      <div className="h-16 md:hidden" /> {/* বটম নেভের জন্য জায়গা রাখা */}
+      <div className="h-16 md:hidden" />
     </div>
   );
 }
