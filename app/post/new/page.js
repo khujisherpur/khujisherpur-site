@@ -18,6 +18,7 @@ function NewPostForm() {
     title: '', name: '', ownerName: '', area: '', phone: '', priceOrSalary: '',
     description: '', rentType: 'house', bedrooms: '', bathrooms: '',
     condition: 'used', negotiable: false, deadline: '', vehicleType: 'ac',
+    experienceYears: '',
   });
 
   const [pendingFile, setPendingFile] = useState(null);
@@ -109,6 +110,7 @@ function NewPostForm() {
           experience_years: form.experienceYears ? parseInt(form.experienceYears) : null,
         };
         if (isAmbulance) payload.vehicle_type = form.vehicleType;
+
         const { error } = await supabase.from('providers').insert(payload);
         if (error) throw error;
       } else {
@@ -222,7 +224,6 @@ function NewPostForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white border-2 border-ink/10 p-6 space-y-4">
-        {/* ভাড়ার ধরন সিলেক্টর */}
         {isRent && (
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">কীসের জন্য ভাড়া?</label>
@@ -243,7 +244,6 @@ function NewPostForm() {
           </div>
         )}
 
-        {/* নাম / শিরোনাম */}
         {isService ? (
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">আপনার নাম</label>
@@ -266,7 +266,6 @@ function NewPostForm() {
           </div>
         )}
 
-        {/* ভাড়ায় মালিকের নাম */}
         {isRent && (
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">বাড়ি/দোকান মালিকের নাম</label>
@@ -279,7 +278,6 @@ function NewPostForm() {
           </div>
         )}
 
-        {/* বেডরুম/বাথরুম (শুধু বাসা/মেস) */}
         {showBedroomFields && (
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -303,7 +301,6 @@ function NewPostForm() {
           </div>
         )}
 
-        {/* কেনা-বেচা: কন্ডিশন + দর কষাকষি */}
         {isBuySell && (
           <>
             <div>
@@ -336,7 +333,6 @@ function NewPostForm() {
           </>
         )}
 
-        {/* এলাকা */}
         <div>
           <label className="block text-sm mb-1.5 text-ink/70">এলাকা</label>
           <input
@@ -347,8 +343,7 @@ function NewPostForm() {
           />
         </div>
 
-        {/* ফোন (সার্ভিস) */}
-        {isService ? (
+        {isService && (
           <>
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">ফোন নম্বর</label>
@@ -362,16 +357,15 @@ function NewPostForm() {
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">অভিজ্ঞতা (বছর, ঐচ্ছিক)</label>
               <input
-                type="number" min="0" value={form.experienceYears || ''}
+                type="number" min="0" value={form.experienceYears}
                 onChange={(e) => updateField('experienceYears', e.target.value)}
                 className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
                 placeholder="যেমন: ৫"
               />
             </div>
           </>
-        ) : (
+        )}
 
-        {/* অ্যাম্বুলেন্স: গাড়ির ধরন */}
         {isAmbulance && (
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">গাড়ির ধরন</label>
@@ -394,7 +388,6 @@ function NewPostForm() {
           </div>
         )}
 
-        {/* দাম/বেতন/ভাড়া — স্পষ্ট ফন্টে */}
         {!isService && (
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">
@@ -413,7 +406,6 @@ function NewPostForm() {
           </div>
         )}
 
-        {/* চাকরি: শেষ তারিখ */}
         {isJob && (
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">আবেদনের শেষ তারিখ (ঐচ্ছিক)</label>
@@ -425,7 +417,6 @@ function NewPostForm() {
           </div>
         )}
 
-        {/* বিবরণ */}
         <div>
           <label className="block text-sm mb-1.5 text-ink/70">বিবরণ</label>
           <textarea
@@ -436,7 +427,6 @@ function NewPostForm() {
           />
         </div>
 
-        {/* ছবি */}
         {isService ? (
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">ছবি (ঐচ্ছিক)</label>
