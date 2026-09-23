@@ -228,7 +228,7 @@ export default async function HomePage() {
                         {item.title}
                       </p>
                       <p className="text-xs text-ink/50 mt-1">{item.area}</p>
-                      {item.price && <p className="text-xs text-green font-medium mt-1">{item.price}</p>}
+                      {item.price && <p className="text-xs text-green font-numeric mt-1">{item.price}</p>}
                       <p className="text-[10px] text-ink/30 mt-1">{timeAgo(item.date, t)}</p>
                     </div>
                   </a>
