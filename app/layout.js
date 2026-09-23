@@ -1,10 +1,16 @@
-import { Hind_Siliguri } from 'next/font/google';
+import { Hind_Siliguri, Noto_Serif_Bengali } from 'next/font/google';
 import './globals.css';
 
 const hind = Hind_Siliguri({
   subsets: ['bengali', 'latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-hind',
+});
+
+const notoSerifBn = Noto_Serif_Bengali({
+  subsets: ['bengali'],
+  weight: ['500', '600', '700'],
+  variable: '--font-noto-serif-bn',
 });
 
 export const metadata = {
@@ -22,7 +28,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="bn" className={hind.variable}>
+    <html lang="bn" className={`${hind.variable} ${notoSerifBn.variable}`}>
       <body className="bg-paper text-ink font-sans antialiased">
         {children}
       </body>
