@@ -17,6 +17,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ['var(--font-hind)', 'sans-serif'],
+        numeric: ['var(--font-noto-serif-bn)', 'serif'],
       },
     },
   },
