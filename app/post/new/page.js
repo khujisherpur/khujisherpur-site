@@ -348,17 +348,28 @@ function NewPostForm() {
         </div>
 
         {/* ফোন (সার্ভিস) */}
-        {isService && (
-          <div>
-            <label className="block text-sm mb-1.5 text-ink/70">ফোন নম্বর</label>
-            <input
-              type="tel" required value={form.phone}
-              onChange={(e) => updateField('phone', e.target.value)}
-              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
-              placeholder="01XXXXXXXXX"
-            />
-          </div>
-        )}
+        {isService ? (
+          <>
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">ফোন নম্বর</label>
+              <input
+                type="tel" required value={form.phone}
+                onChange={(e) => updateField('phone', e.target.value)}
+                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
+                placeholder="01XXXXXXXXX"
+              />
+            </div>
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">অভিজ্ঞতা (বছর, ঐচ্ছিক)</label>
+              <input
+                type="number" min="0" value={form.experienceYears || ''}
+                onChange={(e) => updateField('experienceYears', e.target.value)}
+                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
+                placeholder="যেমন: ৫"
+              />
+            </div>
+          </>
+        ) : (
 
         {/* অ্যাম্বুলেন্স: গাড়ির ধরন */}
         {isAmbulance && (
