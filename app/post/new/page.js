@@ -106,9 +106,9 @@ function NewPostForm() {
           phone: form.phone,
           description: form.description,
           photo_url: photoUrl,
+          experience_years: form.experienceYears ? parseInt(form.experienceYears) : null,
         };
         if (isAmbulance) payload.vehicle_type = form.vehicleType;
-
         const { error } = await supabase.from('providers').insert(payload);
         if (error) throw error;
       } else {
