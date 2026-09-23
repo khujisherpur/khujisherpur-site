@@ -95,7 +95,7 @@ export default async function ListingDetailPage({ params }) {
         <div className="p-6">
           <h1 className="text-xl font-semibold">{listing.title}</h1>
           <p className="text-ink/60 mt-1">{categoryName} · {listing.area}</p>
-          <p className="text-green font-semibold text-lg mt-2">{listing.price_or_salary}</p>
+          <p className="text-green font-numeric text-lg mt-2">{listing.price_or_salary}</p>
           <div className="mt-3 flex items-center gap-3">
             <FavoriteButton targetType="listing" targetId={listing.id} />
             <ReportButton targetType="listing" targetId={listing.id} />
