@@ -11,7 +11,7 @@ function Stars({ value, size = 'text-base' }) {
   );
 }
 
-export default function ReviewSection({ providerId }) {
+export default function ReviewSection({ providerId, ownerId }) {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -20,6 +20,8 @@ export default function ReviewSection({ providerId }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [alreadyReviewed, setAlreadyReviewed] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [replyText, setReplyText] = useState('');
 
   useEffect(() => {
     load();
@@ -29,7 +31,7 @@ export default function ReviewSection({ providerId }) {
   async function load() {
     const { data } = await supabase
       .from('reviews')
-      .select('id, rating, comment, created_at, user_id, users(name)')
+      .select('id, rating, comment, created_at, user_id, reply, replied_at, users(name)')
       .eq('provider_id', providerId)
       .order('created_at', { ascending: false });
     setReviews(data || []);
@@ -72,6 +74,20 @@ export default function ReviewSection({ providerId }) {
     setSubmitting(false);
   }
 
+  async function submitReply(reviewId) {
+    if (!replyText.trim()) return;
+    const { error } = await supabase
+      .from('reviews')
+      .update({ reply: replyText, replied_at: new Date().toISOString() })
+      .eq('id', reviewId);
+    if (!error) {
+      setReplyingTo(null);
+      setReplyText('');
+      await load();
+    }
+  }
+
+  const isOwner = user && ownerId && user.id === ownerId;
   const avg = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
 
   return (
@@ -89,8 +105,7 @@ export default function ReviewSection({ providerId }) {
         !loading && <p className="text-sm text-ink/50 mb-4">এখনো কোনো রিভিউ নেই। প্রথম রিভিউ আপনিই দিন!</p>
       )}
 
-      {/* রিভিউ ফর্ম */}
-      {user && !alreadyReviewed && (
+      {user && !isOwner && !alreadyReviewed && (
         <form onSubmit={handleSubmit} className="bg-paper p-4 mb-4">
           <p className="text-sm mb-2">আপনার রেটিং</p>
           <div className="flex gap-1 mb-3">
@@ -129,12 +144,11 @@ export default function ReviewSection({ providerId }) {
         </p>
       )}
 
-      {user && alreadyReviewed && (
+      {user && !isOwner && alreadyReviewed && (
         <p className="text-sm text-green mb-4">আপনি ইতিমধ্যে এই প্রোফাইলে রিভিউ দিয়েছেন। ধন্যবাদ!</p>
       )}
 
-      {/* রিভিউ লিস্ট */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         {reviews.map((r) => (
           <div key={r.id} className="border-t border-ink/5 pt-3">
             <div className="flex items-center justify-between">
@@ -145,6 +159,42 @@ export default function ReviewSection({ providerId }) {
             <p className="text-xs text-ink/40 mt-1">
               {new Date(r.created_at).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' })}
             </p>
+
+            {r.reply && (
+              <div className="mt-2 ml-4 pl-3 border-l-2 border-green/30">
+                <p className="text-xs font-medium text-green">প্রোভাইডারের জবাব</p>
+                <p className="text-sm text-ink/70 mt-0.5">{r.reply}</p>
+              </div>
+            )}
+
+            {isOwner && !r.reply && (
+              <div className="mt-2">
+                {replyingTo === r.id ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder="জবাব লিখুন..."
+                      className="flex-1 border border-ink/20 px-2 py-1.5 text-sm outline-none focus:border-green"
+                    />
+                    <button
+                      onClick={() => submitReply(r.id)}
+                      className="text-xs bg-green text-white px-3 py-1.5"
+                    >
+                      পাঠান
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setReplyingTo(r.id)}
+                    className="text-xs text-green underline"
+                  >
+                    জবাব দিন
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
