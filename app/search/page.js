@@ -117,7 +117,7 @@ export default async function SearchPage({ searchParams }) {
               <p className="text-xs text-marigold font-medium">{label ? label[lang].name : ''}</p>
               <p className="font-medium mt-1">{l.title}</p>
               <p className="text-sm text-ink/60 mt-1">{l.area}</p>
-              <p className="text-sm text-green font-medium mt-1">{l.price_or_salary}</p>
+              <p className="text-sm text-green font-numeric mt-1">{l.price_or_salary}</p>
             </a>
           );
         })}
