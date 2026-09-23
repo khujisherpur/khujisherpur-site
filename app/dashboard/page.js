@@ -97,19 +97,18 @@ export default function DashboardPage() {
   async function loadMyPosts(userId) {
     const { data: p } = await supabase
       .from('providers')
-      .select('id, name, area, status, is_available, photo_url, categories(name)')
+      .select('id, name, area, status, is_available, photo_url, view_count, categories(name)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     setProviders(p || []);
 
     const { data: l } = await supabase
       .from('listings')
-      .select('id, title, area, status, photos, categories(name)')
+      .select('id, title, area, status, photos, view_count, categories(name)')
       .eq('user_id', userId)
       .order('posted_at', { ascending: false });
     setListings(l || []);
   }
-
   async function deleteProvider(id, photoUrl) {
     if (!confirm(t.confirmDeleteProvider)) return;
 
@@ -216,6 +215,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="font-medium">{p.name}</p>
                   <p className="text-sm text-ink/60">{p.categories?.name} · {p.area}</p>
+                  <p className="text-xs text-ink/40 mt-0.5">👁️ {p.view_count || 0} বার দেখা হয়েছে</p>
                 </div>
                 <span className={`text-xs font-medium ${statusColor[p.status]}`}>
                   {t.status[p.status]}
@@ -258,12 +258,13 @@ export default function DashboardPage() {
                 <div>
                   <p className="font-medium">{l.title}</p>
                   <p className="text-sm text-ink/60">{l.categories?.name} · {l.area}</p>
+                  <p className="text-xs text-ink/40 mt-0.5">👁️ {l.view_count || 0} বার দেখা হয়েছে</p>
                 </div>
                 <span className={`text-xs font-medium ${statusColor[l.status]}`}>
                   {t.status[l.status]}
                 </span>
               </div>
-              <div className="flex gap-2 mt-3 flex-wrap">
+              <div className="flex gap-2 mt-3">
                 <a href={`/dashboard/listing/${l.id}`} className="text-sm border border-ink/20 px-3 py-1.5 hover:bg-paper">
                   {t.edit}
                 </a>
