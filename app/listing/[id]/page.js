@@ -48,7 +48,7 @@ export default async function ListingDetailPage({ params }) {
     .eq('status', 'active')
     .single();
 
-  if (!listing) {
+if (!listing) {
     return (
       <main className="max-w-2xl mx-auto px-4 py-20 text-center">
         <p className="text-ink/70">{t.notFound}</p>
@@ -56,6 +56,8 @@ export default async function ListingDetailPage({ params }) {
       </main>
     );
   }
+
+  await supabase.rpc('increment_listing_view', { lid: listing.id });
 
   const label = categoryLabels[listing.categories?.slug];
   const categoryName = label ? label[lang].name : '';
