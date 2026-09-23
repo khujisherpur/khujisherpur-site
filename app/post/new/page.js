@@ -390,11 +390,11 @@ function NewPostForm() {
               {isJob ? 'বেতন' : isBuySell ? 'মূল্য' : 'ভাড়া'}
             </label>
             <div className="flex items-center border border-ink/20 focus-within:border-green">
-              <span className="pl-3 pr-1 text-ink/50 text-lg font-medium select-none">৳</span>
+              <span className="pl-3 pr-1 text-ink/50 text-lg font-numeric select-none">৳</span>
               <input
                 type="text" required value={form.priceOrSalary}
                 onChange={(e) => updateField('priceOrSalary', e.target.value)}
-                className="flex-1 py-2.5 pr-3 outline-none text-lg font-medium tracking-wide"
+                className="flex-1 py-2.5 pr-3 outline-none text-lg font-numeric tracking-wide"
                 placeholder="৮,০০০"
                 inputMode="numeric"
               />
