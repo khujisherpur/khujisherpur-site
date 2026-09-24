@@ -125,9 +125,13 @@ export default async function HomePage() {
           <a href="/" className="flex items-center bg-white rounded-md px-2.5 py-1.5 flex-shrink-0">
             <img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-7 w-auto" />
           </a>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <LanguageToggle lang={lang} variant="light" />
-            <AuthButton lang={lang} variant="light" />
+            <HeaderBell />
+            <div className="hidden md:block">
+              <AuthButton lang={lang} variant="light" />
+            </div>
+            <MobileMenu lang={lang} />
           </div>
         </div>
       </header>
