@@ -6,6 +6,8 @@ import { categoryLabels } from '../lib/categoryLabels';
 import LanguageToggle from '../components/LanguageToggle';
 import AuthButton from '../components/AuthButton';
 import BottomNav from '../components/BottomNav';
+import HeaderBell from '../components/HeaderBell';
+import MobileMenu from '../components/MobileMenu';
 
 const text = {
   bn: {
