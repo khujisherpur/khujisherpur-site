@@ -12,34 +12,30 @@ import MobileMenu from '../components/MobileMenu';
 const text = {
   bn: {
     heroTitle: 'শেরপুরে যা খুঁজছেন, এক জায়গায় খুঁজে নিন',
-    heroSub: 'বাসা ভাড়া, চাকরি, নাকি বিশ্বস্ত মিস্ত্রি — যা দরকার সবই পাবেন এখানে।',
-    searchPlaceholder: 'যেমন: বাসা ভাড়া, ইলেকট্রিশিয়ান...',
-    searchButton: 'খুঁজুন',
-    liveStats: (n) => `শেরপুরে এখন ${n}টি সক্রিয় পোস্ট ও প্রোফাইল`,
+    searchPlaceholder: 'নাম, এলাকা, ক্যাটাগরি দিয়ে খুঁজুন...',
     whatLooking: 'কী খুঁজছেন?',
-    postAd: '+ পোস্ট দিন',
-    recentTitle: 'সাম্প্রতিক পোস্ট',
+    recentTitle: 'সাম্প্রতিক পোস্ট', seeAll: 'সব দেখুন →',
+    providersTitle: 'সাম্প্রতিক সেবাদাতা',
     howTitle: 'কীভাবে কাজ করে',
-    step1Title: 'খুঁজুন', step1Desc: 'ক্যাটাগরি বা সার্চ দিয়ে যা দরকার তা খুঁজে বের করুন',
-    step2Title: 'যোগাযোগ করুন', step2Desc: 'সরাসরি ফোনে কল করে কথা বলুন',
-    step3Title: 'কাজ সেরে নিন', step3Desc: 'নিজে দেখে-শুনে নিশ্চিত হয়ে সিদ্ধান্ত নিন',
+    step1Title: 'খুঁজুন', step1Desc: 'ক্যাটাগরি বা সার্চ দিয়ে প্রয়োজন খুঁজে নিন',
+    step2Title: 'যোগাযোগ করুন', step2Desc: 'বিস্তারিত দেখে সরাসরি কল করুন',
+    step3Title: 'পান/সেবা নিন', step3Desc: 'আপনার প্রয়োজন সহজেই পূরণ করুন',
+    reviews: 'রিভিউ',
     terms: 'শর্তাবলি', privacy: 'প্রাইভেসি পলিসি', disclaimer: 'দায়বদ্ধতা',
     footer: '© ২০২৬ খুঁজি শেরপুর', credit: 'Developed by ASRAFUL',
     justNow: 'এইমাত্র', minutesAgo: (n) => `${n} মিনিট আগে`, hoursAgo: (n) => `${n} ঘণ্টা আগে`, daysAgo: (n) => `${n} দিন আগে`,
   },
   en: {
     heroTitle: 'Find what you\u2019re looking for in Sherpur, all in one place',
-    heroSub: 'House rent, jobs, or a trusted repairman — get everything you need here.',
-    searchPlaceholder: 'e.g. house rent, electrician...',
-    searchButton: 'Search',
-    liveStats: (n) => `${n} active posts & profiles in Sherpur right now`,
+    searchPlaceholder: 'Search by name, area, category...',
     whatLooking: 'What are you looking for?',
-    postAd: '+ Post Ad',
-    recentTitle: 'Recent Posts',
+    recentTitle: 'Recent Posts', seeAll: 'See all →',
+    providersTitle: 'Recent Providers',
     howTitle: 'How It Works',
     step1Title: 'Search', step1Desc: 'Use categories or search to find what you need',
-    step2Title: 'Contact', step2Desc: 'Call directly and talk to them',
-    step3Title: 'Get It Done', step3Desc: 'Verify in person and make your decision',
+    step2Title: 'Contact', step2Desc: 'Call directly after checking details',
+    step3Title: 'Get It Done', step3Desc: 'Easily fulfill your need',
+    reviews: 'reviews',
     terms: 'Terms', privacy: 'Privacy Policy', disclaimer: 'Disclaimer',
     footer: '© 2026 Khuji Sherpur', credit: 'Developed by ASRAFUL',
     justNow: 'Just now', minutesAgo: (n) => `${n}m ago`, hoursAgo: (n) => `${n}h ago`, daysAgo: (n) => `${n}d ago`,
@@ -72,7 +68,6 @@ export default async function HomePage() {
     .select('id, slug, type, external_url');
   const categories = (dbCategories || []).filter((c) => categoryLabels[c.slug]);
 
-  // শুধু service/listing টাইপের জন্য কাউন্ট গণনা করা
   const countable = categories.filter((c) => c.type === 'service' || c.type === 'listing');
   const counts = await Promise.all(
     countable.map(async (c) => {
@@ -87,7 +82,6 @@ export default async function HomePage() {
     })
   );
   const countMap = Object.fromEntries(counts.map((c) => [c.slug, c.count]));
-  const totalActive = counts.reduce((s, c) => s + c.count, 0);
 
   const [{ data: recentProviders }, { data: recentListings }] = await Promise.all([
     supabase
@@ -102,7 +96,7 @@ export default async function HomePage() {
       .eq('status', 'active')
       .gt('expiry_date', new Date().toISOString())
       .order('posted_at', { ascending: false })
-      .limit(6),
+      .limit(8),
   ]);
 
   const recentItems = [
@@ -116,7 +110,26 @@ export default async function HomePage() {
     })),
   ]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 6);
+    .slice(0, 8);
+
+  // সাম্প্রতিক সেবাদাতাদের রেটিং হিসাব
+  const providersWithRating = await Promise.all(
+    (recentProviders || []).slice(0, 6).map(async (p) => {
+      const { data: reviews } = await supabase
+        .from('reviews')
+        .select('rating')
+        .eq('provider_id', p.id);
+      const count = reviews?.length || 0;
+      const avg = count > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / count : 0;
+      return { ...p, avgRating: avg, reviewCount: count };
+    })
+  );
+
+  const steps = [
+    { icon: '🔍', title: t.step1Title, desc: t.step1Desc },
+    { icon: '📞', title: t.step2Title, desc: t.step2Desc },
+    { icon: '✅', title: t.step3Title, desc: t.step3Desc },
+  ];
 
   return (
     <div className="min-h-screen">
@@ -136,47 +149,34 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4">
-        <section className="py-10 md:py-16">
-          <h1 className="text-3xl md:text-5xl font-semibold leading-tight text-ink max-w-xl">
+      <main className="max-w-4xl mx-auto">
+        {/* Hero */}
+        <section className="bg-gradient-to-b from-green to-green/80 px-4 pt-8 pb-10">
+          <h1 className="text-2xl md:text-4xl font-semibold leading-tight text-white max-w-lg">
             {t.heroTitle}
           </h1>
-          <p className="mt-4 text-ink/70 max-w-md">{t.heroSub}</p>
 
-          <form action="/search" method="GET" className="mt-8 flex gap-2 max-w-xl bg-white border-2 border-ink/10 p-2">
+          <form action="/search" method="GET" className="mt-6 flex bg-white rounded-full shadow-md overflow-hidden max-w-xl">
+            <span className="flex items-center pl-4 text-ink/40">🔍</span>
             <input
               type="text"
               name="q"
               placeholder={t.searchPlaceholder}
-              className="flex-1 bg-transparent outline-none px-3 py-2 text-base placeholder:text-ink/40"
+              className="flex-1 bg-transparent outline-none px-3 py-3 text-sm placeholder:text-ink/40"
             />
             <button
               type="submit"
-              className="bg-marigold text-ink font-semibold px-5 py-2 hover:bg-marigold/90 transition-colors"
+              aria-label="Search"
+              className="bg-marigold text-ink w-12 flex items-center justify-center hover:bg-marigold/90 transition-colors flex-shrink-0"
             >
-              {t.searchButton}
+              🔍
             </button>
           </form>
-
-          {totalActive > 0 && (
-            <p className="mt-4 text-sm text-ink/50 flex items-center gap-1.5">
-              <span className="w-2 h-2 bg-green rounded-full inline-block animate-pulse" />
-              {t.liveStats(totalActive)}
-            </p>
-          )}
         </section>
 
-        <section id="categories" className="pb-16 scroll-mt-20">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h2 className="text-xl font-semibold">{t.whatLooking}</h2>
-            <a
-              href="#categories"
-              className="text-sm bg-marigold text-ink font-semibold rounded-full px-4 py-1.5 hover:bg-marigold/90 transition-colors"
-            >
-              {t.postAd}
-            </a>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {/* Category Grid */}
+        <section id="categories" className="px-4 -mt-4 pb-10 scroll-mt-20">
+          <div className="grid grid-cols-3 gap-2.5">
             {categories.map((c) => {
               const label = categoryLabels[c.slug];
               const count = countMap[c.slug] || 0;
@@ -187,31 +187,33 @@ export default async function HomePage() {
                   href={categoryHref(c)}
                   target={isExternal ? '_blank' : undefined}
                   rel={isExternal ? 'noopener noreferrer' : undefined}
-                  className={`group block bg-white p-4 border-l-4 hover:shadow-md transition-shadow ${label.color}`}
+                  className="bg-white rounded-xl border border-ink/10 p-3 hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-start justify-between">
-                    <span className="text-2xl">{label.icon}</span>
-                    {count > 0 && (
-                      <span className="text-xs bg-paper text-ink/50 px-2 py-0.5 rounded-full">
-                        {count}
-                      </span>
-                    )}
-                    {isExternal && <span className="text-xs text-ink/30">↗</span>}
+                    <span className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg text-white ${label.iconBg}`}>
+                      {label.icon}
+                    </span>
+                    {isExternal ? (
+                      <span className="text-xs text-ink/30">↗</span>
+                    ) : count > 0 ? (
+                      <span className="text-[10px] bg-paper text-ink/50 px-1.5 py-0.5 rounded-full font-numeric">{count}</span>
+                    ) : null}
                   </div>
-                  <p className="font-medium mt-2 group-hover:text-green transition-colors">
-                    {label[lang].name}
-                  </p>
-                  <p className="text-sm text-ink/60 mt-1">{label[lang].desc}</p>
+                  <p className="font-medium text-sm mt-2 leading-tight">{label[lang].name}</p>
                 </a>
               );
             })}
           </div>
         </section>
 
+        {/* Recent Posts */}
         {recentItems.length > 0 && (
-          <section className="pb-16">
-            <h2 className="text-xl font-semibold mb-4">{t.recentTitle}</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <section className="pb-10">
+            <div className="flex items-center justify-between px-4 mb-3">
+              <h2 className="text-lg font-semibold">🔥 {t.recentTitle}</h2>
+              <a href="/search" className="text-sm text-green font-medium">{t.seeAll}</a>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2 px-4 snap-x snap-mandatory scrollbar-hide">
               {recentItems.map((item) => {
                 const label = categoryLabels[item.slug];
                 const href = item.type === 'provider' ? `/provider/${item.id}` : `/listing/${item.id}`;
@@ -219,23 +221,25 @@ export default async function HomePage() {
                   <a
                     key={`${item.type}-${item.id}`}
                     href={href}
-                    className="group block bg-white border border-ink/10 overflow-hidden hover:shadow-md transition-shadow"
+                    className="flex-shrink-0 w-36 snap-start bg-white rounded-xl border border-ink/10 overflow-hidden hover:shadow-md transition-shadow"
                   >
-                    <div className="h-24 bg-paper flex items-center justify-center overflow-hidden">
+                    <div className="relative h-24 bg-paper flex items-center justify-center overflow-hidden">
                       {item.image ? (
                         <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-3xl opacity-30">{label?.icon || '📍'}</span>
                       )}
+                      {label && (
+                        <span className="absolute top-1.5 left-1.5 text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-white/90 text-ink/70">
+                          {label[lang].name}
+                        </span>
+                      )}
                     </div>
-                    <div className="p-3">
-                      <p className="text-xs text-ink/40">{label ? label[lang].name : ''}</p>
-                      <p className="font-medium text-sm mt-0.5 line-clamp-1 group-hover:text-green transition-colors">
-                        {item.title}
-                      </p>
-                      <p className="text-xs text-ink/50 mt-1">{item.area}</p>
-                      {item.price && <p className="text-xs text-green font-numeric mt-1">{item.price}</p>}
-                      <p className="text-[10px] text-ink/30 mt-1">{timeAgo(item.date, t)}</p>
+                    <div className="p-2.5">
+                      <p className="text-xs font-medium line-clamp-1">{item.title}</p>
+                      <p className="text-[10px] text-ink/50 mt-1">📍 {item.area}</p>
+                      {item.price && <p className="text-xs text-green font-numeric font-medium mt-1">{item.price}</p>}
+                      <p className="text-[9px] text-ink/30 mt-1">{timeAgo(item.date, t)}</p>
                     </div>
                   </a>
                 );
@@ -244,24 +248,77 @@ export default async function HomePage() {
           </section>
         )}
 
-        <section className="pb-16">
-          <h2 className="text-xl font-semibold mb-6">{t.howTitle}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { icon: '🔍', title: t.step1Title, desc: t.step1Desc },
-              { icon: '📞', title: t.step2Title, desc: t.step2Desc },
-              { icon: '✅', title: t.step3Title, desc: t.step3Desc },
-            ].map((step, i) => (
-              <div key={i} className="bg-white border border-ink/10 p-5 text-center">
-                <span className="text-3xl">{step.icon}</span>
-                <p className="font-medium mt-3">{step.title}</p>
-                <p className="text-sm text-ink/60 mt-1">{step.desc}</p>
-              </div>
-            ))}
+        {/* How It Works */}
+        <section className="px-4 pb-10">
+          <div className="bg-green/5 border border-green/10 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">{t.howTitle}</h2>
+            </div>
+            <div className="flex items-start justify-between gap-1">
+              {steps.map((step, i) => (
+                <div key={i} className="flex items-center flex-1 last:flex-none">
+                  <div className="flex flex-col items-center text-center flex-1">
+                    <div className="relative">
+                      <span className="w-12 h-12 rounded-full bg-green text-white flex items-center justify-center text-lg">
+                        {step.icon}
+                      </span>
+                      <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-marigold text-ink text-[10px] font-bold flex items-center justify-center font-numeric">
+                        {i + 1}
+                      </span>
+                    </div>
+                    <p className="font-medium text-xs mt-2">{step.title}</p>
+                    <p className="text-[10px] text-ink/60 mt-1 leading-snug px-1">{step.desc}</p>
+                  </div>
+                  {i < steps.length - 1 && <span className="text-ink/20 text-lg px-0.5">›</span>}
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
-        <footer className="border-t border-ink/10 py-6 text-sm text-ink/60 flex flex-col items-center gap-2">
+        {/* Recent Service Providers */}
+        {providersWithRating.length > 0 && (
+          <section className="pb-10">
+            <div className="flex items-center justify-between px-4 mb-3">
+              <h2 className="text-lg font-semibold">{t.providersTitle}</h2>
+              <a href="/search" className="text-sm text-green font-medium">{t.seeAll}</a>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2 px-4 snap-x snap-mandatory scrollbar-hide">
+              {providersWithRating.map((p) => {
+                const label = categoryLabels[p.categories?.slug];
+                return (
+                  <a
+                    key={p.id}
+                    href={`/provider/${p.id}`}
+                    className="flex-shrink-0 w-44 snap-start bg-white rounded-xl border border-ink/10 p-3 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-center gap-2">
+                      {p.photo_url ? (
+                        <img src={p.photo_url} alt={p.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-paper flex items-center justify-center text-sm text-ink/30 flex-shrink-0">
+                          {p.name?.charAt(0)}
+                        </div>
+                      )}
+                      <span className="text-blue-500 text-xs flex-shrink-0" title="Verified">✓</span>
+                    </div>
+                    <p className="text-sm font-medium mt-2 line-clamp-1">{p.name}</p>
+                    <p className="text-[10px] text-ink/50 mt-0.5 line-clamp-1">
+                      {label ? label[lang].name : ''} · {p.area}
+                    </p>
+                    {p.reviewCount > 0 && (
+                      <p className="text-[10px] text-marigold mt-1 font-numeric">
+                        ⭐ {p.avgRating.toFixed(1)} ({p.reviewCount} {t.reviews})
+                      </p>
+                    )}
+                  </a>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        <footer className="border-t border-ink/10 py-6 px-4 text-sm text-ink/60 flex flex-col items-center gap-2 mb-16 md:mb-0">
           <div className="flex gap-4 flex-wrap justify-center">
             <a href="/terms" className="hover:text-ink">{t.terms}</a>
             <a href="/privacy" className="hover:text-ink">{t.privacy}</a>
@@ -280,7 +337,6 @@ export default async function HomePage() {
       </main>
 
       <BottomNav activeTab="home" />
-      <div className="h-16 md:hidden" />
     </div>
   );
 }
