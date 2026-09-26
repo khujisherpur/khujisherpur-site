@@ -3,8 +3,10 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import ImageCropper from '../../../components/ImageCropper';
+import { locations, upazilaList } from '../../../lib/locations';
 
 const rentTypeLabels = { house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য' };
+const roomOptions = ['১', '২', '৩', '৪+'];
 
 function NewPostForm() {
   const searchParams = useSearchParams();
@@ -14,11 +16,14 @@ function NewPostForm() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [category, setCategory] = useState(null);
   const [loadingCategory, setLoadingCategory] = useState(true);
+  const [subcategories, setSubcategories] = useState([]);
+
   const [form, setForm] = useState({
     title: '', name: '', ownerName: '', area: '', phone: '', priceOrSalary: '',
     description: '', rentType: 'house', bedrooms: '', bathrooms: '',
     condition: 'used', negotiable: false, deadline: '', vehicleType: 'ac',
-    experienceYears: '',
+    experienceYears: '', upazila: '', unionName: '', subcategoryId: '',
+    sqft: '', amenities: '', mapLink: '',
   });
 
   const [pendingFile, setPendingFile] = useState(null);
@@ -49,8 +54,23 @@ function NewPostForm() {
       });
   }, [categorySlug]);
 
+  useEffect(() => {
+    if (category?.slug !== 'service-provider') { setSubcategories([]); return; }
+    supabase
+      .from('subcategories')
+      .select('id, name_bn')
+      .eq('category_id', category.id)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .then(({ data }) => setSubcategories(data || []));
+  }, [category]);
+
   function updateField(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  function handleUpazilaChange(value) {
+    setForm((f) => ({ ...f, upazila: value, unionName: '' }));
   }
 
   function handleFileSelect(e) {
@@ -85,12 +105,21 @@ function NewPostForm() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!user || !category) return;
+    if (!form.upazila || !form.unionName) {
+      setError('উপজেলা ও ইউনিয়ন বাছাই করুন');
+      return;
+    }
+    if (category.slug === 'service-provider' && !form.subcategoryId) {
+      setError('কোন ধরনের সেবা দেন তা বাছাই করুন');
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
     try {
       const isService = category.type === 'service';
       const isAmbulance = category.slug === 'ambulance';
+      const isServiceProvider = category.slug === 'service-provider';
       const isRent = category.slug === 'rent';
       const isBuySell = category.slug === 'buy-sell';
       const isJob = category.slug === 'job';
@@ -104,12 +133,15 @@ function NewPostForm() {
           category_id: category.id,
           name: form.name,
           area: form.area,
+          upazila: form.upazila,
+          union_name: form.unionName,
           phone: form.phone,
           description: form.description,
           photo_url: photoUrl,
           experience_years: form.experienceYears ? parseInt(form.experienceYears) : null,
         };
         if (isAmbulance) payload.vehicle_type = form.vehicleType;
+        if (isServiceProvider) payload.subcategory_id = form.subcategoryId;
 
         const { error } = await supabase.from('providers').insert(payload);
         if (error) throw error;
@@ -127,11 +159,15 @@ function NewPostForm() {
         if (isJob && form.deadline) {
           description = `আবেদনের শেষ তারিখ: ${form.deadline}\n\n${form.description}`;
         }
-        if (isRent && (form.bedrooms || form.bathrooms)) {
+        if (isRent) {
           const parts = [];
           if (form.bedrooms) parts.push(`${form.bedrooms} বেডরুম`);
           if (form.bathrooms) parts.push(`${form.bathrooms} বাথরুম`);
-          description = `${parts.join(', ')}\n\n${form.description}`;
+          if (form.sqft) parts.push(`${form.sqft} বর্গফুট`);
+          let rentBlock = parts.length ? `${parts.join(', ')}\n\n` : '';
+          if (form.amenities) rentBlock += `সুযোগ-সুবিধা: ${form.amenities}\n\n`;
+          description = `${rentBlock}${form.description}`;
+          if (form.mapLink) description += `\n\nগুগল ম্যাপ: ${form.mapLink}`;
         }
 
         const payload = {
@@ -139,6 +175,8 @@ function NewPostForm() {
           category_id: category.id,
           title: form.title,
           area: form.area,
+          upazila: form.upazila,
+          union_name: form.unionName,
           price_or_salary: form.priceOrSalary,
           description,
           photos: photoUrls,
@@ -196,10 +234,12 @@ function NewPostForm() {
 
   const isService = category.type === 'service';
   const isAmbulance = category.slug === 'ambulance';
+  const isServiceProvider = category.slug === 'service-provider';
   const isRent = category.slug === 'rent';
   const isBuySell = category.slug === 'buy-sell';
   const isJob = category.slug === 'job';
   const showBedroomFields = isRent && (form.rentType === 'house' || form.rentType === 'mess');
+  const unionsForUpazila = form.upazila ? locations[form.upazila] || [] : [];
 
   return (
     <main className="max-w-xl mx-auto px-4 py-10">
@@ -266,6 +306,22 @@ function NewPostForm() {
           </div>
         )}
 
+        {isServiceProvider && (
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">কোন ধরনের সেবা দেন?</label>
+            <select
+              required value={form.subcategoryId}
+              onChange={(e) => updateField('subcategoryId', e.target.value)}
+              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+            >
+              <option value="">নির্বাচন করুন...</option>
+              {subcategories.map((s) => (
+                <option key={s.id} value={s.id}>{s.name_bn}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {isRent && (
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">বাড়ি/দোকান মালিকের নাম</label>
@@ -278,27 +334,84 @@ function NewPostForm() {
           </div>
         )}
 
+        {/* উপজেলা + ইউনিয়ন — সব ক্যাটাগরিতে */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">উপজেলা</label>
+            <select
+              required value={form.upazila}
+              onChange={(e) => handleUpazilaChange(e.target.value)}
+              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+            >
+              <option value="">নির্বাচন করুন...</option>
+              {upazilaList.map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">ইউনিয়ন</label>
+            <select
+              required value={form.unionName} disabled={!form.upazila}
+              onChange={(e) => updateField('unionName', e.target.value)}
+              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white disabled:bg-paper disabled:text-ink/30"
+            >
+              <option value="">নির্বাচন করুন...</option>
+              {unionsForUpazila.map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {showBedroomFields && (
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm mb-1.5 text-ink/70">বেডরুম</label>
-              <input
-                type="number" min="0" value={form.bedrooms}
+              <label className="block text-sm mb-1.5 text-ink/70">রুম সংখ্যা</label>
+              <select
+                value={form.bedrooms}
                 onChange={(e) => updateField('bedrooms', e.target.value)}
+                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+              >
+                <option value="">নির্বাচন করুন...</option>
+                {roomOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">বাথরুম সংখ্যা</label>
+              <select
+                value={form.bathrooms}
+                onChange={(e) => updateField('bathrooms', e.target.value)}
+                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+              >
+                <option value="">নির্বাচন করুন...</option>
+                {roomOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {isRent && (
+          <>
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">আয়তন (বর্গ-স্কয়ার ফিট, ঐচ্ছিক)</label>
+              <input
+                type="text" value={form.sqft}
+                onChange={(e) => updateField('sqft', e.target.value)}
                 className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
-                placeholder="যেমন: ২"
+                placeholder="যেমন: ৮৫০"
               />
             </div>
             <div>
-              <label className="block text-sm mb-1.5 text-ink/70">বাথরুম</label>
-              <input
-                type="number" min="0" value={form.bathrooms}
-                onChange={(e) => updateField('bathrooms', e.target.value)}
-                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
-                placeholder="যেমন: ১"
+              <label className="block text-sm mb-1.5 text-ink/70">সুযোগ-সুবিধা (ঐচ্ছিক)</label>
+              <textarea
+                rows={2} value={form.amenities}
+                onChange={(e) => updateField('amenities', e.target.value)}
+                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green resize-none"
+                placeholder="যেমন: গ্যাস, পার্কিং, লিফট"
               />
             </div>
-          </div>
+          </>
         )}
 
         {isBuySell && (
@@ -334,12 +447,12 @@ function NewPostForm() {
         )}
 
         <div>
-          <label className="block text-sm mb-1.5 text-ink/70">এলাকা</label>
+          <label className="block text-sm mb-1.5 text-ink/70">সুনির্দিষ্ট এলাকা/বাজার</label>
           <input
             type="text" required value={form.area}
             onChange={(e) => updateField('area', e.target.value)}
             className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
-            placeholder="যেমন: শেরপুর সদর"
+            placeholder="যেমন: নিউ মার্কেট, শেখ হাটি বাজার"
           />
         </div>
 
@@ -426,6 +539,18 @@ function NewPostForm() {
             placeholder="বিস্তারিত লিখুন..."
           />
         </div>
+
+        {isRent && (
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">গুগল ম্যাপ লিংক (ঐচ্ছিক)</label>
+            <input
+              type="url" value={form.mapLink}
+              onChange={(e) => updateField('mapLink', e.target.value)}
+              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
+              placeholder="https://maps.google.com/..."
+            />
+          </div>
+        )}
 
         {isService ? (
           <div>
