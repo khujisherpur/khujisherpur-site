@@ -172,9 +172,91 @@ export default async function HomePage() {
 
       <main className="max-w-4xl mx-auto">
         {/* Hero */}
-        <section className="bg-gradient-to-b from-green to-green/80 px-4 pt-4 pb-8">
-          {/* Cover photo box */}
-          <div className="relative rounded-2xl overflow-hidden border-4 border-white/60 shadow-md h-44 md:h-56 bg-green-dark/40">
+        <section className="bg-gradient-to-b from-[#1B2A4A] to-[#0F1A30] px-4 pt-4 pb-8">
+          {/* Cover photo box — fixed aspect ratio, কোনো স্ক্রিনেই কাটবে না */}
+          <div className="relative rounded-2xl overflow-hidden border-4 border-white/50 shadow-md aspect-[12/5] bg-[#1B2A4A]/60">
+            {validBanners.length > 0 &&
+              validBanners.map((b, i) => (
+                <img
+                  key={b.id}
+                  src={b.image_url}
+                  alt=""
+                  className={
+                    validBanners.length > 1
+                      ? 'hero-banner-slide absolute inset-0 w-full h-full object-cover'
+                      : 'absolute inset-0 w-full h-full object-cover'
+                  }
+                  style={validBanners.length > 1 ? { animationDelay: `${i * 4}s` } : undefined}
+                />
+              ))}
+
+            <HeroIntro title={t.heroTitle} subtitle={t.heroSubtitle} />
+
+            {validBanners.length > 1 && (
+              <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1.5 z-20">
+                {validBanners.map((b, i) => (
+                  <span
+                    key={b.id}
+                    className="hero-banner-dot h-1.5 rounded-full bg-white/50"
+                    style={{ animationDelay: `${i * 4}s` }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Search bar */}
+          <form action="/search" method="GET" className="mt-4 flex bg-white rounded-full shadow-md overflow-hidden max-w-xl">
+            <span className="flex items-center pl-4 text-ink/40">🔍</span>
+            <input
+              type="text"
+              name="q"
+              placeholder={t.searchPlaceholder}
+              className="flex-1 bg-transparent outline-none px-3 py-3 text-sm placeholder:text-ink/40"
+            />
+            <button
+              type="submit"
+              aria-label="Search"
+              className="bg-marigold text-ink w-12 flex items-center justify-center hover:bg-marigold/90 transition-colors flex-shrink-0"
+            >
+              🔍
+            </button>
+          </form>
+
+          <div className="flex items-center gap-2 mt-3 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 w-fit">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green" />
+            </span>
+            <span className="text-xs text-ink/70 font-medium">{t.liveCount(totalActiveCount)}</span>
+          </div>
+        </section>
+
+        {validBanners.length > 1 && (
+          <style>{`
+            .hero-banner-slide {
+              opacity: 0;
+              animation: heroFade ${validBanners.length * 4}s infinite;
+            }
+            @keyframes heroFade {
+              0% { opacity: 0; }
+              5% { opacity: 1; }
+              ${Math.round(100 / validBanners.length) - 5}% { opacity: 1; }
+              ${Math.round(100 / validBanners.length)}% { opacity: 0; }
+              100% { opacity: 0; }
+            }
+            .hero-banner-dot {
+              width: 1.5rem;
+              animation: heroDot ${validBanners.length * 4}s infinite;
+            }
+            @keyframes heroDot {
+              0% { background-color: rgba(255,255,255,0.9); width: 1.5rem; }
+              ${Math.round(100 / validBanners.length) - 2}% { background-color: rgba(255,255,255,0.9); width: 1.5rem; }
+              ${Math.round(100 / validBanners.length)}% { background-color: rgba(255,255,255,0.4); width: 0.375rem; }
+              100% { background-color: rgba(255,255,255,0.4); width: 0.375rem; }
+            }
+          `}</style>
+        )}
             {validBanners.length > 0 &&
               validBanners.map((b, i) => (
                 <img
