@@ -8,6 +8,7 @@ const sidebarItems = [
   { key: 'posts', icon: '📄', label: 'পোস্ট ব্যবস্থাপনা', enabled: true },
   { key: 'profiles', icon: '👤', label: 'প্রোফাইল ব্যবস্থাপনা', enabled: true },
   { key: 'reports', icon: '⚠️', label: 'রিপোর্ট/অভিযোগ', enabled: true },
+  { key: 'banners', icon: '🖼️', label: 'ব্যানার ব্যবস্থাপনা', enabled: true },
   { key: 'users', icon: '👥', label: 'ব্যবহারকারী ব্যবস্থাপনা', enabled: false },
   { key: 'categories', icon: '📁', label: 'ক্যাটাগরি ব্যবস্থাপনা', enabled: false },
   { key: 'settings', icon: '⚙️', label: 'সাইট সেটিংস', enabled: false },
@@ -25,6 +26,12 @@ export default function AdminPage() {
   const [stats, setStats] = useState({ totalListings: 0, totalProviders: 0, totalUsers: 0, openReports: 0 });
   const [categoryBreakdown, setCategoryBreakdown] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
+  const [banners, setBanners] = useState([]);
+  const [bannerForm, setBannerForm] = useState({
+    file: null, advertiser_name: '', advertiser_phone: '',
+    duration_mode: 'permanent', start_date: '', end_date: '',
+  });
+  const [bannerUploading, setBannerUploading] = useState(false);
 
   useEffect(() => {
     init();
@@ -47,7 +54,7 @@ export default function AdminPage() {
     setRole(profile?.role || 'user');
 
     if (profile?.role === 'admin' || profile?.role === 'moderator') {
-      await Promise.all([loadPending(), loadReports(), loadStats()]);
+      await Promise.all([loadPending(), loadReports(), loadStats(), loadBanners()]);
     }
     setLoading(false);
   }
@@ -132,6 +139,63 @@ export default function AdminPage() {
   async function resolveReport(id, status) {
     await supabase.from('reports').update({ status }).eq('id', id);
     loadReports(); loadStats();
+  }
+  async function loadBanners() {
+    const { data } = await supabase
+      .from('homepage_banners')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    setBanners(data || []);
+  }
+
+  async function uploadBanner(e) {
+    e.preventDefault();
+    if (!bannerForm.file) { alert('একটা ছবি বাছাই করুন'); return; }
+    setBannerUploading(true);
+
+    const fileExt = bannerForm.file.name.split('.').pop();
+    const filePath = `banners/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('images')
+      .upload(filePath, bannerForm.file);
+
+    if (uploadError) {
+      alert('আপলোড ব্যর্থ: ' + uploadError.message);
+      setBannerUploading(false);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage.from('images').getPublicUrl(filePath);
+
+    const { error: insertError } = await supabase.from('homepage_banners').insert({
+      image_url: urlData.publicUrl,
+      advertiser_name: bannerForm.advertiser_name || null,
+      advertiser_phone: bannerForm.advertiser_phone || null,
+      duration_mode: bannerForm.duration_mode,
+      start_date: bannerForm.duration_mode === 'fixed' ? bannerForm.start_date : null,
+      end_date: bannerForm.duration_mode === 'fixed' ? bannerForm.end_date : null,
+      sort_order: banners.length,
+    });
+
+    if (insertError) {
+      alert('সেভ ব্যর্থ: ' + insertError.message);
+    } else {
+      setBannerForm({ file: null, advertiser_name: '', advertiser_phone: '', duration_mode: 'permanent', start_date: '', end_date: '' });
+      loadBanners();
+    }
+    setBannerUploading(false);
+  }
+
+  async function toggleBannerActive(id, current) {
+    await supabase.from('homepage_banners').update({ is_active: !current }).eq('id', id);
+    loadBanners();
+  }
+
+  async function deleteBanner(id) {
+    if (!confirm('এই ব্যানারটা মুছে ফেলতে চান?')) return;
+    await supabase.from('homepage_banners').delete().eq('id', id);
+    loadBanners();
   }
 
   const statusLabel = {
@@ -321,6 +385,112 @@ export default function AdminPage() {
                   <div className="flex gap-2 mt-3">
                     <button onClick={() => resolveReport(r.id, 'reviewed')} className="bg-green text-white text-sm px-4 py-1.5">পর্যালোচনা সম্পন্ন</button>
                     <button onClick={() => resolveReport(r.id, 'dismissed')} className="border border-ink/20 text-sm px-4 py-1.5">বাতিল করুন</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'banners' && (
+          <div>
+            <h2 className="text-lg font-medium mb-3">হোমপেজ ব্যানার/বিজ্ঞাপন</h2>
+
+            <form onSubmit={uploadBanner} className="bg-white border border-ink/10 p-4 mb-6 space-y-3">
+              <p className="font-medium text-sm">নতুন ব্যানার যোগ করুন</p>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setBannerForm({ ...bannerForm, file: e.target.files[0] })}
+                className="text-sm w-full"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  placeholder="বিজ্ঞাপনদাতার নাম (ঐচ্ছিক)"
+                  value={bannerForm.advertiser_name}
+                  onChange={(e) => setBannerForm({ ...bannerForm, advertiser_name: e.target.value })}
+                  className="border border-ink/15 px-3 py-2 text-sm rounded-md"
+                />
+                <input
+                  type="text"
+                  placeholder="ফোন নম্বর (ঐচ্ছিক)"
+                  value={bannerForm.advertiser_phone}
+                  onChange={(e) => setBannerForm({ ...bannerForm, advertiser_phone: e.target.value })}
+                  className="border border-ink/15 px-3 py-2 text-sm rounded-md"
+                />
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="radio"
+                    checked={bannerForm.duration_mode === 'permanent'}
+                    onChange={() => setBannerForm({ ...bannerForm, duration_mode: 'permanent' })}
+                  />
+                  স্থায়ী (নিজে বন্ধ না করা পর্যন্ত)
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="radio"
+                    checked={bannerForm.duration_mode === 'fixed'}
+                    onChange={() => setBannerForm({ ...bannerForm, duration_mode: 'fixed' })}
+                  />
+                  নির্দিষ্ট মেয়াদ
+                </label>
+              </div>
+              {bannerForm.duration_mode === 'fixed' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="date"
+                    value={bannerForm.start_date}
+                    onChange={(e) => setBannerForm({ ...bannerForm, start_date: e.target.value })}
+                    className="border border-ink/15 px-3 py-2 text-sm rounded-md"
+                  />
+                  <input
+                    type="date"
+                    value={bannerForm.end_date}
+                    onChange={(e) => setBannerForm({ ...bannerForm, end_date: e.target.value })}
+                    className="border border-ink/15 px-3 py-2 text-sm rounded-md"
+                  />
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={bannerUploading}
+                className="bg-green text-white text-sm px-4 py-2 rounded-md disabled:opacity-50"
+              >
+                {bannerUploading ? 'আপলোড হচ্ছে...' : 'আপলোড করুন'}
+              </button>
+            </form>
+
+            <p className="font-medium text-sm mb-3">বর্তমান ব্যানার ({banners.length})</p>
+            {banners.length === 0 && <p className="text-ink/50 text-sm">কোনো ব্যানার নেই।</p>}
+            <div className="space-y-3">
+              {banners.map((b) => (
+                <div key={b.id} className="bg-white border border-ink/10 p-3 flex gap-3 items-center">
+                  <img src={b.image_url} alt="" className="w-24 h-14 object-cover rounded-md flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{b.advertiser_name || 'নাম নেই'}</p>
+                    <p className="text-xs text-ink/50">
+                      {b.duration_mode === 'permanent' ? 'স্থায়ী' : `${b.start_date} - ${b.end_date}`} · 👁️ {b.view_count} ভিউ
+                    </p>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${b.is_active ? 'bg-green/10 text-green' : 'bg-ink/5 text-ink/40'}`}>
+                      {b.is_active ? 'সক্রিয়' : 'নিষ্ক্রিয়'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1.5 flex-shrink-0">
+                    <button
+                      onClick={() => toggleBannerActive(b.id, b.is_active)}
+                      className="text-xs border border-ink/20 px-2.5 py-1 rounded-md"
+                    >
+                      {b.is_active ? 'বন্ধ করুন' : 'চালু করুন'}
+                    </button>
+                    <button
+                      onClick={() => deleteBanner(b.id)}
+                      className="text-xs border border-red-300 text-red-600 px-2.5 py-1 rounded-md"
+                    >
+                      মুছুন
+                    </button>
                   </div>
                 </div>
               ))}
