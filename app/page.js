@@ -257,8 +257,19 @@ export default async function HomePage() {
         )}
 
         {/* Category Grid */}
+        {/* Category Grid */}
         <section id="categories" className="px-4 pt-4 pb-10 scroll-mt-20">
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">{t.whatLooking}</h2>
+            <a
+              href="#categories"
+              onClick={(e) => { e.preventDefault(); document.getElementById('post-fab')?.click(); }}
+              className="bg-marigold text-ink text-sm font-semibold px-4 py-2 rounded-full flex-shrink-0 whitespace-nowrap"
+            >
+              + {t.postButton}
+            </a>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
             {categories.map((c) => {
               const label = categoryLabels[c.slug];
               const count = countMap[c.slug] || 0;
@@ -269,19 +280,20 @@ export default async function HomePage() {
                   href={categoryHref(c)}
                   target={isExternal ? '_blank' : undefined}
                   rel={isExternal ? 'noopener noreferrer' : undefined}
-                  className="bg-white rounded-xl border border-ink/10 p-3 hover:shadow-md transition-shadow"
+                  className={`relative bg-white rounded-xl border-l-4 ${label.color} border-t border-r border-b border-ink/10 p-2 hover:shadow-md transition-shadow overflow-hidden`}
                 >
-                  <div className="flex items-start justify-between">
-                    <span className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg text-white ${label.iconBg}`}>
+                  <div className="flex items-start justify-between gap-1">
+                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${label.iconBg}`}>
                       {label.icon}
                     </span>
                     {isExternal ? (
-                      <span className="text-xs text-ink/30">↗</span>
+                      <span className="text-[10px] text-ink/30 flex-shrink-0">↗</span>
                     ) : count > 0 ? (
-                      <span className="text-[10px] bg-paper text-ink/50 px-1.5 py-0.5 rounded-full font-numeric">{count}</span>
+                      <span className="text-[9px] bg-paper text-ink/50 px-1 py-0.5 rounded-full font-numeric flex-shrink-0">{count}</span>
                     ) : null}
                   </div>
-                  <p className="font-medium text-sm mt-2 leading-tight">{label[lang].name}</p>
+                  <p className="font-semibold text-[11px] mt-1.5 leading-tight line-clamp-1">{label[lang].name}</p>
+                  <p className="text-[9px] text-ink/50 mt-0.5 leading-snug line-clamp-2">{label[lang].desc}</p>
                 </a>
               );
             })}
