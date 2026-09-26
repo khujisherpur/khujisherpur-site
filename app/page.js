@@ -78,8 +78,8 @@ export default async function HomePage() {
 
   const { data: dbCategories } = await supabase
     .from('categories')
-    .select('id, slug, type, external_url');
-  const categories = (dbCategories || []).filter((c) => categoryLabels[c.slug]);
+    .select('id, slug, type, external_url, is_active');
+  const categories = (dbCategories || []).filter((c) => categoryLabels[c.slug] && c.is_active !== false);
 
   const countable = categories.filter((c) => c.type === 'service' || c.type === 'listing');
   const counts = await Promise.all(
