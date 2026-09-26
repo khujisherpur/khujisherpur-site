@@ -257,7 +257,6 @@ export default async function HomePage() {
         )}
 
         {/* Category Grid */}
-        {/* Category Grid */}
         <section id="categories" className="px-4 pt-4 pb-10 scroll-mt-20">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">{t.whatLooking}</h2>
