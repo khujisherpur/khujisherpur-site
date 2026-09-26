@@ -7,11 +7,14 @@ import LanguageToggle from '../components/LanguageToggle';
 import AuthButton from '../components/AuthButton';
 import BottomNav from '../components/BottomNav';
 import HeaderBell from '../components/HeaderBell';
+import HeroIntro from '../components/HeroIntro';
 
 const text = {
   bn: {
     tagline1: 'শেরপুরে যা খুঁজছেন', tagline2: 'এক জায়গায় খুঁজুন',
     heroTitle: 'শেরপুরে যা খুঁজছেন, এক জায়গায় খুঁজে নিন',
+    heroSubtitle: 'বাসা ভাড়া, চাকরি, নাকি বিশ্বস্ত মিস্ত্রি — যা দরকার সবই পাবেন এখানে।',
+    liveCount: (n) => `শেরপুরে এখন ${n}টি সক্রিয় পোস্ট ও প্রোফাইল`,
     searchPlaceholder: 'নাম, এলাকা, ক্যাটাগরি দিয়ে খুঁজুন...',
     whatLooking: 'কী খুঁজছেন?',
     recentTitle: 'সাম্প্রতিক পোস্ট', seeAll: 'সব দেখুন →',
@@ -28,6 +31,8 @@ const text = {
   en: {
     tagline1: 'What you\u2019re looking for in Sherpur', tagline2: 'find it all in one place',
     heroTitle: 'Find what you\u2019re looking for in Sherpur, all in one place',
+    heroSubtitle: 'House rent, jobs, or a trusted repairman — find everything here.',
+    liveCount: (n) => `${n} active posts & profiles in Sherpur right now`,
     searchPlaceholder: 'Search by name, area, category...',
     whatLooking: 'What are you looking for?',
     recentTitle: 'Recent Posts', seeAll: 'See all →',
@@ -64,6 +69,14 @@ export default async function HomePage() {
   const lang = getLang();
   const t = text[lang];
 
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: banners } = await supabase
+    .from('homepage_banners')
+    .select('id, image_url')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+  const validBanners = (banners || []).filter((b) => b.image_url);
+
   const { data: dbCategories } = await supabase
     .from('categories')
     .select('id, slug, type, external_url');
@@ -83,6 +96,12 @@ export default async function HomePage() {
     })
   );
   const countMap = Object.fromEntries(counts.map((c) => [c.slug, c.count]));
+
+  const [{ count: activeListingsCount }, { count: approvedProvidersCount }] = await Promise.all([
+    supabase.from('listings').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+    supabase.from('providers').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
+  ]);
+  const totalActiveCount = (activeListingsCount || 0) + (approvedProvidersCount || 0);
 
   const [{ data: recentProviders }, { data: recentListings }] = await Promise.all([
     supabase
@@ -155,31 +174,95 @@ export default async function HomePage() {
 
       <main className="max-w-4xl mx-auto">
         {/* Hero */}
-        <section className="bg-gradient-to-b from-green to-green/80 px-4 pt-8 pb-10">
-          <h1 className="text-2xl md:text-4xl font-semibold leading-tight text-white max-w-lg">
-            {t.heroTitle}
-          </h1>
+        <section className="relative overflow-hidden">
+          {validBanners.length > 0 ? (
+            <div className="absolute inset-0 z-0">
+              {validBanners.map((b, i) => (
+                <img
+                  key={b.id}
+                  src={b.image_url}
+                  alt=""
+                  className="hero-banner-slide absolute inset-0 w-full h-full object-cover"
+                  style={{ animationDelay: `${i * 4}s` }}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="absolute inset-0 z-0 bg-gradient-to-b from-green to-green/80" />
+          )}
 
-          <form action="/search" method="GET" className="mt-6 flex bg-white rounded-full shadow-md overflow-hidden max-w-xl">
-            <span className="flex items-center pl-4 text-ink/40">🔍</span>
-            <input
-              type="text"
-              name="q"
-              placeholder={t.searchPlaceholder}
-              className="flex-1 bg-transparent outline-none px-3 py-3 text-sm placeholder:text-ink/40"
-            />
-            <button
-              type="submit"
-              aria-label="Search"
-              className="bg-marigold text-ink w-12 flex items-center justify-center hover:bg-marigold/90 transition-colors flex-shrink-0"
-            >
-              🔍
-            </button>
-          </form>
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/35 to-transparent z-[1]" />
+
+          <div className="relative z-10 px-4 pt-16 pb-8">
+            <form action="/search" method="GET" className="flex bg-white rounded-full shadow-md overflow-hidden max-w-xl">
+              <span className="flex items-center pl-4 text-ink/40">🔍</span>
+              <input
+                type="text"
+                name="q"
+                placeholder={t.searchPlaceholder}
+                className="flex-1 bg-transparent outline-none px-3 py-3 text-sm placeholder:text-ink/40"
+              />
+              <button
+                type="submit"
+                aria-label="Search"
+                className="bg-marigold text-ink w-12 flex items-center justify-center hover:bg-marigold/90 transition-colors flex-shrink-0"
+              >
+                🔍
+              </button>
+            </form>
+
+            <div className="flex items-center gap-2 mt-3 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 w-fit">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green" />
+              </span>
+              <span className="text-xs text-ink/70 font-medium">{t.liveCount(totalActiveCount)}</span>
+            </div>
+
+            {validBanners.length > 1 && (
+              <div className="flex gap-1.5 mt-4">
+                {validBanners.map((b, i) => (
+                  <span
+                    key={b.id}
+                    className="hero-banner-dot h-1.5 rounded-full bg-white/40"
+                    style={{ animationDelay: `${i * 4}s` }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <HeroIntro title={t.heroTitle} subtitle={t.heroSubtitle} />
         </section>
 
+        {validBanners.length > 0 && (
+          <style>{`
+            .hero-banner-slide {
+              opacity: 0;
+              animation: heroFade ${validBanners.length * 4}s infinite;
+            }
+            @keyframes heroFade {
+              0% { opacity: 0; }
+              5% { opacity: 1; }
+              ${Math.round(100 / validBanners.length) - 5}% { opacity: 1; }
+              ${Math.round(100 / validBanners.length)}% { opacity: 0; }
+              100% { opacity: 0; }
+            }
+            .hero-banner-dot {
+              width: 1.5rem;
+              animation: heroDot ${validBanners.length * 4}s infinite;
+            }
+            @keyframes heroDot {
+              0% { background-color: rgba(255,255,255,0.9); width: 1.5rem; }
+              ${Math.round(100 / validBanners.length) - 2}% { background-color: rgba(255,255,255,0.9); width: 1.5rem; }
+              ${Math.round(100 / validBanners.length)}% { background-color: rgba(255,255,255,0.4); width: 0.375rem; }
+              100% { background-color: rgba(255,255,255,0.4); width: 0.375rem; }
+            }
+          `}</style>
+        )}
+
         {/* Category Grid */}
-        <section id="categories" className="px-4 -mt-4 pb-10 scroll-mt-20">
+        <section id="categories" className="px-4 pt-4 pb-10 scroll-mt-20">
           <div className="grid grid-cols-3 gap-2.5">
             {categories.map((c) => {
               const label = categoryLabels[c.slug];
