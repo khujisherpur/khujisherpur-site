@@ -7,10 +7,10 @@ import LanguageToggle from '../components/LanguageToggle';
 import AuthButton from '../components/AuthButton';
 import BottomNav from '../components/BottomNav';
 import HeaderBell from '../components/HeaderBell';
-import MobileMenu from '../components/MobileMenu';
 
 const text = {
   bn: {
+    tagline1: 'শেরপুরে যা খুঁজছেন', tagline2: 'এক জায়গায় খুঁজুন',
     heroTitle: 'শেরপুরে যা খুঁজছেন, এক জায়গায় খুঁজে নিন',
     searchPlaceholder: 'নাম, এলাকা, ক্যাটাগরি দিয়ে খুঁজুন...',
     whatLooking: 'কী খুঁজছেন?',
@@ -26,6 +26,7 @@ const text = {
     justNow: 'এইমাত্র', minutesAgo: (n) => `${n} মিনিট আগে`, hoursAgo: (n) => `${n} ঘণ্টা আগে`, daysAgo: (n) => `${n} দিন আগে`,
   },
   en: {
+    tagline1: 'What you\u2019re looking for in Sherpur', tagline2: 'find it all in one place',
     heroTitle: 'Find what you\u2019re looking for in Sherpur, all in one place',
     searchPlaceholder: 'Search by name, area, category...',
     whatLooking: 'What are you looking for?',
@@ -134,17 +135,20 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 bg-gradient-to-r from-green-dark to-green shadow-md">
-        <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
-          <a href="/" className="flex items-center bg-white rounded-md px-2.5 py-1.5 flex-shrink-0">
-            <img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-7 w-auto" />
+        <div className="max-w-4xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
+          <a href="/" className="flex items-center gap-2 min-w-0 flex-shrink">
+            <span className="flex items-center bg-white rounded-md px-2 py-1.5 flex-shrink-0">
+              <img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-6 w-auto" />
+            </span>
+            <span className="min-w-0 hidden sm:block">
+              <span className="block text-white text-[11px] font-medium leading-tight truncate">{t.tagline1}</span>
+              <span className="block text-white/80 text-[10px] leading-tight truncate">{t.tagline2}</span>
+            </span>
           </a>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <LanguageToggle lang={lang} variant="light" />
             <HeaderBell />
-            <div className="hidden md:block">
-              <AuthButton lang={lang} variant="light" />
-            </div>
-            <MobileMenu lang={lang} />
+            <AuthButton lang={lang} variant="light" />
           </div>
         </div>
       </header>
