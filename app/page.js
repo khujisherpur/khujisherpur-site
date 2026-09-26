@@ -69,7 +69,6 @@ export default async function HomePage() {
   const lang = getLang();
   const t = text[lang];
 
-  const today = new Date().toISOString().slice(0, 10);
   const { data: banners } = await supabase
     .from('homepage_banners')
     .select('id, image_url')
@@ -132,7 +131,6 @@ export default async function HomePage() {
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 8);
 
-  // সাম্প্রতিক সেবাদাতাদের রেটিং হিসাব
   const providersWithRating = await Promise.all(
     (recentProviders || []).slice(0, 6).map(async (p) => {
       const { data: reviews } = await supabase
@@ -174,10 +172,11 @@ export default async function HomePage() {
 
       <main className="max-w-4xl mx-auto">
         {/* Hero */}
-        <section className="relative overflow-hidden">
-          {validBanners.length > 0 ? (
-            <div className="absolute inset-0 z-0">
-              {validBanners.map((b, i) => (
+        <section className="bg-gradient-to-b from-green to-green/80 px-4 pt-4 pb-8">
+          {/* Cover photo box */}
+          <div className="relative rounded-2xl overflow-hidden border-4 border-white/60 shadow-md h-44 md:h-56 bg-green-dark/40">
+            {validBanners.length > 0 &&
+              validBanners.map((b, i) => (
                 <img
                   key={b.id}
                   src={b.image_url}
@@ -186,45 +185,15 @@ export default async function HomePage() {
                   style={{ animationDelay: `${i * 4}s` }}
                 />
               ))}
-            </div>
-          ) : (
-            <div className="absolute inset-0 z-0 bg-gradient-to-b from-green to-green/80" />
-          )}
 
-          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/35 to-transparent z-[1]" />
-
-          <div className="relative z-10 px-4 pt-16 pb-8">
-            <form action="/search" method="GET" className="flex bg-white rounded-full shadow-md overflow-hidden max-w-xl">
-              <span className="flex items-center pl-4 text-ink/40">🔍</span>
-              <input
-                type="text"
-                name="q"
-                placeholder={t.searchPlaceholder}
-                className="flex-1 bg-transparent outline-none px-3 py-3 text-sm placeholder:text-ink/40"
-              />
-              <button
-                type="submit"
-                aria-label="Search"
-                className="bg-marigold text-ink w-12 flex items-center justify-center hover:bg-marigold/90 transition-colors flex-shrink-0"
-              >
-                🔍
-              </button>
-            </form>
-
-            <div className="flex items-center gap-2 mt-3 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 w-fit">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green" />
-              </span>
-              <span className="text-xs text-ink/70 font-medium">{t.liveCount(totalActiveCount)}</span>
-            </div>
+            <HeroIntro title={t.heroTitle} subtitle={t.heroSubtitle} />
 
             {validBanners.length > 1 && (
-              <div className="flex gap-1.5 mt-4">
+              <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1.5 z-20">
                 {validBanners.map((b, i) => (
                   <span
                     key={b.id}
-                    className="hero-banner-dot h-1.5 rounded-full bg-white/40"
+                    className="hero-banner-dot h-1.5 rounded-full bg-white/50"
                     style={{ animationDelay: `${i * 4}s` }}
                   />
                 ))}
@@ -232,7 +201,31 @@ export default async function HomePage() {
             )}
           </div>
 
-          <HeroIntro title={t.heroTitle} subtitle={t.heroSubtitle} />
+          {/* Search bar — now below the cover box */}
+          <form action="/search" method="GET" className="mt-4 flex bg-white rounded-full shadow-md overflow-hidden max-w-xl">
+            <span className="flex items-center pl-4 text-ink/40">🔍</span>
+            <input
+              type="text"
+              name="q"
+              placeholder={t.searchPlaceholder}
+              className="flex-1 bg-transparent outline-none px-3 py-3 text-sm placeholder:text-ink/40"
+            />
+            <button
+              type="submit"
+              aria-label="Search"
+              className="bg-marigold text-ink w-12 flex items-center justify-center hover:bg-marigold/90 transition-colors flex-shrink-0"
+            >
+              🔍
+            </button>
+          </form>
+
+          <div className="flex items-center gap-2 mt-3 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 w-fit">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green" />
+            </span>
+            <span className="text-xs text-ink/70 font-medium">{t.liveCount(totalActiveCount)}</span>
+          </div>
         </section>
 
         {validBanners.length > 0 && (
