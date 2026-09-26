@@ -172,8 +172,8 @@ export default async function HomePage() {
 
       <main className="max-w-4xl mx-auto">
         {/* Hero */}
-        <section className="bg-gradient-to-b from-[#1B2A4A] to-[#0F1A30] px-4 pt-4 pb-8">
-          <div className="relative rounded-2xl overflow-hidden border-4 border-white/50 shadow-md aspect-[12/5] bg-[#1B2A4A]/60">
+        <section className="bg-gradient-to-b from-[#0F4D3A] to-[#0A3527] px-4 pt-4 pb-8">
+          <div className="relative rounded-2xl overflow-hidden border-4 border-white/50 shadow-md aspect-[12/5] bg-[#0F4D3A]/60">
             {validBanners.length > 0 &&
               validBanners.map((b, i) => (
                 <img
