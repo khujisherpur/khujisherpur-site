@@ -45,6 +45,8 @@ function NewPostForm() {
     sqft: '', amenities: '', mapLink: '',
     nameEn: '', slug: '', selectedSubcategoryIds: [], primarySubcategoryId: '',
   });
+  const [existingProvider, setExistingProvider] = useState(null);
+  const [checkingExisting, setCheckingExisting] = useState(false);
   const [slugTouched, setSlugTouched] = useState(false);
   const [slugStatus, setSlugStatus] = useState(null); // 'checking' | 'available' | 'adjusted'
   const [finalSlug, setFinalSlug] = useState('');
@@ -76,6 +78,20 @@ function NewPostForm() {
         setLoadingCategory(false);
       });
   }, [categorySlug]);
+
+  useEffect(() => {
+    if (!user || category?.type !== 'service') { setExistingProvider(null); return; }
+    setCheckingExisting(true);
+    supabase
+      .from('providers')
+      .select('id, name, slug, categories(slug)')
+      .eq('user_id', user.id)
+      .limit(1)
+      .then(({ data }) => {
+        setExistingProvider(data && data.length > 0 ? data[0] : null);
+        setCheckingExisting(false);
+      });
+  }, [user, category]);
 
   useEffect(() => {
     if (category?.slug !== 'service-provider') { setSubcategories([]); return; }
@@ -290,6 +306,23 @@ function NewPostForm() {
       <main className="max-w-md mx-auto px-4 py-20 text-center">
         <p className="text-ink/70 mb-4">সঠিক ক্যাটাগরি বাছাই করা হয়নি।</p>
         <a href="/" className="text-green underline">হোমপেজে ফিরে যান</a>
+      </main>
+    );
+  }
+
+  if (category.type === 'service' && checkingExisting) {
+    return <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>;
+  }
+
+  if (category.type === 'service' && existingProvider) {
+    return (
+      <main className="max-w-md mx-auto px-4 py-20 text-center">
+        <p className="text-3xl mb-4">🛠️</p>
+        <h1 className="text-xl font-semibold mb-2">আপনার ইতিমধ্যে একটি প্রোভাইডার প্রোফাইল আছে</h1>
+        <p className="text-ink/70 text-sm mb-6">
+          একটি ইমেইলে একটিই প্রোভাইডার প্রোফাইল খোলা যায় ("{existingProvider.name}")। নতুন সেবা যোগ করতে চাইলে আপনার বিদ্যমান প্রোফাইল এডিট করুন।
+        </p>
+        <a href="/dashboard" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5">ড্যাশবোর্ডে যান</a>
       </main>
     );
   }
