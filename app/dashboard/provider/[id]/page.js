@@ -3,13 +3,19 @@ export const runtime = 'edge';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../../lib/supabaseClient';
 import ImageCropper from '../../../../components/ImageCropper';
+import { locations, upazilaList } from '../../../../lib/locations';
 
 export default function EditProviderPage({ params }) {
   const [form, setForm] = useState({
     name: '', area: '', phone: '', description: '',
     experienceYears: '', vehicleType: 'ac',
+    nameEn: '', upazila: '', unionName: '',
   });
   const [categorySlug, setCategorySlug] = useState(null);
+  const [slug, setSlug] = useState(null);
+  const [primarySubcategory, setPrimarySubcategory] = useState(null);
+  const [subcategories, setSubcategories] = useState([]);
+  const [selectedSubcategoryIds, setSelectedSubcategoryIds] = useState([]);
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(null);
   const [pendingFile, setPendingFile] = useState(null);
   const [newPhoto, setNewPhoto] = useState(null);
@@ -29,25 +35,56 @@ export default function EditProviderPage({ params }) {
 
     const { data, error } = await supabase
       .from('providers')
-      .select('name, area, phone, description, photo_url, experience_years, vehicle_type, categories(slug)')
+      .select(`
+        name, area, phone, description, photo_url, experience_years, vehicle_type,
+        name_en, slug, upazila, union_name, primary_subcategory_id, category_id,
+        categories(slug), subcategories:primary_subcategory_id(name_bn)
+      `)
       .eq('id', params.id)
       .single();
 
     if (error) {
       setError('এই প্রোফাইলটি খুঁজে পাওয়া যায়নি বা এডিট করার অনুমতি নেই।');
-    } else {
-      setForm({
-        name: data.name, area: data.area, phone: data.phone, description: data.description || '',
-        experienceYears: data.experience_years || '', vehicleType: data.vehicle_type || 'ac',
-      });
-      setCurrentPhotoUrl(data.photo_url);
-      setCategorySlug(data.categories?.slug);
+      setLoading(false);
+      return;
     }
+
+    setForm({
+      name: data.name, area: data.area, phone: data.phone, description: data.description || '',
+      experienceYears: data.experience_years || '', vehicleType: data.vehicle_type || 'ac',
+      nameEn: data.name_en || '', upazila: data.upazila || '', unionName: data.union_name || '',
+    });
+    setCurrentPhotoUrl(data.photo_url);
+    setCategorySlug(data.categories?.slug);
+    setSlug(data.slug);
+    setPrimarySubcategory(data.subcategories?.name_bn || null);
+
+    if (data.categories?.slug === 'service-provider') {
+      const [{ data: allSubs }, { data: mySubs }] = await Promise.all([
+        supabase.from('subcategories').select('id, name_bn').eq('category_id', data.category_id).eq('is_active', true).order('sort_order'),
+        supabase.from('provider_subcategories').select('subcategory_id').eq('provider_id', params.id),
+      ]);
+      setSubcategories(allSubs || []);
+      setSelectedSubcategoryIds((mySubs || []).map((r) => r.subcategory_id));
+    }
+
     setLoading(false);
   }
 
   function updateField(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  function handleUpazilaChange(value) {
+    setForm((f) => ({ ...f, upazila: value, unionName: '' }));
+  }
+
+  function toggleSubcategory(id) {
+    // প্রধান সেবা কখনো বাদ দেওয়া যাবে না
+    if (id === primarySubcategoryId) return;
+    setSelectedSubcategoryIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   }
 
   function handleFileSelect(e) {
@@ -89,13 +126,22 @@ export default function EditProviderPage({ params }) {
         description: form.description,
         photo_url: photoUrl,
         experience_years: form.experienceYears ? parseInt(form.experienceYears) : null,
+        upazila: form.upazila,
+        union_name: form.unionName,
         status: 'pending',
       };
       if (categorySlug === 'ambulance') payload.vehicle_type = form.vehicleType;
+      if (categorySlug === 'service-provider') payload.name_en = form.nameEn.trim();
 
       const { error } = await supabase.from('providers').update(payload).eq('id', params.id);
-
       if (error) throw error;
+
+      if (categorySlug === 'service-provider') {
+        await supabase.from('provider_subcategories').delete().eq('provider_id', params.id);
+        const rows = selectedSubcategoryIds.map((sid) => ({ provider_id: params.id, subcategory_id: sid }));
+        if (rows.length > 0) await supabase.from('provider_subcategories').insert(rows);
+      }
+
       setSaved(true);
     } catch (err) {
       setError(err.message);
@@ -127,6 +173,9 @@ export default function EditProviderPage({ params }) {
     );
   }
 
+  const isServiceProvider = categorySlug === 'service-provider';
+  const unionsForUpazila = form.upazila ? locations[form.upazila] || [] : [];
+
   return (
     <main className="max-w-xl mx-auto px-4 py-10">
       {pendingFile && (
@@ -143,6 +192,20 @@ export default function EditProviderPage({ params }) {
       </header>
 
       <h1 className="text-xl font-semibold mb-6">প্রোফাইল এডিট করুন</h1>
+
+      {isServiceProvider && slug && (
+        <div className="bg-paper border border-ink/10 rounded-md px-4 py-3 mb-4 text-sm">
+          <p className="text-ink/60">
+            প্রোফাইল লিংক: <span className="font-medium text-ink">/{slug}</span>
+          </p>
+          {primarySubcategory && (
+            <p className="text-ink/60 mt-1">
+              প্রধান সেবা: <span className="font-medium text-ink">{primarySubcategory}</span>
+            </p>
+          )}
+          <p className="text-ink/40 text-xs mt-1">এই দুটো পরিবর্তন করা যায় না</p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="bg-white border-2 border-ink/10 p-6 space-y-4">
         <div>
@@ -161,21 +224,60 @@ export default function EditProviderPage({ params }) {
         </div>
 
         <div>
-          <label className="block text-sm mb-1.5 text-ink/70">নাম</label>
+          <label className="block text-sm mb-1.5 text-ink/70">নাম (বাংলা)</label>
           <input
             type="text" required value={form.name}
             onChange={(e) => updateField('name', e.target.value)}
             className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
           />
         </div>
+
+        {isServiceProvider && (
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">নাম (ইংরেজি)</label>
+            <input
+              type="text" required value={form.nameEn}
+              onChange={(e) => updateField('nameEn', e.target.value)}
+              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
+            />
+            <p className="text-xs text-ink/50 mt-1">এটা বদলালেও প্রোফাইল লিংক (/{slug}) একই থাকবে</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">উপজেলা</label>
+            <select
+              required value={form.upazila}
+              onChange={(e) => handleUpazilaChange(e.target.value)}
+              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+            >
+              <option value="">নির্বাচন করুন...</option>
+              {upazilaList.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">ইউনিয়ন</label>
+            <select
+              required value={form.unionName} disabled={!form.upazila}
+              onChange={(e) => updateField('unionName', e.target.value)}
+              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white disabled:bg-paper disabled:text-ink/30"
+            >
+              <option value="">নির্বাচন করুন...</option>
+              {unionsForUpazila.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+        </div>
+
         <div>
-          <label className="block text-sm mb-1.5 text-ink/70">এলাকা</label>
+          <label className="block text-sm mb-1.5 text-ink/70">সুনির্দিষ্ট এলাকা/বাজার</label>
           <input
             type="text" required value={form.area}
             onChange={(e) => updateField('area', e.target.value)}
             className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
           />
         </div>
+
         <div>
           <label className="block text-sm mb-1.5 text-ink/70">ফোন নম্বর</label>
           <input
@@ -212,6 +314,32 @@ export default function EditProviderPage({ params }) {
                 Non-AC
               </button>
             </div>
+          </div>
+        )}
+
+        {isServiceProvider && (
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">কোন কোন সেবা দেন?</label>
+            <div className="border border-ink/20 rounded-md divide-y divide-ink/10 max-h-64 overflow-y-auto">
+              {subcategories.map((s) => {
+                const checked = selectedSubcategoryIds.includes(s.id);
+                const isPrimary = s.name_bn === primarySubcategory;
+                return (
+                  <label key={s.id} className="flex items-center justify-between px-3 py-2.5 text-sm">
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="checkbox" checked={checked} disabled={isPrimary}
+                        onChange={() => toggleSubcategory(s.id)}
+                        className="w-4 h-4"
+                      />
+                      {s.name_bn}
+                    </span>
+                    {isPrimary && <span className="text-[10px] bg-green/10 text-green px-2 py-0.5 rounded-full">প্রধান</span>}
+                  </label>
+                );
+              })}
+            </div>
+            <p className="text-xs text-ink/50 mt-1.5">প্রধান সেবা বাদ দেওয়া যাবে না, শুধু নতুন সেবা যোগ/বাদ দেওয়া যাবে</p>
           </div>
         )}
 
