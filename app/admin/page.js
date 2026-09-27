@@ -10,7 +10,7 @@ const sidebarItems = [
   { key: 'reports', icon: '⚠️', label: 'রিপোর্ট/অভিযোগ', enabled: true },
   { key: 'banners', icon: '🖼️', label: 'ব্যানার ব্যবস্থাপনা', enabled: true },
   { key: 'users', icon: '👥', label: 'ব্যবহারকারী ব্যবস্থাপনা', enabled: false },
-  { key: 'categories', icon: '📁', label: 'ক্যাটাগরি ব্যবস্থাপনা', enabled: false },
+  { key: 'categories', icon: '📁', label: 'ক্যাটাগরি ব্যবস্থাপনা', enabled: true },
   { key: 'settings', icon: '⚙️', label: 'সাইট সেটিংস', enabled: false },
 ];
 
@@ -33,6 +33,12 @@ export default function AdminPage() {
   });
   const [bannerUploading, setBannerUploading] = useState(false);
 
+  const [allCategories, setAllCategories] = useState([]);
+  const [serviceCategoryId, setServiceCategoryId] = useState(null);
+  const [subcats, setSubcats] = useState([]);
+  const [subcatForm, setSubcatForm] = useState({ nameBn: '', nameEn: '' });
+  const [savingSubcat, setSavingSubcat] = useState(false);
+
   useEffect(() => {
     init();
   }, []);
@@ -54,7 +60,7 @@ export default function AdminPage() {
     setRole(profile?.role || 'user');
 
     if (profile?.role === 'admin' || profile?.role === 'moderator') {
-      await Promise.all([loadPending(), loadReports(), loadStats(), loadBanners()]);
+      await Promise.all([loadPending(), loadReports(), loadStats(), loadBanners(), loadCategoryData()]);
     }
     setLoading(false);
   }
@@ -196,6 +202,72 @@ export default function AdminPage() {
     if (!confirm('এই ব্যানারটা মুছে ফেলতে চান?')) return;
     await supabase.from('homepage_banners').delete().eq('id', id);
     loadBanners();
+  }
+
+  function slugifySubcat(text) {
+    return text.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
+  }
+
+  async function loadCategoryData() {
+    const { data: cats } = await supabase.from('categories').select('*').order('sort_order', { ascending: true });
+    setAllCategories(cats || []);
+
+    const serviceCat = (cats || []).find((c) => c.slug === 'service-provider');
+    if (!serviceCat) return;
+    setServiceCategoryId(serviceCat.id);
+
+    const { data: subs } = await supabase
+      .from('subcategories')
+      .select('*')
+      .eq('category_id', serviceCat.id)
+      .order('sort_order', { ascending: true });
+    setSubcats(subs || []);
+  }
+
+  async function toggleCategoryActive(id, current) {
+    await supabase.from('categories').update({ is_active: !current }).eq('id', id);
+    loadCategoryData();
+  }
+
+  async function updateCategorySortOrder(id, value) {
+    await supabase.from('categories').update({ sort_order: parseInt(value) || 0 }).eq('id', id);
+  }
+
+  async function addSubcategory(e) {
+    e.preventDefault();
+    if (!subcatForm.nameBn.trim() || !serviceCategoryId) return;
+    setSavingSubcat(true);
+    const slug = slugifySubcat(subcatForm.nameEn || subcatForm.nameBn);
+    await supabase.from('subcategories').insert({
+      category_id: serviceCategoryId,
+      name_bn: subcatForm.nameBn.trim(),
+      name_en: subcatForm.nameEn.trim() || subcatForm.nameBn.trim(),
+      slug,
+      sort_order: subcats.length,
+    });
+    setSubcatForm({ nameBn: '', nameEn: '' });
+    setSavingSubcat(false);
+    loadCategoryData();
+  }
+
+  async function toggleSubcatActive(id, current) {
+    await supabase.from('subcategories').update({ is_active: !current }).eq('id', id);
+    loadCategoryData();
+  }
+
+  async function updateSubcatSortOrder(id, value) {
+    await supabase.from('subcategories').update({ sort_order: parseInt(value) || 0 }).eq('id', id);
+  }
+
+  async function deleteSubcategory(id) {
+    const { count } = await supabase.from('providers').select('id', { count: 'exact', head: true }).eq('primary_subcategory_id', id);
+    if (count > 0) {
+      alert(`এই সাব-ক্যাটাগরিতে ${count} জন প্রোভাইডার আছে, তাই এটা মুছে ফেলা যাবে না। বরং "নিষ্ক্রিয়" করে দিন।`);
+      return;
+    }
+    if (!confirm('এই সাব-ক্যাটাগরিটা মুছে ফেলতে চান?')) return;
+    await supabase.from('subcategories').delete().eq('id', id);
+    loadCategoryData();
   }
 
   const statusLabel = {
@@ -494,6 +566,95 @@ export default function AdminPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'categories' && (
+          <div className="space-y-8">
+            <div>
+              <h2 className="text-lg font-medium mb-3">সেবাদাতার সাব-ক্যাটাগরি</h2>
+
+              <form onSubmit={addSubcategory} className="bg-white border border-ink/10 p-4 mb-4 flex gap-2 flex-wrap items-end">
+                <div className="flex-1 min-w-[140px]">
+                  <label className="block text-xs mb-1 text-ink/50">নাম (বাংলা)</label>
+                  <input
+                    type="text" required value={subcatForm.nameBn}
+                    onChange={(e) => setSubcatForm({ ...subcatForm, nameBn: e.target.value })}
+                    className="w-full border border-ink/15 px-3 py-2 text-sm rounded-md"
+                    placeholder="যেমন: রংমিস্ত্রি"
+                  />
+                </div>
+                <div className="flex-1 min-w-[140px]">
+                  <label className="block text-xs mb-1 text-ink/50">নাম (ইংরেজি, ঐচ্ছিক)</label>
+                  <input
+                    type="text" value={subcatForm.nameEn}
+                    onChange={(e) => setSubcatForm({ ...subcatForm, nameEn: e.target.value })}
+                    className="w-full border border-ink/15 px-3 py-2 text-sm rounded-md"
+                    placeholder="Painter"
+                  />
+                </div>
+                <button type="submit" disabled={savingSubcat} className="bg-green text-white text-sm px-4 py-2 rounded-md disabled:opacity-50 flex-shrink-0">
+                  {savingSubcat ? 'যোগ হচ্ছে...' : '+ যোগ করুন'}
+                </button>
+              </form>
+
+              <div className="space-y-2">
+                {subcats.map((s) => (
+                  <div key={s.id} className="bg-white border border-ink/10 p-3 flex items-center gap-3">
+                    <input
+                      type="number" defaultValue={s.sort_order}
+                      onBlur={(e) => updateSubcatSortOrder(s.id, e.target.value)}
+                      className="w-14 border border-ink/15 px-2 py-1 text-sm rounded-md text-center"
+                      title="ক্রম"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{s.name_bn}</p>
+                      <p className="text-xs text-ink/40 truncate">{s.slug}</p>
+                    </div>
+                    <button
+                      onClick={() => toggleSubcatActive(s.id, s.is_active)}
+                      className={`text-xs px-2.5 py-1 rounded-full flex-shrink-0 ${s.is_active ? 'bg-green/10 text-green' : 'bg-ink/5 text-ink/40'}`}
+                    >
+                      {s.is_active ? 'সক্রিয়' : 'নিষ্ক্রিয়'}
+                    </button>
+                    <button
+                      onClick={() => deleteSubcategory(s.id)}
+                      className="text-xs border border-red-300 text-red-600 px-2.5 py-1 rounded-md flex-shrink-0"
+                    >
+                      মুছুন
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h2 className="text-lg font-medium mb-3">সব ক্যাটাগরি</h2>
+              <p className="text-xs text-ink/50 mb-3">নতুন top-level ক্যাটাগরি যোগ করতে ডেভেলপারের সাহায্য লাগবে — এখান থেকে শুধু ক্রম ও সক্রিয়/নিষ্ক্রিয় বদলানো যাবে।</p>
+              <div className="space-y-2">
+                {allCategories.map((c) => (
+                  <div key={c.id} className="bg-white border border-ink/10 p-3 flex items-center gap-3">
+                    <input
+                      type="number" defaultValue={c.sort_order}
+                      onBlur={(e) => updateCategorySortOrder(c.id, e.target.value)}
+                      className="w-14 border border-ink/15 px-2 py-1 text-sm rounded-md text-center"
+                      title="ক্রম"
+                    />
+                    <span className="text-lg flex-shrink-0">{c.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{c.name}</p>
+                      <p className="text-xs text-ink/40 truncate">{c.slug}</p>
+                    </div>
+                    <button
+                      onClick={() => toggleCategoryActive(c.id, c.is_active)}
+                      className={`text-xs px-2.5 py-1 rounded-full flex-shrink-0 ${c.is_active !== false ? 'bg-green/10 text-green' : 'bg-ink/5 text-ink/40'}`}
+                    >
+                      {c.is_active !== false ? 'সক্রিয়' : 'নিষ্ক্রিয়'}
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
