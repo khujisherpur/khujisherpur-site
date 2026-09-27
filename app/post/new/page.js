@@ -7,6 +7,16 @@ import { locations, upazilaList } from '../../../lib/locations';
 
 const rentTypeLabels = { house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য' };
 const roomOptions = ['১', '২', '৩', '৪+'];
+const roomOptions = ['১', '২', '৩', '৪+'];
+
+const categoryFieldText = {
+  rent: { titlePh: 'যেমন: ২ বেডরুম বাসা, শেরপুর সদর', priceLabel: 'ভাড়া', pricePh: '৮,০০০' },
+  'buy-sell': { titlePh: 'যেমন: স্যামসাং স্মার্টফোন', priceLabel: 'মূল্য', pricePh: '১৫,০০০' },
+  job: { titlePh: 'যেমন: সেলসম্যান প্রয়োজন', priceLabel: 'বেতন', pricePh: '১৫,০০০' },
+  'agri-product': { titlePh: 'যেমন: টাটকা দেশি মুরগি (প্রতি কেজি)', priceLabel: 'মূল্য', pricePh: '৩০০' },
+  teacher: { titlePh: 'যেমন: গণিত ও ইংরেজি প্রাইভেট টিউটর প্রয়োজন', priceLabel: 'টিউশন ফি (মাসিক)', pricePh: '৩,০০০' },
+  venue: { titlePh: 'যেমন: কমিউনিটি সেন্টার ভাড়া দেওয়া হবে', priceLabel: 'ভাড়া', pricePh: '১০,০০০' },
+};
 
 function slugify(text) {
   return text
@@ -368,7 +378,7 @@ function NewPostForm() {
               type="text" required value={form.title}
               onChange={(e) => updateField('title', e.target.value)}
               className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
-              placeholder={isBuySell ? 'যেমন: স্যামসাং স্মার্টফোন' : isJob ? 'যেমন: সেলসম্যান প্রয়োজন' : 'যেমন: ২ বেডরুম বাসা, শেরপুর সদর'}
+              placeholder={categoryFieldText[category.slug]?.titlePh || 'শিরোনাম লিখুন'}
             />
           </div>
         )}
@@ -628,7 +638,7 @@ function NewPostForm() {
         {!isService && (
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">
-              {isJob ? 'বেতন' : isBuySell ? 'মূল্য' : 'ভাড়া'}
+              {categoryFieldText[category.slug]?.priceLabel || 'মূল্য'}
             </label>
             <div className="flex items-center border border-ink/20 focus-within:border-green">
               <span className="pl-3 pr-1 text-ink/50 text-lg font-numeric select-none">৳</span>
@@ -636,7 +646,7 @@ function NewPostForm() {
                 type="text" required value={form.priceOrSalary}
                 onChange={(e) => updateField('priceOrSalary', e.target.value)}
                 className="flex-1 py-2.5 pr-3 outline-none text-lg font-numeric tracking-wide"
-                placeholder="৮,০০০"
+                placeholder={categoryFieldText[category.slug]?.pricePh || '০'}
                 inputMode="numeric"
               />
             </div>
