@@ -8,6 +8,16 @@ import { locations, upazilaList } from '../../../lib/locations';
 const rentTypeLabels = { house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য' };
 const roomOptions = ['১', '২', '৩', '৪+'];
 
+function slugify(text) {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 function NewPostForm() {
   const searchParams = useSearchParams();
   const categorySlug = searchParams.get('category');
@@ -24,7 +34,11 @@ function NewPostForm() {
     condition: 'used', negotiable: false, deadline: '', vehicleType: 'ac',
     experienceYears: '', upazila: '', unionName: '', subcategoryId: '',
     sqft: '', amenities: '', mapLink: '',
+    nameEn: '', slug: '', selectedSubcategoryIds: [], primarySubcategoryId: '',
   });
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [slugStatus, setSlugStatus] = useState(null); // 'checking' | 'available' | 'adjusted'
+  const [finalSlug, setFinalSlug] = useState('');
 
   const [pendingFile, setPendingFile] = useState(null);
   const [providerPhoto, setProviderPhoto] = useState(null);
@@ -58,12 +72,42 @@ function NewPostForm() {
     if (category?.slug !== 'service-provider') { setSubcategories([]); return; }
     supabase
       .from('subcategories')
-      .select('id, name_bn')
+      .select('id, name_bn, slug')
       .eq('category_id', category.id)
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
       .then(({ data }) => setSubcategories(data || []));
   }, [category]);
+
+  // nameEn বদলালে, ম্যানুয়ালি slug এডিট না করা থাকলে অটো-জেনারেট
+  useEffect(() => {
+    if (category?.slug === 'service-provider' && !slugTouched) {
+      setForm((f) => ({ ...f, slug: slugify(f.nameEn) }));
+    }
+  }, [form.nameEn]);
+
+  // slug বদলালে অ্যাভেইলেবিলিটি চেক (debounced)
+  useEffect(() => {
+    if (category?.slug !== 'service-provider' || !form.slug) {
+      setSlugStatus(null);
+      setFinalSlug('');
+      return;
+    }
+    setSlugStatus('checking');
+    const timer = setTimeout(async () => {
+      let candidate = form.slug;
+      let suffix = 1;
+      while (true) {
+        const { data } = await supabase.from('providers').select('id').eq('slug', candidate).maybeSingle();
+        if (!data) break;
+        suffix += 1;
+        candidate = `${form.slug}-${suffix}`;
+      }
+      setFinalSlug(candidate);
+      setSlugStatus(candidate === form.slug ? 'available' : 'adjusted');
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [form.slug, category]);
 
   function updateField(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -71,6 +115,17 @@ function NewPostForm() {
 
   function handleUpazilaChange(value) {
     setForm((f) => ({ ...f, upazila: value, unionName: '' }));
+  }
+
+  function toggleSubcategory(id) {
+    setForm((f) => {
+      const selected = f.selectedSubcategoryIds.includes(id)
+        ? f.selectedSubcategoryIds.filter((x) => x !== id)
+        : [...f.selectedSubcategoryIds, id];
+      let primary = f.primarySubcategoryId;
+      if (!selected.includes(primary)) primary = selected[0] || '';
+      return { ...f, selectedSubcategoryIds: selected, primarySubcategoryId: primary };
+    });
   }
 
   function handleFileSelect(e) {
@@ -109,9 +164,11 @@ function NewPostForm() {
       setError('উপজেলা ও ইউনিয়ন বাছাই করুন');
       return;
     }
-    if (category.slug === 'service-provider' && !form.subcategoryId) {
-      setError('কোন ধরনের সেবা দেন তা বাছাই করুন');
-      return;
+    const isServiceProvider = category.slug === 'service-provider';
+    if (isServiceProvider) {
+      if (!form.nameEn.trim()) { setError('ইংরেজি নাম দিন (এটা দিয়ে আপনার প্রোফাইল লিংক তৈরি হবে)'); return; }
+      if (form.selectedSubcategoryIds.length === 0) { setError('অন্তত একটা সেবা বাছাই করুন'); return; }
+      if (!form.primarySubcategoryId) { setError('প্রধান সেবা বাছাই করুন'); return; }
     }
     setSubmitting(true);
     setError(null);
@@ -119,7 +176,6 @@ function NewPostForm() {
     try {
       const isService = category.type === 'service';
       const isAmbulance = category.slug === 'ambulance';
-      const isServiceProvider = category.slug === 'service-provider';
       const isRent = category.slug === 'rent';
       const isBuySell = category.slug === 'buy-sell';
       const isJob = category.slug === 'job';
@@ -141,10 +197,20 @@ function NewPostForm() {
           experience_years: form.experienceYears ? parseInt(form.experienceYears) : null,
         };
         if (isAmbulance) payload.vehicle_type = form.vehicleType;
-        if (isServiceProvider) payload.subcategory_id = form.subcategoryId;
+        if (isServiceProvider) {
+          payload.name_en = form.nameEn.trim();
+          payload.slug = finalSlug || slugify(form.nameEn);
+          payload.primary_subcategory_id = form.primarySubcategoryId;
+          payload.subcategory_id = form.primarySubcategoryId; // পুরনো কোডের সাথে সামঞ্জস্যের জন্য
+        }
 
-        const { error } = await supabase.from('providers').insert(payload);
+        const { data: inserted, error } = await supabase.from('providers').insert(payload).select('id').single();
         if (error) throw error;
+
+        if (isServiceProvider && inserted) {
+          const rows = form.selectedSubcategoryIds.map((sid) => ({ provider_id: inserted.id, subcategory_id: sid }));
+          await supabase.from('provider_subcategories').insert(rows);
+        }
       } else {
         let photoUrls = [];
         if (listingPhotos.length > 0) {
@@ -240,6 +306,7 @@ function NewPostForm() {
   const isJob = category.slug === 'job';
   const showBedroomFields = isRent && (form.rentType === 'house' || form.rentType === 'mess');
   const unionsForUpazila = form.upazila ? locations[form.upazila] || [] : [];
+  const primarySubcatName = subcategories.find((s) => s.id === form.primarySubcategoryId)?.name_bn;
 
   return (
     <main className="max-w-xl mx-auto px-4 py-10">
@@ -286,7 +353,7 @@ function NewPostForm() {
 
         {isService ? (
           <div>
-            <label className="block text-sm mb-1.5 text-ink/70">আপনার নাম</label>
+            <label className="block text-sm mb-1.5 text-ink/70">আপনার নাম (বাংলা)</label>
             <input
               type="text" required value={form.name}
               onChange={(e) => updateField('name', e.target.value)}
@@ -307,19 +374,77 @@ function NewPostForm() {
         )}
 
         {isServiceProvider && (
-          <div>
-            <label className="block text-sm mb-1.5 text-ink/70">কোন ধরনের সেবা দেন?</label>
-            <select
-              required value={form.subcategoryId}
-              onChange={(e) => updateField('subcategoryId', e.target.value)}
-              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
-            >
-              <option value="">নির্বাচন করুন...</option>
-              {subcategories.map((s) => (
-                <option key={s.id} value={s.id}>{s.name_bn}</option>
-              ))}
-            </select>
-          </div>
+          <>
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">আপনার নাম (ইংরেজি)</label>
+              <input
+                type="text" required value={form.nameEn}
+                onChange={(e) => updateField('nameEn', e.target.value)}
+                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
+                placeholder="যেমন: Rahim Uddin"
+              />
+              <p className="text-xs text-ink/50 mt-1">এটা দিয়ে আপনার প্রোফাইলের লিংক তৈরি হবে</p>
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">প্রোফাইল লিংক (URL)</label>
+              <input
+                type="text" required value={form.slug}
+                onChange={(e) => { setSlugTouched(true); updateField('slug', slugify(e.target.value)); }}
+                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green font-numeric"
+                placeholder="rahim-uddin"
+              />
+              {form.slug && (
+                <div className="mt-2 bg-paper border border-ink/10 rounded-md px-3 py-2 text-xs">
+                  <p className="text-ink/60">
+                    আপনার লিংক: <span className="font-medium text-green">
+                      khujisherpur-site.pages.dev/{subcategories.find((s) => s.id === form.primarySubcategoryId)?.slug || '...'}/{slugStatus === 'checking' ? form.slug : (finalSlug || form.slug)}
+                    </span>
+                  </p>
+                  {slugStatus === 'checking' && <p className="text-ink/40 mt-1">চেক করা হচ্ছে...</p>}
+                  {slugStatus === 'available' && <p className="text-green mt-1">✓ এই লিংকটি পাওয়া যাচ্ছে</p>}
+                  {slugStatus === 'adjusted' && (
+                    <p className="text-marigold mt-1">⚠️ এই নামে আগে থেকে একজন আছে, তাই "{finalSlug}" ব্যবহার হবে</p>
+                  )}
+                  <p className="text-red-500 mt-1.5 font-medium">⚠️ এই লিংক পরে আর বদলানো যাবে না, ভালো করে দেখে নিন</p>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">কোন কোন সেবা দেন? (একাধিক বাছাই করা যাবে)</label>
+              <div className="border border-ink/20 rounded-md divide-y divide-ink/10 max-h-64 overflow-y-auto">
+                {subcategories.map((s) => {
+                  const checked = form.selectedSubcategoryIds.includes(s.id);
+                  return (
+                    <div key={s.id} className="flex items-center justify-between px-3 py-2.5">
+                      <label className="flex items-center gap-2 text-sm flex-1">
+                        <input
+                          type="checkbox" checked={checked}
+                          onChange={() => toggleSubcategory(s.id)}
+                          className="w-4 h-4"
+                        />
+                        {s.name_bn}
+                      </label>
+                      {checked && (
+                        <label className="flex items-center gap-1.5 text-xs text-ink/60 flex-shrink-0">
+                          <input
+                            type="radio" name="primarySubcategory"
+                            checked={form.primarySubcategoryId === s.id}
+                            onChange={() => updateField('primarySubcategoryId', s.id)}
+                          />
+                          প্রধান
+                        </label>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {primarySubcatName && (
+                <p className="text-xs text-ink/50 mt-1.5">প্রধান সেবা: <span className="font-medium text-ink">{primarySubcatName}</span> (এটা পরে বদলানো যাবে না)</p>
+              )}
+            </div>
+          </>
         )}
 
         {isRent && (
@@ -334,7 +459,6 @@ function NewPostForm() {
           </div>
         )}
 
-        {/* উপজেলা + ইউনিয়ন — সব ক্যাটাগরিতে */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">উপজেলা</label>
