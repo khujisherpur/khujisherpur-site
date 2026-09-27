@@ -57,11 +57,11 @@ export default function LocationFilter({ lang, currentQuery, currentUpazila, cur
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`flex items-center gap-1.5 text-sm px-4 py-2 border flex-shrink-0 whitespace-nowrap ${
-          hasFilter ? 'bg-green text-white border-green' : 'border-ink/15 text-ink/60 bg-white'
+        className={`flex items-center gap-1.5 text-sm px-4 py-3 rounded-xl shadow-md flex-shrink-0 whitespace-nowrap max-w-[130px] transition-colors ${
+          hasFilter ? 'bg-green text-white' : 'bg-white text-ink/70 hover:bg-paper'
         }`}
       >
-        📍 {hasFilter ? (currentUnion || currentUpazila) : t.filter}
+        📍 <span className="truncate">{hasFilter ? (currentUnion || currentUpazila) : t.filter}</span>
       </button>
 
       {open && (
