@@ -262,7 +262,6 @@ export default async function HomePage() {
             <h2 className="text-lg font-semibold">{t.whatLooking}</h2>
             <a
               href="#categories"
-              onClick={(e) => { e.preventDefault(); document.getElementById('post-fab')?.click(); }}
               className="bg-marigold text-ink text-sm font-semibold px-4 py-2 rounded-full flex-shrink-0 whitespace-nowrap"
             >
               + {t.postButton}
