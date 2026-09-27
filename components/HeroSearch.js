@@ -24,15 +24,15 @@ export default function HeroSearch({ lang, placeholder }) {
   }
 
   return (
-    <div>
-      <form onSubmit={handleSubmit} className="flex bg-white rounded-full shadow-md overflow-hidden max-w-xl">
+    <div className="flex items-center gap-2 max-w-xl">
+      <form onSubmit={handleSubmit} className="flex-1 min-w-0 flex bg-white rounded-full shadow-md overflow-hidden">
         <span className="flex items-center pl-4 text-ink/40">🔍</span>
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
-          className="flex-1 bg-transparent outline-none px-3 py-3 text-sm placeholder:text-ink/40"
+          className="flex-1 min-w-0 bg-transparent outline-none px-3 py-3 text-sm placeholder:text-ink/40"
         />
         <button
           type="submit"
@@ -42,15 +42,13 @@ export default function HeroSearch({ lang, placeholder }) {
           🔍
         </button>
       </form>
-      <div className="mt-2">
-        <LocationFilter
-          lang={lang}
-          currentQuery={query}
-          currentUpazila={upazila}
-          currentUnion={unionName}
-          onApply={handleApply}
-        />
-      </div>
+      <LocationFilter
+        lang={lang}
+        currentQuery={query}
+        currentUpazila={upazila}
+        currentUnion={unionName}
+        onApply={handleApply}
+      />
     </div>
   );
 }
