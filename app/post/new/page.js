@@ -7,7 +7,6 @@ import { locations, upazilaList } from '../../../lib/locations';
 
 const rentTypeLabels = { house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য' };
 const roomOptions = ['১', '২', '৩', '৪+'];
-const roomOptions = ['১', '২', '৩', '৪+'];
 
 const categoryFieldText = {
   rent: { titlePh: 'যেমন: ২ বেডরুম বাসা, শেরপুর সদর', priceLabel: 'ভাড়া', pricePh: '৮,০০০' },
