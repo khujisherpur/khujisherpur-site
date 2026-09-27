@@ -8,6 +8,7 @@ import AuthButton from '../components/AuthButton';
 import BottomNav from '../components/BottomNav';
 import HeaderBell from '../components/HeaderBell';
 import HeroIntro from '../components/HeroIntro';
+import HeroSearch from '../components/HeroSearch';
 
 const text = {
   bn: {
@@ -204,22 +205,9 @@ export default async function HomePage() {
             )}
           </div>
 
-          <form action="/search" method="GET" className="mt-4 flex bg-white rounded-full shadow-md overflow-hidden max-w-xl">
-            <span className="flex items-center pl-4 text-ink/40">🔍</span>
-            <input
-              type="text"
-              name="q"
-              placeholder={t.searchPlaceholder}
-              className="flex-1 bg-transparent outline-none px-3 py-3 text-sm placeholder:text-ink/40"
-            />
-            <button
-              type="submit"
-              aria-label="Search"
-              className="bg-marigold text-ink w-12 flex items-center justify-center hover:bg-marigold/90 transition-colors flex-shrink-0"
-            >
-              🔍
-            </button>
-          </form>
+          <div className="mt-4">
+            <HeroSearch lang={lang} placeholder={t.searchPlaceholder} />
+          </div>
 
           <div className="flex items-center gap-2 mt-3 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 w-fit">
             <span className="relative flex h-2.5 w-2.5">
