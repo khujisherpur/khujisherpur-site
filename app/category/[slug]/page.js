@@ -13,6 +13,7 @@ const text = {
     noListing: 'এখনো কোনো পোস্ট নেই। প্রথম হিসেবে আপনি যোগ করতে পারেন!',
     unavailable: 'এই মুহূর্তে অনুপলব্ধ', notFound: 'এই ক্যাটাগরি খুঁজে পাওয়া যায়নি।', backHome: 'হোমপেজে ফিরে যান',
     all: 'সব', house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য',
+    whichService: 'কোন সেবা খুঁজছেন?', backToServices: '← সব সেবা',
   },
   en: {
     login: 'Login', home: '← Home',
@@ -21,16 +22,25 @@ const text = {
     noListing: 'No posts yet. Be the first to add one!',
     unavailable: 'Currently unavailable', notFound: 'Category not found.', backHome: 'Back to Home',
     all: 'All', house: 'House', shop: 'Shop', mess: 'Mess', other: 'Other',
+    whichService: 'Which service are you looking for?', backToServices: '← All services',
   },
 };
 
 const rentTypeTabs = ['house', 'shop', 'mess', 'other'];
+
+const subcategoryIcons = {
+  electrician: '⚡', plumber: '🚰', 'ac-technician': '❄️', 'fridge-technician': '🧊',
+  mechanic: '⚙️', carpenter: '🪚', mason: '🧱', painter: '🎨', cleaning: '🧹',
+  'mobile-repair': '📱', 'computer-repair': '💻', cctv: '📹',
+  'internet-wifi': '📶', driver: '🚗', 'transport-shifting': '🚚',
+};
 
 export default async function CategoryPage({ params, searchParams }) {
   const lang = getLang();
   const t = text[lang];
   const label = categoryLabels[params.slug];
   const activeRentType = searchParams?.type || 'all';
+  const activeSub = searchParams?.sub || null;
 
   const { data: category } = await supabase
     .from('categories')
@@ -49,16 +59,97 @@ export default async function CategoryPage({ params, searchParams }) {
 
   const isService = category.type === 'service';
   const isRent = category.slug === 'rent';
+  const isServiceProvider = category.slug === 'service-provider';
   const name = label[lang].name;
 
+  // সেবাদাতা ক্যাটাগরি + এখনো সাব-ক্যাটাগরি বাছা হয়নি → সাব-ক্যাটাগরি গ্রিড দেখাও
+  if (isServiceProvider && !activeSub) {
+    const { data: subcats } = await supabase
+      .from('subcategories')
+      .select('id, slug, name_bn, name_en')
+      .eq('category_id', category.id)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    // প্রতিটা সাব-ক্যাটাগরিতে কতজন প্রোভাইডার আছে (কাউন্ট)
+    const subWithCounts = await Promise.all(
+      (subcats || []).map(async (s) => {
+        const { count } = await supabase
+          .from('providers')
+          .select('id', { count: 'exact', head: true })
+          .eq('subcategory_id', s.id)
+          .eq('status', 'approved');
+        return { ...s, count: count || 0 };
+      })
+    );
+
+    return (
+      <main className="max-w-4xl mx-auto px-4">
+        <header className="flex items-center justify-between py-6 flex-wrap gap-3">
+          <a href="/" className="flex items-center">
+            <img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-10 w-auto" />
+          </a>
+          <div className="flex items-center gap-2">
+            <LanguageToggle lang={lang} />
+            <a href="/login" className="text-sm border border-ink/20 rounded-full px-4 py-1.5 hover:bg-white transition-colors">
+              {t.login}
+            </a>
+          </div>
+        </header>
+
+        <div className="py-6">
+          <a href="/" className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
+          <div className="flex items-center gap-3 mt-3">
+            <span className="text-3xl">{label.icon}</span>
+            <h1 className="text-2xl md:text-3xl font-semibold">{name}</h1>
+          </div>
+          <p className="text-ink/60 text-sm mt-2">{t.whichService}</p>
+        </div>
+
+        <section className="pb-16 grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+          {subWithCounts.map((s) => (
+            <a
+              key={s.id}
+              href={`/category/service-provider?sub=${s.slug}`}
+              className="bg-white rounded-xl border border-ink/10 p-3 hover:shadow-md transition-shadow text-center"
+            >
+              <span className="w-11 h-11 mx-auto rounded-lg flex items-center justify-center text-xl bg-[#EEF1F8]">
+                {subcategoryIcons[s.slug] || '🛠️'}
+              </span>
+              <p className="font-medium text-xs mt-2 leading-tight">
+                {lang === 'bn' ? s.name_bn : (s.name_en || s.name_bn)}
+              </p>
+              {s.count > 0 && (
+                <p className="text-[10px] text-ink/40 mt-0.5 font-numeric">{s.count}</p>
+              )}
+            </a>
+          ))}
+        </section>
+      </main>
+    );
+  }
+
   let items = [];
+  let activeSubcategory = null;
+
   if (isService) {
-    const { data } = await supabase
+    let query = supabase
       .from('providers')
       .select('id, name, area, is_available')
       .eq('category_id', category.id)
-      .eq('status', 'approved')
-      .order('created_at', { ascending: false });
+      .eq('status', 'approved');
+
+    if (isServiceProvider && activeSub) {
+      const { data: subRow } = await supabase
+        .from('subcategories')
+        .select('id, name_bn, name_en')
+        .eq('slug', activeSub)
+        .single();
+      activeSubcategory = subRow;
+      if (subRow) query = query.eq('subcategory_id', subRow.id);
+    }
+
+    const { data } = await query.order('created_at', { ascending: false });
     items = data || [];
   } else {
     let query = supabase
@@ -91,13 +182,22 @@ export default async function CategoryPage({ params, searchParams }) {
       </header>
 
       <div className="py-6">
-        <a href="/" className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
+        <a
+          href={isServiceProvider ? '/category/service-provider' : '/'}
+          className="text-sm text-ink/50 hover:text-ink"
+        >
+          {isServiceProvider ? t.backToServices : t.home}
+        </a>
         <div className="flex items-center gap-3 mt-3">
-          <span className="text-3xl">{label.icon}</span>
-          <h1 className="text-2xl md:text-3xl font-semibold">{name}</h1>
+          <span className="text-3xl">{isServiceProvider && activeSubcategory ? (subcategoryIcons[activeSub] || '🛠️') : label.icon}</span>
+          <h1 className="text-2xl md:text-3xl font-semibold">
+            {isServiceProvider && activeSubcategory
+              ? (lang === 'bn' ? activeSubcategory.name_bn : (activeSubcategory.name_en || activeSubcategory.name_bn))
+              : name}
+          </h1>
         </div>
         <a
-          href={`/post/new?category=${category.slug}`}
+          href={isServiceProvider ? `/post/new?category=${category.slug}&sub=${activeSub}` : `/post/new?category=${category.slug}`}
           className="inline-block mt-4 bg-marigold text-ink font-semibold px-5 py-2.5 hover:bg-marigold/90 transition-colors"
         >
           {isService ? t.addProfile : t.addPost}
