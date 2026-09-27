@@ -14,7 +14,7 @@ const text = {
   },
 };
 
-export default function LocationFilter({ lang, currentQuery, currentUpazila, currentUnion }) {
+export default function LocationFilter({ lang, currentQuery, currentUpazila, currentUnion, onApply }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [upazila, setUpazila] = useState(currentUpazila || '');
@@ -30,14 +30,22 @@ export default function LocationFilter({ lang, currentQuery, currentUpazila, cur
   }
 
   function apply() {
-    router.push(buildUrl(upazila, unionName));
+    if (onApply) {
+      onApply(upazila, unionName);
+    } else {
+      router.push(buildUrl(upazila, unionName));
+    }
     setOpen(false);
   }
 
   function clear() {
     setUpazila('');
     setUnionName('');
-    router.push(buildUrl('', ''));
+    if (onApply) {
+      onApply('', '');
+    } else {
+      router.push(buildUrl('', ''));
+    }
     setOpen(false);
   }
 
