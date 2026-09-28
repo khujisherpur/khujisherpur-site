@@ -3,11 +3,11 @@ export const dynamic = 'force-dynamic';
 import { supabase } from '../../../lib/supabaseClient';
 import { getLang } from '../../../lib/getLang';
 import { categoryLabels } from '../../../lib/categoryLabels';
-import LanguageToggle from '../../../components/LanguageToggle';
+import SiteHeader from '../../../components/SiteHeader';
 
 const text = {
   bn: {
-    login: 'লগইন', home: '← হোমপেজ',
+    home: '← হোমপেজ',
     addProfile: '+ আপনার প্রোফাইল যুক্ত করুন', addPost: '+ নতুন পোস্ট দিন',
     noProvider: 'এখনো কোনো প্রোভাইডার নেই। প্রথম হিসেবে আপনি যোগ করতে পারেন!',
     noListing: 'এখনো কোনো পোস্ট নেই। প্রথম হিসেবে আপনি যোগ করতে পারেন!',
@@ -16,7 +16,7 @@ const text = {
     whichService: 'কোন সেবা খুঁজছেন?', backToServices: '← সব সেবা',
   },
   en: {
-    login: 'Login', home: '← Home',
+    home: '← Home',
     addProfile: '+ Add Your Profile', addPost: '+ Post New Listing',
     noProvider: 'No providers yet. Be the first to add one!',
     noListing: 'No posts yet. Be the first to add one!',
@@ -50,10 +50,13 @@ export default async function CategoryPage({ params, searchParams }) {
 
   if (!category || !label) {
     return (
-      <main className="max-w-4xl mx-auto px-4 py-20 text-center">
-        <p className="text-ink/70">{t.notFound}</p>
-        <a href="/" className="text-green underline mt-2 inline-block">{t.backHome}</a>
-      </main>
+      <>
+        <SiteHeader lang={lang} />
+        <main className="max-w-4xl mx-auto px-4 py-20 text-center">
+          <p className="text-ink/70">{t.notFound}</p>
+          <a href="/" className="text-green underline mt-2 inline-block">{t.backHome}</a>
+        </main>
+      </>
     );
   }
 
@@ -62,7 +65,6 @@ export default async function CategoryPage({ params, searchParams }) {
   const isServiceProvider = category.slug === 'service-provider';
   const name = label[lang].name;
 
-  // সেবাদাতা ক্যাটাগরি + এখনো সাব-ক্যাটাগরি বাছা হয়নি → সাব-ক্যাটাগরি গ্রিড দেখাও
   if (isServiceProvider && !activeSub) {
     const { data: subcats } = await supabase
       .from('subcategories')
@@ -71,7 +73,6 @@ export default async function CategoryPage({ params, searchParams }) {
       .eq('is_active', true)
       .order('sort_order', { ascending: true });
 
-    // প্রতিটা সাব-ক্যাটাগরিতে কতজন প্রোভাইডার আছে (কাউন্ট)
     const subWithCounts = await Promise.all(
       (subcats || []).map(async (s) => {
         const { count } = await supabase
@@ -84,48 +85,39 @@ export default async function CategoryPage({ params, searchParams }) {
     );
 
     return (
-      <main className="max-w-4xl mx-auto px-4">
-        <header className="flex items-center justify-between py-6 flex-wrap gap-3">
-          <a href="/" className="flex items-center">
-            <img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-10 w-auto" />
-          </a>
-          <div className="flex items-center gap-2">
-            <LanguageToggle lang={lang} />
-            <a href="/login" className="text-sm border border-ink/20 rounded-full px-4 py-1.5 hover:bg-white transition-colors">
-              {t.login}
-            </a>
+      <>
+        <SiteHeader lang={lang} />
+        <main className="max-w-4xl mx-auto px-4">
+          <div className="py-6">
+            <a href="/" className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
+            <div className="flex items-center gap-3 mt-3">
+              <span className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-[#EEF1F8]">{label.icon}</span>
+              <h1 className="text-2xl md:text-3xl font-semibold">{name}</h1>
+            </div>
+            <p className="text-ink/60 text-sm mt-2">{t.whichService}</p>
           </div>
-        </header>
 
-        <div className="py-6">
-          <a href="/" className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
-          <div className="flex items-center gap-3 mt-3">
-            <span className="text-3xl">{label.icon}</span>
-            <h1 className="text-2xl md:text-3xl font-semibold">{name}</h1>
-          </div>
-          <p className="text-ink/60 text-sm mt-2">{t.whichService}</p>
-        </div>
-
-        <section className="pb-16 grid grid-cols-3 sm:grid-cols-4 gap-2.5">
-          {subWithCounts.map((s) => (
-            <a
-              key={s.id}
-              href={`/category/service-provider?sub=${s.slug}`}
-              className="bg-white rounded-xl border border-ink/10 p-3 hover:shadow-md transition-shadow text-center"
-            >
-              <span className="w-11 h-11 mx-auto rounded-lg flex items-center justify-center text-xl bg-[#EEF1F8]">
-                {subcategoryIcons[s.slug] || '🛠️'}
-              </span>
-              <p className="font-medium text-xs mt-2 leading-tight">
-                {lang === 'bn' ? s.name_bn : (s.name_en || s.name_bn)}
-              </p>
-              {s.count > 0 && (
-                <p className="text-[10px] text-ink/40 mt-0.5 font-numeric">{s.count}</p>
-              )}
-            </a>
-          ))}
-        </section>
-      </main>
+          <section className="pb-16 grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+            {subWithCounts.map((s) => (
+              <a
+                key={s.id}
+                href={`/category/service-provider?sub=${s.slug}`}
+                className="bg-white rounded-xl border border-ink/10 border-b-4 border-b-green p-3 hover:shadow-md transition-shadow text-center"
+              >
+                <span className="w-11 h-11 mx-auto rounded-lg flex items-center justify-center text-xl bg-[#EEF1F8]">
+                  {subcategoryIcons[s.slug] || '🛠️'}
+                </span>
+                <p className="font-medium text-xs mt-2 leading-tight">
+                  {lang === 'bn' ? s.name_bn : (s.name_en || s.name_bn)}
+                </p>
+                {s.count > 0 && (
+                  <p className="text-[10px] text-ink/40 mt-0.5 font-numeric">{s.count}</p>
+                )}
+              </a>
+            ))}
+          </section>
+        </main>
+      </>
     );
   }
 
@@ -168,93 +160,86 @@ export default async function CategoryPage({ params, searchParams }) {
   }
 
   return (
-    <main className="max-w-4xl mx-auto px-4">
-      <header className="flex items-center justify-between py-6 flex-wrap gap-3">
-        <a href="/" className="flex items-center">
-          <img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-10 w-auto" />
-        </a>
-        <div className="flex items-center gap-2">
-          <LanguageToggle lang={lang} />
-          <a href="/login" className="text-sm border border-ink/20 rounded-full px-4 py-1.5 hover:bg-white transition-colors">
-            {t.login}
-          </a>
-        </div>
-      </header>
-
-      <div className="py-6">
-        <a
-          href={isServiceProvider ? '/category/service-provider' : '/'}
-          className="text-sm text-ink/50 hover:text-ink"
-        >
-          {isServiceProvider ? t.backToServices : t.home}
-        </a>
-        <div className="flex items-center gap-3 mt-3">
-          <span className="text-3xl">{isServiceProvider && activeSubcategory ? (subcategoryIcons[activeSub] || '🛠️') : label.icon}</span>
-          <h1 className="text-2xl md:text-3xl font-semibold">
-            {isServiceProvider && activeSubcategory
-              ? (lang === 'bn' ? activeSubcategory.name_bn : (activeSubcategory.name_en || activeSubcategory.name_bn))
-              : name}
-          </h1>
-        </div>
-        <a
-          href={isServiceProvider ? `/post/new?category=${category.slug}&sub=${activeSub}` : `/post/new?category=${category.slug}`}
-          className="inline-block mt-4 bg-marigold text-ink font-semibold px-5 py-2.5 hover:bg-marigold/90 transition-colors"
-        >
-          {isService ? t.addProfile : t.addPost}
-        </a>
-      </div>
-
-      {isRent && (
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+    <>
+      <SiteHeader lang={lang} />
+      <main className="max-w-4xl mx-auto px-4">
+        <div className="py-6">
           <a
-            href={`/category/rent`}
-            className={`text-sm px-4 py-1.5 rounded-full whitespace-nowrap flex-shrink-0 ${
-              activeRentType === 'all' ? 'bg-green text-white' : 'bg-white border border-ink/15 text-ink/60'
-            }`}
+            href={isServiceProvider ? '/category/service-provider' : '/'}
+            className="text-sm text-ink/50 hover:text-ink"
           >
-            {t.all}
+            {isServiceProvider ? t.backToServices : t.home}
           </a>
-          {rentTypeTabs.map((rt) => (
+          <div className="flex items-center gap-3 mt-3">
+            <span className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-[#EEF1F8]">
+              {isServiceProvider && activeSubcategory ? (subcategoryIcons[activeSub] || '🛠️') : label.icon}
+            </span>
+            <h1 className="text-2xl md:text-3xl font-semibold">
+              {isServiceProvider && activeSubcategory
+                ? (lang === 'bn' ? activeSubcategory.name_bn : (activeSubcategory.name_en || activeSubcategory.name_bn))
+                : name}
+            </h1>
+          </div>
+          <a
+            href={isServiceProvider ? `/post/new?category=${category.slug}&sub=${activeSub}` : `/post/new?category=${category.slug}`}
+            className="inline-block mt-4 bg-marigold text-ink font-semibold px-5 py-2.5 hover:bg-marigold/90 transition-colors"
+          >
+            {isService ? t.addProfile : t.addPost}
+          </a>
+        </div>
+
+        {isRent && (
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
             <a
-              key={rt}
-              href={`/category/rent?type=${rt}`}
+              href={`/category/rent`}
               className={`text-sm px-4 py-1.5 rounded-full whitespace-nowrap flex-shrink-0 ${
-                activeRentType === rt ? 'bg-green text-white' : 'bg-white border border-ink/15 text-ink/60'
+                activeRentType === 'all' ? 'bg-green text-white' : 'bg-white border border-ink/15 text-ink/60'
               }`}
             >
-              {t[rt]}
+              {t.all}
             </a>
-          ))}
-        </div>
-      )}
-
-      <section className="pb-16 space-y-3">
-        {items.length === 0 && (
-          <p className="text-ink/50 text-sm py-10 text-center">
-            {isService ? t.noProvider : t.noListing}
-          </p>
-        )}
-        {isService
-          ? items.map((p) => (
-              <a key={p.id} href={`/provider/${p.id}`} className="block bg-white p-4 border border-ink/10 hover:border-green transition-colors">
-                <p className="font-medium">{p.name}</p>
-                <p className="text-sm text-ink/60 mt-1">{p.area}</p>
-                {!p.is_available && <p className="text-xs text-red-500 mt-1">{t.unavailable}</p>}
-              </a>
-            ))
-          : items.map((l) => (
-              <a key={l.id} href={`/listing/${l.id}`} className="block bg-white p-4 border border-ink/10 hover:border-green transition-colors">
-                {isRent && l.rent_type && (
-                  <span className="inline-block text-[10px] bg-paper text-ink/50 px-2 py-0.5 rounded-full mb-1.5">
-                    {t[l.rent_type] || l.rent_type}
-                  </span>
-                )}
-                <p className="font-medium">{l.title}</p>
-                <p className="text-sm text-ink/60 mt-1">{l.area}</p>
-                <p className="text-sm text-green font-numeric mt-1">{l.price_or_salary}</p>
+            {rentTypeTabs.map((rt) => (
+              <a
+                key={rt}
+                href={`/category/rent?type=${rt}`}
+                className={`text-sm px-4 py-1.5 rounded-full whitespace-nowrap flex-shrink-0 ${
+                  activeRentType === rt ? 'bg-green text-white' : 'bg-white border border-ink/15 text-ink/60'
+                }`}
+              >
+                {t[rt]}
               </a>
             ))}
-      </section>
-    </main>
+          </div>
+        )}
+
+        <section className="pb-16 space-y-3">
+          {items.length === 0 && (
+            <p className="text-ink/50 text-sm py-10 text-center">
+              {isService ? t.noProvider : t.noListing}
+            </p>
+          )}
+          {isService
+            ? items.map((p) => (
+                <a key={p.id} href={`/provider/${p.id}`} className="block bg-white p-4 border border-ink/10 border-l-4 border-l-green hover:shadow-md transition-shadow">
+                  <p className="font-medium">{p.name}</p>
+                  <p className="text-sm text-ink/60 mt-1">{p.area}</p>
+                  {!p.is_available && <p className="text-xs text-red-500 mt-1">{t.unavailable}</p>}
+                </a>
+              ))
+            : items.map((l) => (
+                <a key={l.id} href={`/listing/${l.id}`} className="block bg-white p-4 border border-ink/10 border-l-4 border-l-marigold hover:shadow-md transition-shadow">
+                  {isRent && l.rent_type && (
+                    <span className="inline-block text-[10px] bg-[#EEF1F8] text-ink/60 px-2 py-0.5 rounded-full mb-1.5">
+                      {t[l.rent_type] || l.rent_type}
+                    </span>
+                  )}
+                  <p className="font-medium">{l.title}</p>
+                  <p className="text-sm text-ink/60 mt-1">{l.area}</p>
+                  <p className="text-sm text-green font-numeric mt-1">{l.price_or_salary}</p>
+                </a>
+              ))}
+        </section>
+      </main>
+    </>
   );
 }
