@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import NotificationBell from '../../components/NotificationBell';
 import BottomNav from '../../components/BottomNav';
+import SiteHeader from '../../components/SiteHeader';
 
 const text = {
   bn: {
@@ -109,6 +110,7 @@ export default function DashboardPage() {
       .order('posted_at', { ascending: false });
     setListings(l || []);
   }
+
   async function deleteProvider(id, photoUrl) {
     if (!confirm(t.confirmDeleteProvider)) return;
 
@@ -117,6 +119,9 @@ export default function DashboardPage() {
       await supabase.storage.from('images').remove([path]);
     }
 
+    await supabase.from('provider_subcategories').delete().eq('provider_id', id);
+    await supabase.from('reviews').delete().eq('provider_id', id);
+    await supabase.from('favorites').delete().eq('provider_id', id);
     await supabase.from('providers').delete().eq('id', id);
     loadMyPosts(user.id);
   }
@@ -153,143 +158,156 @@ export default function DashboardPage() {
     window.location.href = '/';
   }
 
-  if (loading) return <p className="text-center py-20 text-ink/60">{t.loading}</p>;
+  if (loading) {
+    return (
+      <>
+        <SiteHeader lang={lang} simple />
+        <p className="text-center py-20 text-ink/60">{t.loading}</p>
+      </>
+    );
+  }
 
   if (!user) {
     return (
-      <main className="max-w-md mx-auto px-4 py-20 text-center">
-        <p className="text-ink/70 mb-4">{t.loginRequired}</p>
-        <a href="/login" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5">{t.loginButton}</a>
-      </main>
+      <>
+        <SiteHeader lang={lang} simple />
+        <main className="max-w-md mx-auto px-4 py-20 text-center">
+          <p className="text-ink/70 mb-4">{t.loginRequired}</p>
+          <a href="/login" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5">{t.loginButton}</a>
+        </main>
+      </>
     );
   }
 
   return (
-    <main className="max-w-2xl mx-auto px-4 py-10">
-      <header className="flex items-center justify-between mb-8 flex-wrap gap-3">
-        <a href="/"><img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-9 w-auto" /></a>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <NotificationBell userId={user.id} />
-          <div className="flex border border-ink/20 rounded-full overflow-hidden text-sm">
-            <button
-              onClick={() => setLang('bn')}
-              className={`px-3 py-1 ${lang === 'bn' ? 'bg-green text-white' : 'text-ink/60'}`}
-            >
-              বাংলা
-            </button>
-            <button
-              onClick={() => setLang('en')}
-              className={`px-3 py-1 ${lang === 'en' ? 'bg-green text-white' : 'text-ink/60'}`}
-            >
-              English
+    <>
+      <SiteHeader lang={lang} simple />
+      <main className="max-w-2xl mx-auto px-4 py-6">
+        <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold mb-1">{t.myPosts}</h1>
+            <p className="text-ink/60 text-sm">{user.email}</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <NotificationBell userId={user.id} />
+            <div className="flex border border-ink/20 rounded-full overflow-hidden text-sm">
+              <button
+                onClick={() => setLang('bn')}
+                className={`px-3 py-1 ${lang === 'bn' ? 'bg-green text-white' : 'text-ink/60'}`}
+              >
+                বাংলা
+              </button>
+              <button
+                onClick={() => setLang('en')}
+                className={`px-3 py-1 ${lang === 'en' ? 'bg-green text-white' : 'text-ink/60'}`}
+              >
+                English
+              </button>
+            </div>
+            <button onClick={handleLogout} className="text-sm border border-ink/20 rounded-full px-4 py-1.5 hover:bg-white">
+              {t.logout}
             </button>
           </div>
-          <button onClick={handleLogout} className="text-sm border border-ink/20 rounded-full px-4 py-1.5 hover:bg-white">
-            {t.logout}
-          </button>
         </div>
-      </header>
 
-<h1 className="text-2xl font-semibold mb-1">{t.myPosts}</h1>
-      <p className="text-ink/60 text-sm mb-8">{user.email}</p>
-
-      <div className="flex gap-4 mb-8">
-        <a href="/dashboard/favorites" className="text-sm text-green underline">
-          ❤️ আমার ফেভারিট দেখুন
-        </a>
-        <a href="/dashboard/donor" className="text-sm text-red-500 underline">
-          🩸 ডোনার ড্যাশবোর্ড
-        </a>
-      </div>
-
-      {/* প্রোভাইডার প্রোফাইল */}
-      <section className="mb-10">
-        <h2 className="text-lg font-medium mb-3">{t.providerSection} ({providers.length})</h2>
-        {providers.length === 0 && (
-          <p className="text-ink/50 text-sm">{t.noProvider}</p>
-        )}
-        <div className="space-y-3">
-          {providers.map((p) => (
-            <div key={p.id} className="bg-white border border-ink/10 p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-medium">{p.name}</p>
-                  <p className="text-sm text-ink/60">{p.categories?.name} · {p.area}</p>
-                  <p className="text-xs text-ink/40 mt-0.5">👁️ {p.view_count || 0} বার দেখা হয়েছে</p>
-                </div>
-                <span className={`text-xs font-medium ${statusColor[p.status]}`}>
-                  {t.status[p.status]}
-                </span>
-              </div>
-              <div className="flex gap-2 mt-3 flex-wrap">
-                <a href={`/dashboard/provider/${p.id}`} className="text-sm border border-ink/20 px-3 py-1.5 hover:bg-paper">
-                  {t.edit}
-                </a>
-                {p.status === 'approved' && (
-                  <button
-                    onClick={() => toggleAvailability(p.id, p.is_available)}
-                    className="text-sm border border-ink/20 px-3 py-1.5 hover:bg-paper"
-                  >
-                    {p.is_available ? t.makeUnavailable : t.makeAvailable}
-                  </button>
-                )}
-                <button
-                  onClick={() => deleteProvider(p.id, p.photo_url)}
-                  className="text-sm border border-red-300 text-red-600 px-3 py-1.5 hover:bg-red-50"
-                >
-                  {t.delete}
-                </button>
-              </div>
-            </div>
-          ))}
+        <div className="flex gap-4 mb-8">
+          <a href="/dashboard/favorites" className="text-sm text-green underline">
+            ❤️ আমার ফেভারিট দেখুন
+          </a>
+          <a href="/dashboard/donor" className="text-sm text-red-500 underline">
+            🩸 ডোনার ড্যাশবোর্ড
+          </a>
         </div>
-      </section>
 
-      {/* লিস্টিং পোস্ট */}
-      <section>
-        <h2 className="text-lg font-medium mb-3">{t.listingSection} ({listings.length})</h2>
-        {listings.length === 0 && (
-          <p className="text-ink/50 text-sm">{t.noListing}</p>
-        )}
-        <div className="space-y-3">
-          {listings.map((l) => (
-            <div key={l.id} className="bg-white border border-ink/10 p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-medium">{l.title}</p>
-                  <p className="text-sm text-ink/60">{l.categories?.name} · {l.area}</p>
-                  <p className="text-xs text-ink/40 mt-0.5">👁️ {l.view_count || 0} বার দেখা হয়েছে</p>
+        {/* প্রোভাইডার প্রোফাইল */}
+        <section className="mb-10">
+          <h2 className="text-lg font-medium mb-3">{t.providerSection} ({providers.length})</h2>
+          {providers.length === 0 && (
+            <p className="text-ink/50 text-sm">{t.noProvider}</p>
+          )}
+          <div className="space-y-3">
+            {providers.map((p) => (
+              <div key={p.id} className="bg-white border border-ink/10 border-l-4 border-l-green p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-medium">{p.name}</p>
+                    <p className="text-sm text-ink/60">{p.categories?.name} · {p.area}</p>
+                    <p className="text-xs text-ink/40 mt-0.5">👁️ {p.view_count || 0} বার দেখা হয়েছে</p>
+                  </div>
+                  <span className={`text-xs font-medium ${statusColor[p.status]}`}>
+                    {t.status[p.status]}
+                  </span>
                 </div>
-                <span className={`text-xs font-medium ${statusColor[l.status]}`}>
-                  {t.status[l.status]}
-                </span>
-              </div>
-              <div className="flex gap-2 mt-3">
-                <a href={`/dashboard/listing/${l.id}`} className="text-sm border border-ink/20 px-3 py-1.5 hover:bg-paper">
-                  {t.edit}
-                </a>
-                {l.status === 'expired' && (
+                <div className="flex gap-2 mt-3 flex-wrap">
+                  <a href={`/dashboard/provider/${p.id}`} className="text-sm border border-ink/20 px-3 py-1.5 hover:bg-[#EEF1F8]">
+                    {t.edit}
+                  </a>
+                  {p.status === 'approved' && (
+                    <button
+                      onClick={() => toggleAvailability(p.id, p.is_available)}
+                      className="text-sm border border-ink/20 px-3 py-1.5 hover:bg-[#EEF1F8]"
+                    >
+                      {p.is_available ? t.makeUnavailable : t.makeAvailable}
+                    </button>
+                  )}
                   <button
-                    onClick={() => renewListing(l.id)}
-                    className="text-sm bg-green text-white px-3 py-1.5 hover:bg-green-dark"
+                    onClick={() => deleteProvider(p.id, p.photo_url)}
+                    className="text-sm border border-red-300 text-red-600 px-3 py-1.5 hover:bg-red-50"
                   >
-                    {lang === 'bn' ? 'রিনিউ করুন (৩০ দিন)' : 'Renew (30 days)'}
+                    {t.delete}
                   </button>
-                )}
-                <button
-                  onClick={() => deleteListing(l.id, l.photos)}
-                  className="text-sm border border-red-300 text-red-600 px-3 py-1.5 hover:bg-red-50"
-                >
-                  {t.delete}
-                </button>
+                </div>
               </div>
-            </div>
-          ))}
-      </div>
-      </section>
+            ))}
+          </div>
+        </section>
 
-      <BottomNav activeTab="account" />
-      <div className="h-16" />
-    </main>
+        {/* লিস্টিং পোস্ট */}
+        <section>
+          <h2 className="text-lg font-medium mb-3">{t.listingSection} ({listings.length})</h2>
+          {listings.length === 0 && (
+            <p className="text-ink/50 text-sm">{t.noListing}</p>
+          )}
+          <div className="space-y-3">
+            {listings.map((l) => (
+              <div key={l.id} className="bg-white border border-ink/10 border-l-4 border-l-marigold p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-medium">{l.title}</p>
+                    <p className="text-sm text-ink/60">{l.categories?.name} · {l.area}</p>
+                    <p className="text-xs text-ink/40 mt-0.5">👁️ {l.view_count || 0} বার দেখা হয়েছে</p>
+                  </div>
+                  <span className={`text-xs font-medium ${statusColor[l.status]}`}>
+                    {t.status[l.status]}
+                  </span>
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <a href={`/dashboard/listing/${l.id}`} className="text-sm border border-ink/20 px-3 py-1.5 hover:bg-[#EEF1F8]">
+                    {t.edit}
+                  </a>
+                  {l.status === 'expired' && (
+                    <button
+                      onClick={() => renewListing(l.id)}
+                      className="text-sm bg-green text-white px-3 py-1.5 hover:bg-green-dark"
+                    >
+                      {lang === 'bn' ? 'রিনিউ করুন (৩০ দিন)' : 'Renew (30 days)'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => deleteListing(l.id, l.photos)}
+                    className="text-sm border border-red-300 text-red-600 px-3 py-1.5 hover:bg-red-50"
+                  >
+                    {t.delete}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <BottomNav activeTab="account" />
+        <div className="h-16" />
+      </main>
+    </>
   );
 }
