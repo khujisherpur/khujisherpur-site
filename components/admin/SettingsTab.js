@@ -40,7 +40,12 @@ const groups = [
   },
 ];
 
-const allKeys = [...groups.flatMap((g) => g.fields.map((f) => f.key)), 'auto_approve_posts'];
+const allKeys = [
+  ...groups.flatMap((g) => g.fields.map((f) => f.key)),
+  'auto_approve_posts',
+  'maintenance_mode',
+  'maintenance_message',
+];
 
 function Toggle({ checked, onChange }) {
   return (
@@ -135,6 +140,7 @@ export default function SettingsTab() {
   }
 
   const autoApprove = values.auto_approve_posts === 'true';
+  const maintenance = values.maintenance_mode === 'true';
 
   return (
     <div className="pb-24">
@@ -198,6 +204,36 @@ export default function SettingsTab() {
         </section>
       </div>
 
+<section className={`mt-4 bg-white rounded-xl border border-ink/10 border-l-4 p-4 ${maintenance ? 'border-l-red-500' : 'border-l-ink/20'}`}>
+        <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+          <span className="w-7 h-7 rounded-lg bg-[#EEF1F8] flex items-center justify-center text-sm">🛠️</span>
+          মেইনটেন্যান্স মোড
+        </h3>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">সাইট সাময়িক বন্ধ রাখুন</p>
+            <p className="text-xs text-ink/50 mt-0.5">
+              চালু থাকলে সবাই রক্ষণাবেক্ষণের পেজ দেখবে। অ্যাডমিন পেজ ও লগইন খোলা থাকবে।
+            </p>
+          </div>
+          <Toggle checked={maintenance} onChange={(v) => setField('maintenance_mode', v ? 'true' : 'false')} />
+        </div>
+        <div className="mt-3">
+          <label className="block text-xs text-ink/60 mb-1">দর্শককে দেখানোর বার্তা (ঐচ্ছিক)</label>
+          <textarea
+            rows={2}
+            value={values.maintenance_message || ''}
+            onChange={(e) => setField('maintenance_message', e.target.value)}
+            placeholder="যেমন: আজ রাত ১০টা পর্যন্ত কাজ চলবে।"
+            className="w-full border border-ink/15 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-green resize-none"
+          />
+        </div>
+        {maintenance && (
+          <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mt-3">
+            ⚠️ সেভ করলেই সাইট সবার জন্য বন্ধ হয়ে যাবে।
+          </p>
+        )}
+      </section>
       {/* Sticky save bar */}
       {changedKeys.length > 0 && (
         <div className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-ink/10 shadow-[0_-2px_10px_rgba(0,0,0,0.06)] px-4 py-3 flex items-center gap-3 md:pl-64">
