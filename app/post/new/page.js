@@ -43,6 +43,7 @@ function NewPostForm() {
 
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isBanned, setIsBanned] = useState(false);
   const [category, setCategory] = useState(null);
   const [loadingCategory, setLoadingCategory] = useState(true);
   const [subcategories, setSubcategories] = useState([]);
@@ -70,8 +71,16 @@ function NewPostForm() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       setUser(data.user);
+      if (data.user) {
+        const { data: ban } = await supabase
+          .from('banned_users')
+          .select('user_id')
+          .eq('user_id', data.user.id)
+          .maybeSingle();
+        setIsBanned(!!ban);
+      }
       setCheckingAuth(false);
     });
   }, []);
@@ -314,7 +323,25 @@ function NewPostForm() {
       </PageShell>
     );
   }
-
+  
+if (isBanned) {
+    return (
+      <PageShell>
+        <main className="max-w-md mx-auto px-4 py-16 text-center">
+          <div className="bg-white border border-ink/10 border-t-4 border-t-red-500 rounded-xl p-6">
+            <p className="text-4xl mb-3">🚫</p>
+            <h1 className="text-lg font-semibold mb-2">আপনার অ্যাকাউন্ট সাসপেন্ড করা আছে</h1>
+            <p className="text-ink/70 text-sm mb-5">
+              সাইটের নিয়ম লঙ্ঘনের কারণে আপাতত আপনি নতুন পোস্ট বা প্রোফাইল তৈরি করতে পারবেন না। ভুল হয়ে থাকলে অ্যাডমিনের সাথে যোগাযোগ করুন।
+            </p>
+            <a href="/" className="inline-block bg-green text-white text-sm font-medium px-5 py-2.5 rounded-lg">
+              হোমপেজে ফিরুন
+            </a>
+          </div>
+        </main>
+      </PageShell>
+    );
+  }
   if (!category) {
     return (
       <PageShell>
