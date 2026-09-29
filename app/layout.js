@@ -1,5 +1,10 @@
 import { Hind_Siliguri, Noto_Serif_Bengali } from 'next/font/google';
 import './globals.css';
+import { supabase } from '../lib/supabaseClient';
+import MaintenanceGate from '../components/MaintenanceGate';
+
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
 
 const hind = Hind_Siliguri({
   subsets: ['bengali', 'latin'],
@@ -14,7 +19,7 @@ const notoSerifBn = Noto_Serif_Bengali({
 });
 
 export const metadata = {
-  title: 'খুঁজি শেরপুর | শেরপুরে যা খুঁজছেন, এক জায়গায় খুঁজে নিন',
+  title: 'খুঁজি শেরপুর | শেরপুরে যা খুঁজছেন, এক জায়গায় খুঁজুন',
   description:
     'শেরপুর জেলায় বাসা ভাড়া, মেস ভাড়া, চাকরি বিজ্ঞপ্তি, ইলেকট্রিশিয়ান ও প্লাম্বার — সব এক জায়গায় খুঁজুন।',
   icons: {
@@ -26,11 +31,27 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  let maintenance = false;
+  let message = '';
+  try {
+    const { data } = await supabase
+      .from('site_settings')
+      .select('key, value')
+      .in('key', ['maintenance_mode', 'maintenance_message']);
+    const s = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
+    maintenance = s.maintenance_mode === 'true';
+    message = s.maintenance_message || '';
+  } catch (e) {
+    maintenance = false;
+  }
+
   return (
     <html lang="bn" className={`${hind.variable} ${notoSerifBn.variable}`}>
       <body className="bg-paper text-ink font-sans antialiased">
-        {children}
+        <MaintenanceGate active={maintenance} message={message}>
+          {children}
+        </MaintenanceGate>
       </body>
     </html>
   );
