@@ -69,6 +69,8 @@ function categoryHref(cat) {
 export default async function HomePage() {
   const lang = getLang();
   const t = text[lang];
+  const { data: settingsRows } = await supabase.from('site_settings').select('key, value');
+  const settings = Object.fromEntries((settingsRows || []).map((r) => [r.key, r.value]));
 
   const { data: banners } = await supabase
     .from('homepage_banners')
@@ -190,7 +192,7 @@ export default async function HomePage() {
                 />
               ))}
 
-            <HeroIntro title={t.heroTitle} subtitle={t.heroSubtitle} />
+            <HeroIntro title={t.heroTitle} subtitle={settings.tagline || t.heroSubtitle} />
 
             {validBanners.length > 1 && (
               <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1.5 z-20">
@@ -404,7 +406,22 @@ export default async function HomePage() {
             <a href="/privacy" className="hover:text-ink">{t.privacy}</a>
             <a href="/disclaimer" className="hover:text-ink">{t.disclaimer}</a>
           </div>
-          <p>{t.footer}</p>
+          {(settings.contact_phone || settings.contact_email || settings.facebook_url) && (
+            <div className="flex gap-4 flex-wrap justify-center text-xs">
+              {settings.contact_phone && (
+                <a href={`tel:${settings.contact_phone}`} className="hover:text-ink">📞 {settings.contact_phone}</a>
+              )}
+              {settings.contact_email && (
+                <a href={`mailto:${settings.contact_email}`} className="hover:text-ink">✉️ {settings.contact_email}</a>
+              )}
+              {settings.facebook_url && (
+                <a href={settings.facebook_url} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
+                  📘 {lang === 'bn' ? 'ফেসবুক পেজ' : 'Facebook'}
+                </a>
+              )}
+            </div>
+          )}
+          <p>{settings.footer_text || t.footer}</p>
           <a
             href="https://www.facebook.com/share/1CDYwoqn57/"
             target="_blank"
