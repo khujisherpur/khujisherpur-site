@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { categoryLabels } from '../../lib/categoryLabels';
 import UsersTab from '../../components/admin/UsersTab';
+import SettingsTab from '../../components/admin/SettingsTab';
 
 const sidebarItems = [
   { key: 'dashboard', icon: '🏠', label: 'ড্যাশবোর্ড', enabled: true },
@@ -12,7 +13,7 @@ const sidebarItems = [
   { key: 'banners', icon: '🖼️', label: 'ব্যানার ব্যবস্থাপনা', enabled: true },
   { key: 'users', icon: '👥', label: 'ব্যবহারকারী ব্যবস্থাপনা', enabled: true },
   { key: 'categories', icon: '📁', label: 'ক্যাটাগরি ব্যবস্থাপনা', enabled: true },
-  { key: 'settings', icon: '⚙️', label: 'সাইট সেটিংস', enabled: false },
+  { key: 'settings', icon: '⚙️', label: 'সাইট সেটিংস', enabled: true },
 ];
 
 export default function AdminPage() {
@@ -332,6 +333,11 @@ export default function AdminPage() {
           <span className="text-sm bg-green text-white px-3 py-1 rounded-full flex-shrink-0">{role}</span>
         </div>
 {activeTab === 'users' && <UsersTab currentUserId={user.id} currentRole={role} />}
+  {activeTab === 'settings' && (
+          role === 'admin'
+            ? <SettingsTab />
+            : <p className="text-sm text-ink/60">সাইট সেটিংস শুধু অ্যাডমিন বদলাতে পারবেন।</p>
+        )}
         {activeTab === 'dashboard' && (
           <>
             {/* Stat cards */}
