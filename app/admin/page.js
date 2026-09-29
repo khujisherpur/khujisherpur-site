@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { categoryLabels } from '../../lib/categoryLabels';
+import UsersTab from '../../components/admin/UsersTab';
 
 const sidebarItems = [
   { key: 'dashboard', icon: '🏠', label: 'ড্যাশবোর্ড', enabled: true },
@@ -9,7 +10,7 @@ const sidebarItems = [
   { key: 'profiles', icon: '👤', label: 'প্রোফাইল ব্যবস্থাপনা', enabled: true },
   { key: 'reports', icon: '⚠️', label: 'রিপোর্ট/অভিযোগ', enabled: true },
   { key: 'banners', icon: '🖼️', label: 'ব্যানার ব্যবস্থাপনা', enabled: true },
-  { key: 'users', icon: '👥', label: 'ব্যবহারকারী ব্যবস্থাপনা', enabled: false },
+  { key: 'users', icon: '👥', label: 'ব্যবহারকারী ব্যবস্থাপনা', enabled: true },
   { key: 'categories', icon: '📁', label: 'ক্যাটাগরি ব্যবস্থাপনা', enabled: true },
   { key: 'settings', icon: '⚙️', label: 'সাইট সেটিংস', enabled: false },
 ];
@@ -330,7 +331,7 @@ export default function AdminPage() {
           </div>
           <span className="text-sm bg-green text-white px-3 py-1 rounded-full flex-shrink-0">{role}</span>
         </div>
-
+{activeTab === 'users' && <UsersTab currentUserId={user.id} currentRole={role} />}
         {activeTab === 'dashboard' && (
           <>
             {/* Stat cards */}
