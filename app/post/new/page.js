@@ -44,6 +44,7 @@ function NewPostForm() {
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [isBanned, setIsBanned] = useState(false);
+  const [autoApproved, setAutoApproved] = useState(false);
   const [category, setCategory] = useState(null);
   const [loadingCategory, setLoadingCategory] = useState(true);
   const [subcategories, setSubcategories] = useState([]);
@@ -298,6 +299,12 @@ function NewPostForm() {
         if (error) throw error;
       }
 
+      const { data: approveSetting } = await supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'auto_approve_posts')
+        .maybeSingle();
+      setAutoApproved(approveSetting?.value === 'true');
       setSuccess(true);
     } catch (err) {
       setError(err.message);
@@ -381,9 +388,13 @@ if (isBanned) {
       <PageShell>
         <main className="max-w-md mx-auto px-4 py-20 text-center">
           <p className="text-3xl mb-4">✅</p>
-          <h1 className="text-xl font-semibold mb-2">পোস্ট জমা হয়েছে!</h1>
+          <h1 className="text-xl font-semibold mb-2">
+            {category.type === 'service' ? 'প্রোফাইল জমা হয়েছে!' : 'পোস্ট জমা হয়েছে!'}
+          </h1>
           <p className="text-ink/70 text-sm mb-6">
-            এটা এখন পর্যালোচনার (Pending) অবস্থায় আছে। Admin/Moderator অনুমোদন করলে সবাই দেখতে পাবে।
+            {autoApproved
+              ? 'এটা এখন সাইটে প্রকাশিত হয়েছে, সবাই দেখতে পাবে।'
+              : 'এটা এখন পর্যালোচনার অবস্থায় আছে। অ্যাডমিন অনুমোদন করলে সবাই দেখতে পাবে।'}
           </p>
           <a href="/dashboard" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5">ড্যাশবোর্ডে যান</a>
         </main>
