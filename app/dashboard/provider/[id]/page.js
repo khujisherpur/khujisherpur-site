@@ -6,6 +6,14 @@ import ImageCropper from '../../../../components/ImageCropper';
 import SiteHeader from '../../../../components/SiteHeader';
 import { locations, upazilaList } from '../../../../lib/locations';
 
+function extractStoragePath(publicUrl) {
+  if (!publicUrl) return null;
+  const marker = '/images/';
+  const idx = publicUrl.indexOf(marker);
+  if (idx === -1) return null;
+  return publicUrl.slice(idx + marker.length);
+}
+
 function PageShell({ children }) {
   return (
     <>
@@ -29,7 +37,10 @@ export default function EditProviderPage({ params }) {
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(null);
   const [pendingFile, setPendingFile] = useState(null);
   const [newPhoto, setNewPhoto] = useState(null);
+  const [newPhotoPreview, setNewPhotoPreview] = useState(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
@@ -53,8 +64,8 @@ export default function EditProviderPage({ params }) {
       .eq('id', params.id)
       .single();
 
-    if (error) {
-      setError('এই প্রোফাইলটি খুঁজে পাওয়া যায়নি বা এডিট করার অনুমতি নেই।');
+    if (error || !data) {
+      setLoadFailed(true);
       setLoading(false);
       return;
     }
@@ -103,8 +114,25 @@ export default function EditProviderPage({ params }) {
   }
 
   function handleCropComplete(blob) {
+    if (newPhotoPreview) URL.revokeObjectURL(newPhotoPreview);
     setNewPhoto(blob);
+    setNewPhotoPreview(URL.createObjectURL(blob));
+    setRemovePhoto(false);
     setPendingFile(null);
+  }
+
+  function clearPhoto() {
+    if (newPhotoPreview) URL.revokeObjectURL(newPhotoPreview);
+    setNewPhoto(null);
+    setNewPhotoPreview(null);
+    if (currentPhotoUrl) setRemovePhoto(true);
+  }
+
+  function undoPhotoChange() {
+    if (newPhotoPreview) URL.revokeObjectURL(newPhotoPreview);
+    setNewPhoto(null);
+    setNewPhotoPreview(null);
+    setRemovePhoto(false);
   }
 
   async function uploadBlob(blob) {
@@ -119,13 +147,18 @@ export default function EditProviderPage({ params }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!user) return;
     setSaving(true);
     setError(null);
+    let uploadedUrl = null;
 
     try {
       let photoUrl = currentPhotoUrl;
       if (newPhoto) {
-        photoUrl = await uploadBlob(newPhoto);
+        uploadedUrl = await uploadBlob(newPhoto);
+        photoUrl = uploadedUrl;
+      } else if (removePhoto) {
+        photoUrl = null;
       }
 
       const payload = {
@@ -142,8 +175,15 @@ export default function EditProviderPage({ params }) {
       if (categorySlug === 'ambulance') payload.vehicle_type = form.vehicleType;
       if (categorySlug === 'service-provider') payload.name_en = form.nameEn.trim();
 
-      const { error } = await supabase.from('providers').update(payload).eq('id', params.id);
-      if (error) throw error;
+      const { data: updated, error: updateError } = await supabase
+        .from('providers')
+        .update(payload)
+        .eq('id', params.id)
+        .select('id');
+      if (updateError) throw updateError;
+      if (!updated || updated.length === 0) {
+        throw new Error('সেভ করা যায়নি। আপনার অ্যাকাউন্ট সাসপেন্ড থাকতে পারে বা এই প্রোফাইল এডিটের অনুমতি নেই।');
+      }
 
       if (categorySlug === 'service-provider') {
         const finalIds = Array.from(
@@ -154,8 +194,17 @@ export default function EditProviderPage({ params }) {
         if (rows.length > 0) await supabase.from('provider_subcategories').insert(rows);
       }
 
+      if ((newPhoto || removePhoto) && currentPhotoUrl) {
+        const oldPath = extractStoragePath(currentPhotoUrl);
+        if (oldPath) await supabase.storage.from('images').remove([oldPath]);
+      }
+
       setSaved(true);
     } catch (err) {
+      if (uploadedUrl) {
+        const p = extractStoragePath(uploadedUrl);
+        if (p) await supabase.storage.from('images').remove([p]);
+      }
       setError(err.message);
     }
     setSaving(false);
@@ -169,11 +218,11 @@ export default function EditProviderPage({ params }) {
     );
   }
 
-  if (error && !form.name) {
+  if (loadFailed) {
     return (
       <PageShell>
         <main className="max-w-md mx-auto px-4 py-20 text-center">
-          <p className="text-ink/70">{error}</p>
+          <p className="text-ink/70">এই প্রোফাইলটি খুঁজে পাওয়া যায়নি বা এডিট করার অনুমতি নেই।</p>
           <a href="/dashboard" className="text-green underline mt-2 inline-block">ড্যাশবোর্ডে ফিরে যান</a>
         </main>
       </PageShell>
@@ -184,12 +233,12 @@ export default function EditProviderPage({ params }) {
     return (
       <PageShell>
         <main className="max-w-md mx-auto px-4 py-20 text-center">
-          <p className="text-3xl mb-4">✅</p>
+          <p className="text-4xl mb-4">✅</p>
           <h1 className="text-xl font-semibold mb-2">আপডেট হয়েছে!</h1>
-          <p className="text-ink/70 text-sm mb-6">
-            পরিবর্তনগুলো আবার পর্যালোচনার জন্য পাঠানো হয়েছে।
-          </p>
-          <a href="/dashboard" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5">ড্যাশবোর্ডে ফিরে যান</a>
+          <p className="text-ink/70 text-sm mb-6">পরিবর্তনগুলো আবার পর্যালোচনার জন্য পাঠানো হয়েছে।</p>
+          <a href="/dashboard" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5 rounded-lg">
+            ড্যাশবোর্ডে ফিরে যান
+          </a>
         </main>
       </PageShell>
     );
@@ -198,10 +247,12 @@ export default function EditProviderPage({ params }) {
   const isServiceProvider = categorySlug === 'service-provider';
   const unionsForUpazila = form.upazila ? locations[form.upazila] || [] : [];
   const primaryName = subcategories.find((s) => s.id === primarySubcategoryId)?.name_bn;
+  const shownPhoto = newPhotoPreview || (removePhoto ? null : currentPhotoUrl);
+  const photoChanged = !!newPhoto || removePhoto;
 
   return (
     <PageShell>
-      <main className="max-w-xl mx-auto px-4 py-6">
+      <main className="max-w-xl mx-auto px-4 py-5">
         {pendingFile && (
           <ImageCropper
             file={pendingFile}
@@ -211,10 +262,11 @@ export default function EditProviderPage({ params }) {
           />
         )}
 
+        <a href="/dashboard" className="text-sm text-ink/60 inline-block mb-3">← ড্যাশবোর্ড</a>
         <h1 className="text-xl font-semibold mb-4">প্রোফাইল এডিট করুন</h1>
 
         {isServiceProvider && slug && (
-          <div className="bg-[#EEF1F8] border border-ink/10 rounded-md px-4 py-3 mb-4 text-sm">
+          <div className="bg-[#EEF1F8] border border-ink/10 rounded-xl px-4 py-3 mb-4 text-sm">
             <p className="text-ink/60">
               প্রোফাইল লিংক: <span className="font-medium text-ink">/{slug}</span>
             </p>
@@ -223,23 +275,42 @@ export default function EditProviderPage({ params }) {
                 প্রধান সেবা: <span className="font-medium text-ink">{primaryName}</span>
               </p>
             )}
-            <p className="text-ink/40 text-xs mt-1">এই দুটো পরিবর্তন করা যায় না</p>
+            <p className="text-ink/40 text-xs mt-1">🔒 এই দুটো পরিবর্তন করা যায় না</p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="bg-white border border-ink/10 border-t-4 border-t-green p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="bg-white border border-ink/10 border-t-4 border-t-green rounded-xl p-5 space-y-4">
+          {/* ছবি */}
           <div>
-            <label className="block text-sm mb-1.5 text-ink/70">প্রোফাইল ছবি</label>
-            <div className="flex items-center gap-3">
-              <img
-                src={newPhoto ? URL.createObjectURL(newPhoto) : (currentPhotoUrl || '/favicon-32.png')}
-                alt="প্রোফাইল ছবি"
-                className="w-16 h-16 rounded-full object-cover border border-ink/10"
-              />
-              <label className="text-sm border border-ink/20 px-4 py-2 cursor-pointer hover:bg-paper">
-                ছবি বদলান
-                <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-              </label>
+            <label className="block text-sm mb-2 text-ink/70">প্রোফাইল ছবি</label>
+            <div className="flex items-center gap-4">
+              {shownPhoto ? (
+                <img src={shownPhoto} alt="প্রোফাইল ছবি" className="w-20 h-20 rounded-full object-cover border border-ink/10" />
+              ) : (
+                <span className="w-20 h-20 rounded-full bg-[#EEF1F8] text-green-dark text-2xl font-semibold flex items-center justify-center">
+                  {form.name?.charAt(0)}
+                </span>
+              )}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm border border-ink/20 rounded-lg px-4 py-2 cursor-pointer text-center active:bg-paper">
+                  {shownPhoto ? 'ছবি বদলান' : '+ ছবি যোগ করুন'}
+                  <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                </label>
+                {shownPhoto && (
+                  <button
+                    type="button"
+                    onClick={clearPhoto}
+                    className="text-xs text-red-600 border border-red-300 rounded-lg px-4 py-1.5"
+                  >
+                    ছবি সরান
+                  </button>
+                )}
+                {photoChanged && (
+                  <button type="button" onClick={undoPhotoChange} className="text-xs text-ink/50 underline">
+                    পরিবর্তন বাতিল
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -248,7 +319,7 @@ export default function EditProviderPage({ params }) {
             <input
               type="text" required value={form.name}
               onChange={(e) => updateField('name', e.target.value)}
-              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
+              className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
             />
           </div>
 
@@ -258,7 +329,7 @@ export default function EditProviderPage({ params }) {
               <input
                 type="text" required value={form.nameEn}
                 onChange={(e) => updateField('nameEn', e.target.value)}
-                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
+                className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
               />
               <p className="text-xs text-ink/50 mt-1">এটা বদলালেও প্রোফাইল লিংক (/{slug}) একই থাকবে</p>
             </div>
@@ -270,7 +341,7 @@ export default function EditProviderPage({ params }) {
               <select
                 required value={form.upazila}
                 onChange={(e) => handleUpazilaChange(e.target.value)}
-                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green bg-white"
               >
                 <option value="">নির্বাচন করুন...</option>
                 {upazilaList.map((u) => <option key={u} value={u}>{u}</option>)}
@@ -281,7 +352,7 @@ export default function EditProviderPage({ params }) {
               <select
                 required value={form.unionName} disabled={!form.upazila}
                 onChange={(e) => updateField('unionName', e.target.value)}
-                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white disabled:bg-paper disabled:text-ink/30"
+                className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green bg-white disabled:bg-paper disabled:text-ink/30"
               >
                 <option value="">নির্বাচন করুন...</option>
                 {unionsForUpazila.map((u) => <option key={u} value={u}>{u}</option>)}
@@ -294,7 +365,7 @@ export default function EditProviderPage({ params }) {
             <input
               type="text" required value={form.area}
               onChange={(e) => updateField('area', e.target.value)}
-              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
+              className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
             />
           </div>
 
@@ -303,7 +374,7 @@ export default function EditProviderPage({ params }) {
             <input
               type="tel" required value={form.phone}
               onChange={(e) => updateField('phone', e.target.value)}
-              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
+              className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
             />
           </div>
           <div>
@@ -311,7 +382,7 @@ export default function EditProviderPage({ params }) {
             <input
               type="number" min="0" value={form.experienceYears}
               onChange={(e) => updateField('experienceYears', e.target.value)}
-              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
+              className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
             />
           </div>
 
@@ -319,20 +390,16 @@ export default function EditProviderPage({ params }) {
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">গাড়ির ধরন</label>
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => updateField('vehicleType', 'ac')}
-                  className={`flex-1 text-sm py-2 border ${form.vehicleType === 'ac' ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60'}`}
-                >
-                  AC
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateField('vehicleType', 'non_ac')}
-                  className={`flex-1 text-sm py-2 border ${form.vehicleType === 'non_ac' ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60'}`}
-                >
-                  Non-AC
-                </button>
+                {[['ac', 'AC'], ['non_ac', 'Non-AC']].map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => updateField('vehicleType', val)}
+                    className={`flex-1 text-sm py-2 rounded-lg border ${form.vehicleType === val ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -340,7 +407,7 @@ export default function EditProviderPage({ params }) {
           {isServiceProvider && (
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">কোন কোন সেবা দেন?</label>
-              <div className="border border-ink/20 rounded-md divide-y divide-ink/10 max-h-64 overflow-y-auto">
+              <div className="border border-ink/20 rounded-lg divide-y divide-ink/10 max-h-64 overflow-y-auto">
                 {subcategories.map((s) => {
                   const isPrimary = s.id === primarySubcategoryId;
                   const checked = isPrimary || selectedSubcategoryIds.includes(s.id);
@@ -368,15 +435,19 @@ export default function EditProviderPage({ params }) {
             <textarea
               required rows={4} value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
-              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green resize-none"
+              className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green resize-none"
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          <p className="text-xs text-marigold bg-marigold/10 rounded-lg px-3 py-2">
+            ℹ️ সেভ করলে প্রোফাইলটি আবার পর্যালোচনায় যাবে, অনুমোদনের আগ পর্যন্ত সাইটে দেখা যাবে না।
+          </p>
+
+          {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
 
           <button
             type="submit" disabled={saving}
-            className="w-full bg-marigold text-ink font-semibold py-2.5 hover:bg-marigold/90 transition-colors disabled:opacity-50"
+            className="w-full bg-marigold text-ink font-semibold py-3 rounded-lg disabled:opacity-50"
           >
             {saving ? 'সেভ হচ্ছে...' : 'পরিবর্তন সেভ করুন'}
           </button>
