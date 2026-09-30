@@ -83,6 +83,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [providers, setProviders] = useState([]);
   const [listings, setListings] = useState([]);
+  const [ban, setBan] = useState(null);
 
   useEffect(() => {
     init();
@@ -91,7 +92,15 @@ export default function DashboardPage() {
   async function init() {
     const { data } = await supabase.auth.getUser();
     setUser(data.user);
-    if (data.user) await loadMyPosts(data.user.id);
+    if (data.user) {
+      await loadMyPosts(data.user.id);
+      const { data: b } = await supabase
+        .from('banned_users')
+        .select('reason')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+      setBan(b || null);
+    }
     setLoading(false);
   }
 
@@ -210,6 +219,26 @@ export default function DashboardPage() {
           </div>
         </div>
 
+                  {ban && (
+          <div className="bg-red-50 border border-red-200 border-l-4 border-l-red-500 rounded-xl p-4 mb-6">
+            <p className="font-semibold text-red-700 text-sm">
+              🚫 {lang === 'bn' ? 'আপনার অ্যাকাউন্ট সাসপেন্ড করা আছে' : 'Your account is suspended'}
+            </p>
+            <p className="text-red-600/80 text-xs mt-1 leading-relaxed">
+              {lang === 'bn'
+                ? 'আপাতত আপনি নতুন পোস্ট বা প্রোফাইল তৈরি করতে বা বিদ্যমান পোস্ট এডিট করতে পারবেন না।'
+                : 'You cannot create new posts or profiles, or edit existing ones, for now.'}
+            </p>
+            {ban.reason && (
+              <p className="text-red-700 text-xs mt-2 bg-white/60 rounded-lg px-3 py-2">
+                {lang === 'bn' ? 'কারণ: ' : 'Reason: '}{ban.reason}
+              </p>
+            )}
+            <p className="text-red-600/60 text-[11px] mt-2">
+              {lang === 'bn' ? 'ভুল হয়ে থাকলে অ্যাডমিনের সাথে যোগাযোগ করুন।' : 'If this is a mistake, please contact the admin.'}
+            </p>
+          </div>
+        )}
         <div className="flex gap-4 mb-8">
           <a href="/dashboard/favorites" className="text-sm text-green underline">
             ❤️ আমার ফেভারিট দেখুন
