@@ -9,6 +9,7 @@ import BottomNav from '../components/BottomNav';
 import HeaderBell from '../components/HeaderBell';
 import HeroIntro from '../components/HeroIntro';
 import HeroSearch from '../components/HeroSearch';
+import AnnouncementBar from '../components/AnnouncementBar';
 
 const text = {
   bn: {
@@ -154,6 +155,9 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen">
+    {settings.announcement_enabled === 'true' && settings.announcement_text && (
+        <AnnouncementBar text={settings.announcement_text} link={settings.announcement_link} />
+      )}
       <header className="sticky top-0 z-40 bg-gradient-to-r from-green-dark to-green shadow-md">
         <div className="max-w-4xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
           <a href="/" className="flex items-center gap-2 min-w-0 flex-shrink">
