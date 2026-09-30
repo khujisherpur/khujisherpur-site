@@ -45,6 +45,9 @@ const allKeys = [
   'auto_approve_posts',
   'maintenance_mode',
   'maintenance_message',
+  'announcement_enabled',
+  'announcement_text',
+  'announcement_link',
 ];
 
 function Toggle({ checked, onChange }) {
@@ -141,6 +144,7 @@ export default function SettingsTab() {
 
   const autoApprove = values.auto_approve_posts === 'true';
   const maintenance = values.maintenance_mode === 'true';
+  const announce = values.announcement_enabled === 'true';
 
   return (
     <div className="pb-24">
@@ -232,6 +236,50 @@ export default function SettingsTab() {
           <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mt-3">
             ⚠️ সেভ করলেই সাইট সবার জন্য বন্ধ হয়ে যাবে।
           </p>
+        )}
+      </section>
+<section className={`mt-4 bg-white rounded-xl border border-ink/10 border-l-4 p-4 ${announce ? 'border-l-marigold' : 'border-l-ink/20'}`}>
+        <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+          <span className="w-7 h-7 rounded-lg bg-[#EEF1F8] flex items-center justify-center text-sm">📢</span>
+          ঘোষণা বার
+        </h3>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">হোমপেজে ঘোষণা দেখান</p>
+            <p className="text-xs text-ink/50 mt-0.5">হোমপেজের একদম উপরে একটা সরু বার আসবে।</p>
+          </div>
+          <Toggle checked={announce} onChange={(v) => setField('announcement_enabled', v ? 'true' : 'false')} />
+        </div>
+        <div className="mt-3 space-y-3">
+          <div>
+            <label className="block text-xs text-ink/60 mb-1">ঘোষণার লেখা</label>
+            <input
+              type="text"
+              value={values.announcement_text || ''}
+              onChange={(e) => setField('announcement_text', e.target.value)}
+              placeholder="যেমন: ব্যানার বিজ্ঞাপনে বিশেষ ছাড় চলছে"
+              maxLength={120}
+              className="w-full border border-ink/15 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-green"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-ink/60 mb-1">লিংক (ঐচ্ছিক)</label>
+            <input
+              type="text"
+              value={values.announcement_link || ''}
+              onChange={(e) => setField('announcement_link', e.target.value)}
+              placeholder="https://... অথবা /post/new?category=rent"
+              className="w-full border border-ink/15 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-green"
+            />
+          </div>
+        </div>
+        {announce && values.announcement_text && (
+          <div className="mt-3">
+            <p className="text-[11px] text-ink/40 mb-1">প্রিভিউ</p>
+            <div className="bg-marigold text-ink text-xs font-medium rounded-lg px-3 py-2 leading-snug">
+              📢 {values.announcement_text}{values.announcement_link ? ' →' : ''}
+            </div>
+          </div>
         )}
       </section>
       {/* Sticky save bar */}
