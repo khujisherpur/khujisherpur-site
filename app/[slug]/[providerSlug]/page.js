@@ -70,23 +70,27 @@ export default async function ProviderSlugPage({ params }) {
   const [{ data: allSubcats }, { data: reviews }] = await Promise.all([
     supabase
       .from('provider_subcategories')
-      .select('subcategories(slug, name_bn, name_en)')
+      .select('subcategories(id, slug, name_bn, name_en)')
       .eq('provider_id', provider.id),
     supabase.from('reviews').select('rating').eq('provider_id', provider.id),
   ]);
 
-  const services = (allSubcats || [])
-    .map((row) => row.subcategories)
-    .filter(Boolean)
+  const subName = (s) => (lang === 'bn' ? s.name_bn : s.name_en || s.name_bn);
+
+  let subs = (allSubcats || []).map((row) => row.subcategories).filter(Boolean);
+  if (!subs.some((s) => s.id === subcategory.id)) subs = [subcategory, ...subs];
+
+  const services = subs
     .map((s) => ({
       slug: s.slug,
       icon: subcategoryIcons[s.slug] || '🛠️',
-      label: lang === 'bn' ? s.name_bn : s.name_en || s.name_bn,
-    }));
+      label: subName(s),
+      primary: s.id === subcategory.id,
+    }))
+    .sort((a, b) => Number(b.primary) - Number(a.primary));
 
   const count = reviews?.length || 0;
   const avg = count > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / count : 0;
-  const primaryName = lang === 'bn' ? subcategory.name_bn : subcategory.name_en || subcategory.name_bn;
 
   return (
     <>
@@ -96,7 +100,7 @@ export default async function ProviderSlugPage({ params }) {
         lang={lang}
         backHref={`/${subcategory.slug}`}
         backLabel={t.back}
-        headline={`${primaryName} · ${provider.area}`}
+        headline={`${subName(subcategory)} · ${provider.area}`}
         services={services}
         rating={{ avg, count }}
       />
