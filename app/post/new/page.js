@@ -6,6 +6,7 @@ import ImageCropper from '../../../components/ImageCropper';
 import SiteHeader from '../../../components/SiteHeader';
 import { locations, upazilaList } from '../../../lib/locations';
 import { categoryLabels } from '../../../lib/categoryLabels';
+import { cleanPhone, isValidBdPhone } from '../../../lib/format';
 
 const rentTypeLabels = { house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য' };
 const roomOptions = ['১', '২', '৩', '৪+'];
@@ -57,6 +58,7 @@ function NewPostForm() {
     condition: 'used', negotiable: false, deadline: '', vehicleType: 'ac',
     experienceYears: '', upazila: '', unionName: '', subcategoryId: '',
     sqft: '', amenities: '', mapLink: '',
+    contact_phone: '', whatsapp: '', contact_email: '',
     nameEn: '', slug: '', selectedSubcategoryIds: [], primarySubcategoryId: '',
   });
   const [existingProvider, setExistingProvider] = useState(null);
@@ -161,6 +163,7 @@ function NewPostForm() {
       .order('sort_order', { ascending: true })
       .then(({ data }) => setAllCats(data || []));
   }, []);
+
   function updateField(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
   }
@@ -216,6 +219,15 @@ function NewPostForm() {
       setError('উপজেলা ও ইউনিয়ন বাছাই করুন');
       return;
     }
+    const phoneToCheck = category.type === 'service' ? form.phone : form.contact_phone;
+    if (!isValidBdPhone(phoneToCheck)) {
+      setError('সঠিক মোবাইল নম্বর দিন (যেমন: 01XXXXXXXXX)');
+      return;
+    }
+    if (category.type !== 'service' && form.whatsapp && !isValidBdPhone(form.whatsapp)) {
+      setError('হোয়াটসঅ্যাপ নম্বরটি সঠিক নয় (যেমন: 01XXXXXXXXX)');
+      return;
+    }
     const isServiceProvider = category.slug === 'service-provider';
     if (isServiceProvider) {
       if (!form.nameEn.trim()) { setError('ইংরেজি নাম দিন (এটা দিয়ে আপনার প্রোফাইল লিংক তৈরি হবে)'); return; }
@@ -243,7 +255,7 @@ function NewPostForm() {
           area: form.area,
           upazila: form.upazila,
           union_name: form.unionName,
-          phone: form.phone,
+          phone: cleanPhone(form.phone),
           description: form.description,
           photo_url: photoUrl,
           experience_years: form.experienceYears ? parseInt(form.experienceYears) : null,
@@ -298,6 +310,9 @@ function NewPostForm() {
           price_or_salary: form.priceOrSalary,
           description,
           photos: photoUrls,
+          contact_phone: cleanPhone(form.contact_phone),
+          whatsapp: form.whatsapp ? cleanPhone(form.whatsapp) : null,
+          contact_email: form.contact_email.trim() || null,
         };
         if (isRent) {
           payload.rent_type = form.rentType;
@@ -339,8 +354,8 @@ function NewPostForm() {
       </PageShell>
     );
   }
-  
-if (isBanned) {
+
+  if (isBanned) {
     return (
       <PageShell>
         <main className="max-w-md mx-auto px-4 py-16 text-center">
@@ -358,6 +373,7 @@ if (isBanned) {
       </PageShell>
     );
   }
+
   if (!category) {
     const postableCats = allCats.filter(
       (c) => categoryLabels[c.slug] && c.is_active !== false && (c.type === 'listing' || c.type === 'service')
@@ -877,6 +893,42 @@ if (isBanned) {
                   </label>
                 )}
               </div>
+            </div>
+          )}
+
+          {!isService && (
+            <div className="rounded-xl border border-ink/10 bg-paper p-4 space-y-3">
+              <p className="text-sm font-medium">📞 যোগাযোগের তথ্য</p>
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">
+                  মোবাইল নম্বর <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel" required inputMode="tel" value={form.contact_phone}
+                  onChange={(e) => updateField('contact_phone', e.target.value)}
+                  className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                  placeholder="01XXXXXXXXX"
+                />
+              </div>
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">হোয়াটসঅ্যাপ নম্বর (ঐচ্ছিক)</label>
+                <input
+                  type="tel" inputMode="tel" value={form.whatsapp}
+                  onChange={(e) => updateField('whatsapp', e.target.value)}
+                  className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                  placeholder="01XXXXXXXXX"
+                />
+              </div>
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">ইমেইল (ঐচ্ছিক, চাকরির আবেদনে কাজে লাগে)</label>
+                <input
+                  type="email" value={form.contact_email}
+                  onChange={(e) => updateField('contact_email', e.target.value)}
+                  className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                  placeholder="you@example.com"
+                />
+              </div>
+              <p className="text-[11px] text-ink/45">এই তথ্য পোস্টে সবার সামনে দেখা যাবে, যাতে আগ্রহীরা সরাসরি যোগাযোগ করতে পারে।</p>
             </div>
           )}
 
