@@ -57,7 +57,7 @@ export default async function ProviderSlugPage({ params }) {
 
   const { data: provider } = await supabase
     .from('providers')
-    .select('id, user_id, name, name_en, slug, area, upazila, union_name, phone, description, is_available, photo_url, experience_years, view_count, primary_subcategory_id')
+    .select('id, user_id, name, name_en, slug, area, upazila, union_name, phone, whatsapp, description, is_available, photo_url, experience_years, view_count, primary_subcategory_id')
     .eq('slug', params.providerSlug)
     .eq('primary_subcategory_id', subcategory.id)
     .eq('status', 'approved')
