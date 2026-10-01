@@ -61,6 +61,7 @@ function NewPostForm() {
     contact_phone: '', whatsapp: '', contact_email: '',
     nameEn: '', slug: '', selectedSubcategoryIds: [], primarySubcategoryId: '',
   });
+  const [waSame, setWaSame] = useState(false);
   const [existingProvider, setExistingProvider] = useState(null);
   const [checkingExisting, setCheckingExisting] = useState(false);
   const [slugTouched, setSlugTouched] = useState(false);
@@ -219,12 +220,13 @@ function NewPostForm() {
       setError('উপজেলা ও ইউনিয়ন বাছাই করুন');
       return;
     }
-    const phoneToCheck = category.type === 'service' ? form.phone : form.contact_phone;
-    if (!isValidBdPhone(phoneToCheck)) {
+    const mainPhone = category.type === 'service' ? form.phone : form.contact_phone;
+    const waValue = waSame ? mainPhone : form.whatsapp;
+    if (!isValidBdPhone(mainPhone)) {
       setError('সঠিক মোবাইল নম্বর দিন (যেমন: 01XXXXXXXXX)');
       return;
     }
-    if (category.type !== 'service' && form.whatsapp && !isValidBdPhone(form.whatsapp)) {
+    if (waValue && !isValidBdPhone(waValue)) {
       setError('হোয়াটসঅ্যাপ নম্বরটি সঠিক নয় (যেমন: 01XXXXXXXXX)');
       return;
     }
@@ -256,6 +258,7 @@ function NewPostForm() {
           upazila: form.upazila,
           union_name: form.unionName,
           phone: cleanPhone(form.phone),
+          whatsapp: waValue ? cleanPhone(waValue) : null,
           description: form.description,
           photo_url: photoUrl,
           experience_years: form.experienceYears ? parseInt(form.experienceYears) : null,
@@ -311,7 +314,7 @@ function NewPostForm() {
           description,
           photos: photoUrls,
           contact_phone: cleanPhone(form.contact_phone),
-          whatsapp: form.whatsapp ? cleanPhone(form.whatsapp) : null,
+          whatsapp: waValue ? cleanPhone(waValue) : null,
           contact_email: form.contact_email.trim() || null,
         };
         if (isRent) {
@@ -486,6 +489,27 @@ function NewPostForm() {
   const showBedroomFields = isRent && (form.rentType === 'house' || form.rentType === 'mess');
   const unionsForUpazila = form.upazila ? locations[form.upazila] || [] : [];
   const primarySubcatName = subcategories.find((s) => s.id === form.primarySubcategoryId)?.name_bn;
+
+  const waField = (inputCls) => (
+    <div>
+      <label className="block text-sm mb-1.5 text-ink/70">হোয়াটসঅ্যাপ নম্বর (ঐচ্ছিক)</label>
+      <label className="flex items-center gap-2 text-xs text-ink/60 mb-1.5">
+        <input
+          type="checkbox" checked={waSame}
+          onChange={(e) => setWaSame(e.target.checked)}
+          className="w-4 h-4"
+        />
+        ফোন নম্বরেই হোয়াটসঅ্যাপ আছে
+      </label>
+      <input
+        type="tel" inputMode="tel" disabled={waSame}
+        value={waSame ? '' : form.whatsapp}
+        onChange={(e) => updateField('whatsapp', e.target.value)}
+        className={`${inputCls} disabled:bg-paper disabled:text-ink/30`}
+        placeholder={waSame ? 'ফোন নম্বরই ব্যবহার হবে' : '01XXXXXXXXX'}
+      />
+    </div>
+  );
 
   return (
     <PageShell>
@@ -763,12 +787,13 @@ function NewPostForm() {
               <div>
                 <label className="block text-sm mb-1.5 text-ink/70">ফোন নম্বর</label>
                 <input
-                  type="tel" required value={form.phone}
+                  type="tel" required inputMode="tel" value={form.phone}
                   onChange={(e) => updateField('phone', e.target.value)}
                   className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
                   placeholder="01XXXXXXXXX"
                 />
               </div>
+              {waField('w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green')}
               <div>
                 <label className="block text-sm mb-1.5 text-ink/70">অভিজ্ঞতা (বছর, ঐচ্ছিক)</label>
                 <input
@@ -910,15 +935,7 @@ function NewPostForm() {
                   placeholder="01XXXXXXXXX"
                 />
               </div>
-              <div>
-                <label className="block text-sm mb-1.5 text-ink/70">হোয়াটসঅ্যাপ নম্বর (ঐচ্ছিক)</label>
-                <input
-                  type="tel" inputMode="tel" value={form.whatsapp}
-                  onChange={(e) => updateField('whatsapp', e.target.value)}
-                  className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
-                  placeholder="01XXXXXXXXX"
-                />
-              </div>
+              {waField('w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white')}
               <div>
                 <label className="block text-sm mb-1.5 text-ink/70">ইমেইল (ঐচ্ছিক, চাকরির আবেদনে কাজে লাগে)</label>
                 <input
