@@ -5,16 +5,16 @@ import PhotoLightbox from '../../../components/PhotoLightbox';
 import ReportButton from '../../../components/ReportButton';
 import FavoriteButton from '../../../components/FavoriteButton';
 import ShareButton from '../../../components/ShareButton';
-import SiteHeader from '../../../components/SiteHeader';
 import ContactBar from '../../../components/ContactBar';
+import SiteHeader from '../../../components/SiteHeader';
 import { getLang } from '../../../lib/getLang';
 import { categoryLabels } from '../../../lib/categoryLabels';
-import { formatPrice, timeAgo, toBn } from '../../../lib/format';
+import { formatPrice, timeAgo, toBn, cleanPhone, waLink } from '../../../lib/format';
 
 export async function generateMetadata({ params }) {
   const { data: listing } = await supabase
     .from('listings')
-    .select('id, title, area, upazila, union_name, price_or_salary, description, photos, rent_type, owner_name, posted_at, view_count, contact_phone, whatsapp, contact_email, categories(slug)')
+    .select('title, area, price_or_salary, description, categories(name)')
     .eq('id', params.id)
     .eq('status', 'active')
     .single();
@@ -37,6 +37,8 @@ const text = {
     notFound: 'এই পোস্টটি খুঁজে পাওয়া যায়নি বা মেয়াদ শেষ হয়ে গেছে।', backHome: 'হোমপেজে ফিরে যান',
     details: 'বিস্তারিত', category: 'ক্যাটাগরি', location: 'এলাকা', type: 'ধরন', owner: 'মালিক', posted: 'পোস্ট করা হয়েছে',
     views: 'ভিউ',
+    contact: 'যোগাযোগ', phone: 'মোবাইল', whatsapp: 'হোয়াটসঅ্যাপ', email: 'ইমেইল',
+    noContact: 'এই পোস্টে যোগাযোগের তথ্য দেওয়া হয়নি।',
     house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য',
   },
   en: {
@@ -44,9 +46,31 @@ const text = {
     notFound: 'This post was not found or has expired.', backHome: 'Back to Home',
     details: 'Details', category: 'Category', location: 'Location', type: 'Type', owner: 'Owner', posted: 'Posted',
     views: 'views',
+    contact: 'Contact', phone: 'Phone', whatsapp: 'WhatsApp', email: 'Email',
+    noContact: 'No contact information was provided for this post.',
     house: 'House', shop: 'Shop', mess: 'Mess', other: 'Other',
   },
 };
+
+// বিবরণের ভেতরের লিংক ক্লিক করার উপযোগী করে
+function Linkify({ value }) {
+  const parts = String(value).split(/(https?:\/\/[^\s]+)/g);
+  return parts.map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer nofollow ugc"
+        className="text-green underline break-all"
+      >
+        {part}
+      </a>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
 
 export default async function ListingDetailPage({ params }) {
   const lang = getLang();
@@ -54,7 +78,7 @@ export default async function ListingDetailPage({ params }) {
 
   const { data: listing } = await supabase
     .from('listings')
-    .select('id, title, area, upazila, union_name, price_or_salary, description, photos, rent_type, owner_name, posted_at, view_count, categories(slug)')
+    .select('id, title, area, upazila, union_name, price_or_salary, description, photos, rent_type, owner_name, posted_at, view_count, contact_phone, whatsapp, contact_email, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'active')
     .single();
@@ -81,6 +105,10 @@ export default async function ListingDetailPage({ params }) {
   ).join(', ');
   const price = formatPrice(listing.price_or_salary, lang);
   const views = (listing.view_count || 0) + 1;
+
+  const hasPhone = !!listing.contact_phone;
+  const waUrl = waLink(listing.whatsapp);
+  const hasContact = hasPhone || !!waUrl || !!listing.contact_email;
 
   const rows = [
     { k: t.category, v: categoryName },
@@ -148,10 +176,50 @@ export default async function ListingDetailPage({ params }) {
               <ShareButton title={listing.title} lang={lang} />
             </div>
 
+            {/* যোগাযোগ */}
+            <div className="mt-6 pt-5 border-t border-ink/10">
+              <h2 className="text-sm font-medium text-ink/60 mb-2">{t.contact}</h2>
+              {hasContact ? (
+                <div className="bg-paper rounded-xl divide-y divide-ink/5">
+                  {hasPhone && (
+                    <a
+                      href={`tel:${cleanPhone(listing.contact_phone)}`}
+                      className="flex justify-between gap-4 px-3 py-3 text-sm"
+                    >
+                      <span className="text-ink/55">📞 {t.phone}</span>
+                      <span className="font-numeric font-medium text-green">{listing.contact_phone}</span>
+                    </a>
+                  )}
+                  {waUrl && (
+                    <a
+                      href={waUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex justify-between gap-4 px-3 py-3 text-sm"
+                    >
+                      <span className="text-ink/55">💬 {t.whatsapp}</span>
+                      <span className="font-numeric font-medium text-green">{listing.whatsapp}</span>
+                    </a>
+                  )}
+                  {listing.contact_email && (
+                    <a
+                      href={`mailto:${listing.contact_email}`}
+                      className="flex justify-between gap-4 px-3 py-3 text-sm"
+                    >
+                      <span className="text-ink/55">✉️ {t.email}</span>
+                      <span className="font-medium text-green break-all text-right">{listing.contact_email}</span>
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-ink/50 bg-paper rounded-xl px-3 py-3">{t.noContact}</p>
+              )}
+            </div>
+
             <div className="mt-6 pt-5 border-t border-ink/10">
               <h2 className="text-sm font-medium text-ink/60 mb-2">{t.desc}</h2>
               <p className="text-ink/80 text-sm leading-relaxed whitespace-pre-line">
-                {listing.description || t.noDesc}
+                {listing.description ? <Linkify value={listing.description} /> : t.noDesc}
               </p>
             </div>
 
@@ -186,7 +254,8 @@ export default async function ListingDetailPage({ params }) {
           }}
         />
       </main>
-          <ContactBar
+
+      <ContactBar
         phone={listing.contact_phone}
         whatsapp={listing.whatsapp || ''}
         email={listing.contact_email}
