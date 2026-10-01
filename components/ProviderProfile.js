@@ -198,7 +198,7 @@ export default function ProviderProfile({
         />
       </main>
 
-      <ContactBar phone={provider.phone} lang={lang} />
+      <ContactBar phone={provider.phone} whatsapp={provider.whatsapp || ''} lang={lang} />
     </>
   );
 }
