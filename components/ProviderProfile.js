@@ -17,7 +17,7 @@ const text = {
     experience: 'বছরের অভিজ্ঞতা',
     reviews: 'রিভিউ',
     views: 'ভিউ',
-    services: 'অন্যান্য সেবা',
+    services: 'যে সেবা দেন',
   },
   en: {
     unavailable: 'Currently unavailable',
@@ -29,9 +29,13 @@ const text = {
     experience: 'years experience',
     reviews: 'reviews',
     views: 'views',
-    services: 'Other services',
+    services: 'Services offered',
   },
 };
+
+function uniq(list) {
+  return Array.from(new Set(list.map((v) => (v || '').trim()).filter(Boolean)));
+}
 
 export default function ProviderProfile({
   provider,
@@ -45,7 +49,8 @@ export default function ProviderProfile({
 }) {
   const t = text[lang];
   const num = (n) => (lang === 'bn' ? toBn(n) : n);
-  const where = [provider.union_name, provider.upazila].filter(Boolean).join(', ');
+  const where = uniq([provider.union_name, provider.upazila]).join(', ');
+  const fullAddress = uniq([provider.area, provider.union_name, provider.upazila]).join(', ');
 
   return (
     <>
@@ -81,6 +86,22 @@ export default function ProviderProfile({
                 </span>
               </div>
               <p className="text-ink/60 mt-1 text-sm">{headline}</p>
+
+              {services.length > 0 && (
+                <div className="flex items-center justify-center gap-1.5 flex-wrap mt-3">
+                  {services.map((s) => (
+                    <a
+                      key={s.slug}
+                      href={`/${s.slug}`}
+                      className={`text-xs px-3 py-1.5 rounded-full font-medium ${
+                        s.primary ? 'bg-marigold text-ink' : 'bg-[#EEF1F8] text-ink/70'
+                      }`}
+                    >
+                      {s.icon} {s.label}
+                    </a>
+                  ))}
+                </div>
+              )}
 
               <div className="flex items-center justify-center gap-2 flex-wrap mt-3">
                 {rating.count > 0 && (
@@ -126,23 +147,6 @@ export default function ProviderProfile({
               </div>
             </div>
 
-            {services.length > 1 && (
-              <div className="mt-6 pt-5 border-t border-ink/10">
-                <h2 className="text-sm font-medium text-ink/60 mb-2">{t.services}</h2>
-                <div className="flex gap-1.5 flex-wrap">
-                  {services.map((s) => (
-                    <a
-                      key={s.slug}
-                      href={`/${s.slug}`}
-                      className="text-xs bg-[#EEF1F8] text-ink/70 px-3 py-1.5 rounded-full active:bg-ink/10"
-                    >
-                      {s.icon} {s.label}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div className="mt-6 pt-5 border-t border-ink/10">
               <h2 className="text-sm font-medium text-ink/60 mb-2">{t.about}</h2>
               <p className="text-ink/80 text-sm leading-relaxed whitespace-pre-line">
@@ -156,10 +160,7 @@ export default function ProviderProfile({
                 <p>
                   📞 <span className="font-numeric font-medium">{provider.phone}</span>
                 </p>
-                <p className="text-ink/70">
-                  📍 {provider.area}
-                  {where ? `, ${where}` : ''}
-                </p>
+                {fullAddress && <p className="text-ink/70">📍 {fullAddress}</p>}
               </div>
             </div>
 
