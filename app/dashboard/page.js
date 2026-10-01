@@ -321,7 +321,7 @@ export default function DashboardPage() {
             <div className="bg-white border border-dashed border-ink/20 rounded-xl p-6 text-center">
               <p className="text-3xl mb-1">🛠️</p>
               <p className="text-ink/50 text-sm mb-3">{t.noProvider}</p>
-              <a href="/#categories" className="inline-block bg-marigold text-ink text-sm font-semibold px-4 py-2 rounded-full">
+              <a href="/post/new?category=service-provider" className="inline-block bg-marigold text-ink text-sm font-semibold px-4 py-2 rounded-full">
                 {t.createNow}
               </a>
             </div>
@@ -400,7 +400,7 @@ export default function DashboardPage() {
             <div className="bg-white border border-dashed border-ink/20 rounded-xl p-6 text-center">
               <p className="text-3xl mb-1">📄</p>
               <p className="text-ink/50 text-sm mb-3">{t.noListing}</p>
-              <a href="/#categories" className="inline-block bg-marigold text-ink text-sm font-semibold px-4 py-2 rounded-full">
+              <a href="/post/new" className="inline-block bg-marigold text-ink text-sm font-semibold px-4 py-2 rounded-full">
                 {t.createNow}
               </a>
             </div>
