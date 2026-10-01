@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import ImageCropper from '../../../components/ImageCropper';
 import SiteHeader from '../../../components/SiteHeader';
 import { locations, upazilaList } from '../../../lib/locations';
+import { categoryLabels } from '../../../lib/categoryLabels';
 
 const rentTypeLabels = { house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য' };
 const roomOptions = ['১', '২', '৩', '৪+'];
@@ -48,6 +49,7 @@ function NewPostForm() {
   const [category, setCategory] = useState(null);
   const [loadingCategory, setLoadingCategory] = useState(true);
   const [subcategories, setSubcategories] = useState([]);
+  const [allCats, setAllCats] = useState([]);
 
   const [form, setForm] = useState({
     title: '', name: '', ownerName: '', area: '', phone: '', priceOrSalary: '',
@@ -152,6 +154,13 @@ function NewPostForm() {
     return () => clearTimeout(timer);
   }, [form.slug, category]);
 
+  useEffect(() => {
+    supabase
+      .from('categories')
+      .select('id, slug, type, is_active, sort_order')
+      .order('sort_order', { ascending: true })
+      .then(({ data }) => setAllCats(data || []));
+  }, []);
   function updateField(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
   }
@@ -350,11 +359,61 @@ if (isBanned) {
     );
   }
   if (!category) {
+    const postableCats = allCats.filter(
+      (c) => categoryLabels[c.slug] && c.is_active !== false && (c.type === 'listing' || c.type === 'service')
+    );
+    const bloodOn = allCats.some((c) => c.type === 'blood' && c.is_active !== false);
+
     return (
       <PageShell>
-        <main className="max-w-md mx-auto px-4 py-20 text-center">
-          <p className="text-ink/70 mb-4">সঠিক ক্যাটাগরি বাছাই করা হয়নি।</p>
-          <a href="/" className="text-green underline">হোমপেজে ফিরে যান</a>
+        <main className="max-w-xl mx-auto px-4 py-5">
+          <h1 className="text-xl font-semibold">কী পোস্ট করতে চান?</h1>
+          <p className="text-sm text-ink/55 mt-1 mb-4">একটা ক্যাটাগরি বাছাই করুন</p>
+
+          {allCats.length === 0 && <p className="text-center text-ink/50 text-sm py-10">লোড হচ্ছে...</p>}
+
+          <div className="grid grid-cols-2 gap-3">
+            {postableCats.map((c) => {
+              const label = categoryLabels[c.slug];
+              return (
+                <a
+                  key={c.slug}
+                  href={`/post/new?category=${c.slug}`}
+                  className={`bg-white rounded-xl border-l-4 ${label.color} border-t border-r border-b border-ink/10 p-3 flex items-center gap-3 active:bg-paper`}
+                >
+                  <span className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${label.iconBg}`}>
+                    {label.icon}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-sm leading-tight">{label.bn.name}</span>
+                    <span className="block text-[11px] text-ink/50 mt-0.5 line-clamp-2">{label.bn.desc}</span>
+                  </span>
+                </a>
+              );
+            })}
+          </div>
+
+          {bloodOn && (
+            <>
+              <p className="text-sm font-medium mt-6 mb-2">🩸 রক্ত</p>
+              <div className="grid grid-cols-2 gap-3">
+                <a
+                  href="/blood/request"
+                  className="bg-white rounded-xl border-l-4 border-l-red-400 border-t border-r border-b border-ink/10 p-3 text-sm font-semibold active:bg-paper"
+                >
+                  রক্ত চাই
+                  <span className="block text-[11px] font-normal text-ink/50 mt-0.5">অনুরোধ জমা দিন</span>
+                </a>
+                <a
+                  href="/blood/donor"
+                  className="bg-white rounded-xl border-l-4 border-l-red-400 border-t border-r border-b border-ink/10 p-3 text-sm font-semibold active:bg-paper"
+                >
+                  রক্তদাতা হন
+                  <span className="block text-[11px] font-normal text-ink/50 mt-0.5">ডোনার হিসেবে নিবন্ধন</span>
+                </a>
+              </div>
+            </>
+          )}
         </main>
       </PageShell>
     );
