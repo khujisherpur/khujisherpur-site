@@ -1,10 +1,18 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+import { redirect } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import ProviderProfile from '../../../components/ProviderProfile';
 import { getLang } from '../../../lib/getLang';
 import { categoryLabels } from '../../../lib/categoryLabels';
+
+const subcategoryIcons = {
+  electrician: '⚡', plumber: '🚰', 'ac-technician': '❄️', 'fridge-technician': '🧊',
+  mechanic: '⚙️', carpenter: '🪚', mason: '🧱', painter: '🎨', cleaning: '🧹',
+  'mobile-repair': '📱', 'computer-repair': '💻', cctv: '📹',
+  'internet-wifi': '📶', driver: '🚗', 'transport-shifting': '🚚',
+};
 
 export async function generateMetadata({ params }) {
   const { data: provider } = await supabase
@@ -37,7 +45,7 @@ export default async function ProviderDetailPage({ params }) {
 
   const { data: provider } = await supabase
     .from('providers')
-    .select('id, user_id, name, area, upazila, union_name, phone, description, is_available, photo_url, vehicle_type, experience_years, view_count, categories(slug)')
+    .select('id, user_id, name, slug, area, upazila, union_name, phone, description, is_available, photo_url, vehicle_type, experience_years, view_count, primary_subcategory_id, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'approved')
     .single();
@@ -54,6 +62,30 @@ export default async function ProviderDetailPage({ params }) {
     );
   }
 
+  const { data: myServices } = await supabase
+    .from('provider_subcategories')
+    .select('subcategories(id, slug, name_bn, name_en)')
+    .eq('provider_id', provider.id);
+  let subs = (myServices || []).map((r) => r.subcategories).filter(Boolean);
+
+  let primary = subs.find((s) => s.id === provider.primary_subcategory_id) || null;
+  if (!primary && provider.primary_subcategory_id) {
+    const { data: p } = await supabase
+      .from('subcategories')
+      .select('id, slug, name_bn, name_en')
+      .eq('id', provider.primary_subcategory_id)
+      .maybeSingle();
+    if (p) {
+      primary = p;
+      subs = [p, ...subs];
+    }
+  }
+
+  // সুন্দর ঠিকানা থাকলে সেখানে পাঠিয়ে দিই
+  if (provider.slug && primary) {
+    redirect(`/${primary.slug}/${provider.slug}`);
+  }
+
   await supabase.rpc('increment_provider_view', { pid: provider.id });
 
   const { data: reviews } = await supabase.from('reviews').select('rating').eq('provider_id', provider.id);
@@ -63,6 +95,17 @@ export default async function ProviderDetailPage({ params }) {
   const slug = provider.categories?.slug;
   const label = categoryLabels[slug];
   const categoryName = label ? label[lang].name : '';
+  const subName = (s) => (lang === 'bn' ? s.name_bn : s.name_en || s.name_bn);
+
+  const services = subs
+    .map((s) => ({
+      slug: s.slug,
+      icon: subcategoryIcons[s.slug] || '🛠️',
+      label: subName(s),
+      primary: primary ? s.id === primary.id : false,
+    }))
+    .sort((a, b) => Number(b.primary) - Number(a.primary));
+
   const badges = [];
   if (slug === 'ambulance' && provider.vehicle_type) {
     badges.push(`🚑 ${provider.vehicle_type === 'ac' ? 'AC' : 'Non-AC'}`);
@@ -76,7 +119,8 @@ export default async function ProviderDetailPage({ params }) {
         lang={lang}
         backHref={slug ? `/category/${slug}` : '/'}
         backLabel={t.back}
-        headline={`${categoryName} · ${provider.area}`}
+        headline={`${primary ? subName(primary) : categoryName} · ${provider.area}`}
+        services={services}
         rating={{ avg, count }}
         badges={badges}
       />
