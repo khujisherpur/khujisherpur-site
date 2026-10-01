@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 const text = {
-  bn: { home: 'হোম', search: 'খুঁজুন', post: 'পোস্ট', favorites: 'ফেভারিট', account: 'অ্যাকাউন্ট' },
+  bn: { home: 'হোম', search: 'খুঁজুন', post: 'পোস্ট', favorites: 'সংরক্ষিত', account: 'অ্যাকাউন্ট' },
   en: { home: 'Home', search: 'Search', post: 'Post', favorites: 'Saved', account: 'Account' },
 };
 
@@ -29,7 +29,7 @@ export default function BottomNav({ activeTab = '' }) {
   const items = [
     { key: 'home', href: '/', icon: '🏠', label: t.home },
     { key: 'search', href: '/search', icon: '🔍', label: t.search },
-    { key: 'post', href: '/#categories', icon: '➕', label: t.post, isCenter: true },
+    { key: 'post', href: '/post/new', icon: '➕', label: t.post, isCenter: true },
     { key: 'favorites', href: favoritesHref, icon: '❤️', label: t.favorites },
     { key: 'account', href: accountHref, icon: '👤', label: t.account },
   ];
