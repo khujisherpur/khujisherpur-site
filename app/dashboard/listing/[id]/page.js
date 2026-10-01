@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../../lib/supabaseClient';
 import ImageCropper from '../../../../components/ImageCropper';
 import SiteHeader from '../../../../components/SiteHeader';
+import { cleanPhone, isValidBdPhone } from '../../../../lib/format';
 
 const MAX_PHOTOS = 3;
 
@@ -25,7 +26,10 @@ function PageShell({ children }) {
 }
 
 export default function EditListingPage({ params }) {
-  const [form, setForm] = useState({ title: '', area: '', price_or_salary: '', description: '' });
+  const [form, setForm] = useState({
+    title: '', area: '', price_or_salary: '', description: '',
+    contact_phone: '', whatsapp: '', contact_email: '',
+  });
   const [categoryName, setCategoryName] = useState('');
   const [user, setUser] = useState(null);
   const [photos, setPhotos] = useState([]);
@@ -47,7 +51,7 @@ export default function EditListingPage({ params }) {
 
     const { data, error } = await supabase
       .from('listings')
-      .select('title, area, price_or_salary, description, photos, categories(name)')
+      .select('title, area, price_or_salary, description, photos, contact_phone, whatsapp, contact_email, categories(name)')
       .eq('id', params.id)
       .single();
 
@@ -61,6 +65,9 @@ export default function EditListingPage({ params }) {
       area: data.area || '',
       price_or_salary: data.price_or_salary || '',
       description: data.description || '',
+      contact_phone: data.contact_phone || '',
+      whatsapp: data.whatsapp || '',
+      contact_email: data.contact_email || '',
     });
     setCategoryName(data.categories?.name || '');
     setPhotos((data.photos || []).map((url) => ({ key: url, url, preview: url })));
@@ -114,6 +121,14 @@ export default function EditListingPage({ params }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!user) return;
+    if (!isValidBdPhone(form.contact_phone)) {
+      setError('সঠিক মোবাইল নম্বর দিন (যেমন: 01XXXXXXXXX)');
+      return;
+    }
+    if (form.whatsapp && !isValidBdPhone(form.whatsapp)) {
+      setError('হোয়াটসঅ্যাপ নম্বরটি সঠিক নয় (যেমন: 01XXXXXXXXX)');
+      return;
+    }
     setSaving(true);
     setError(null);
     const uploaded = [];
@@ -138,6 +153,9 @@ export default function EditListingPage({ params }) {
           price_or_salary: form.price_or_salary,
           description: form.description,
           photos: finalUrls,
+          contact_phone: cleanPhone(form.contact_phone),
+          whatsapp: form.whatsapp ? cleanPhone(form.whatsapp) : null,
+          contact_email: form.contact_email.trim() || null,
           status: 'pending',
         })
         .eq('id', params.id)
@@ -296,6 +314,38 @@ export default function EditListingPage({ params }) {
             />
           </div>
 
+                <div className="rounded-xl border border-ink/10 bg-paper p-4 space-y-3">
+            <p className="text-sm font-medium">📞 যোগাযোগের তথ্য</p>
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">
+                মোবাইল নম্বর <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel" required inputMode="tel" value={form.contact_phone}
+                onChange={(e) => updateField('contact_phone', e.target.value)}
+                className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green bg-white"
+                placeholder="01XXXXXXXXX"
+              />
+            </div>
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">হোয়াটসঅ্যাপ নম্বর (ঐচ্ছিক)</label>
+              <input
+                type="tel" inputMode="tel" value={form.whatsapp}
+                onChange={(e) => updateField('whatsapp', e.target.value)}
+                className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green bg-white"
+                placeholder="01XXXXXXXXX"
+              />
+            </div>
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">ইমেইল (ঐচ্ছিক)</label>
+              <input
+                type="email" value={form.contact_email}
+                onChange={(e) => updateField('contact_email', e.target.value)}
+                className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green bg-white"
+                placeholder="you@example.com"
+              />
+            </div>
+          </div>
           <p className="text-xs text-marigold bg-marigold/10 rounded-lg px-3 py-2">
             ℹ️ সেভ করলে পোস্টটি আবার পর্যালোচনায় যাবে, অনুমোদনের আগ পর্যন্ত সাইটে দেখা যাবে না।
           </p>
