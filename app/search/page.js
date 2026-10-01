@@ -6,6 +6,7 @@ import { categoryLabels } from '../../lib/categoryLabels';
 import SiteHeader from '../../components/SiteHeader';
 import BottomNav from '../../components/BottomNav';
 import LocationFilter from '../../components/LocationFilter';
+import SaveSearchButton from '../../components/SaveSearchButton';
 
 const text = {
   bn: {
@@ -97,11 +98,14 @@ export default async function SearchPage({ searchParams }) {
           </div>
 
           {hasSearch && (
-            <p className="text-sm text-ink/60 mt-4">
-              {query && <>"<span className="font-medium text-ink">{query}</span>" {t.foundFor} </>}
-              {totalResults} {t.results}
-              {upazila && <> · {t.inArea} {unionName || upazila}</>}
-            </p>
+            <>
+              <p className="text-sm text-ink/60 mt-4">
+                {query && <>"<span className="font-medium text-ink">{query}</span>" {t.foundFor} </>}
+                {totalResults} {t.results}
+                {upazila && <> · {t.inArea} {unionName || upazila}</>}
+              </p>
+              <SaveSearchButton lang={lang} query={query} upazila={upazila} union={unionName} />
+            </>
           )}
         </div>
 
