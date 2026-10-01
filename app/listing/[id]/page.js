@@ -6,6 +6,7 @@ import ReportButton from '../../../components/ReportButton';
 import FavoriteButton from '../../../components/FavoriteButton';
 import ShareButton from '../../../components/ShareButton';
 import SiteHeader from '../../../components/SiteHeader';
+import ContactBar from '../../../components/ContactBar';
 import { getLang } from '../../../lib/getLang';
 import { categoryLabels } from '../../../lib/categoryLabels';
 import { formatPrice, timeAgo, toBn } from '../../../lib/format';
@@ -13,7 +14,7 @@ import { formatPrice, timeAgo, toBn } from '../../../lib/format';
 export async function generateMetadata({ params }) {
   const { data: listing } = await supabase
     .from('listings')
-    .select('title, area, price_or_salary, description, categories(name)')
+    .select('id, title, area, upazila, union_name, price_or_salary, description, photos, rent_type, owner_name, posted_at, view_count, contact_phone, whatsapp, contact_email, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'active')
     .single();
@@ -75,7 +76,9 @@ export default async function ListingDetailPage({ params }) {
   const label = categoryLabels[listing.categories?.slug];
   const categoryName = label ? label[lang].name : '';
   const photos = listing.photos || [];
-  const where = [listing.area, listing.union_name, listing.upazila].filter(Boolean).join(', ');
+  const where = Array.from(
+    new Set([listing.area, listing.union_name, listing.upazila].map((v) => (v || '').trim()).filter(Boolean))
+  ).join(', ');
   const price = formatPrice(listing.price_or_salary, lang);
   const views = (listing.view_count || 0) + 1;
 
@@ -90,7 +93,7 @@ export default async function ListingDetailPage({ params }) {
   return (
     <>
       <SiteHeader lang={lang} />
-      <main className="max-w-2xl mx-auto px-4 pt-4 pb-16">
+      <main className="max-w-2xl mx-auto px-4 pt-4 pb-32">
         <a href={`/category/${listing.categories?.slug}`} className="text-sm text-ink/55 hover:text-ink">
           {t.back}
         </a>
@@ -183,6 +186,12 @@ export default async function ListingDetailPage({ params }) {
           }}
         />
       </main>
+          <ContactBar
+        phone={listing.contact_phone}
+        whatsapp={listing.whatsapp || ''}
+        email={listing.contact_email}
+        lang={lang}
+      />
     </>
   );
 }
