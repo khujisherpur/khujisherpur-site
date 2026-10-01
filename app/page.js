@@ -10,6 +10,7 @@ import HeaderBell from '../components/HeaderBell';
 import HeroIntro from '../components/HeroIntro';
 import HeroSearch from '../components/HeroSearch';
 import AnnouncementBar from '../components/AnnouncementBar';
+import { formatPrice, timeAgo as timeAgoFmt, toBn } from '../lib/format';
 
 const text = {
   bn: {
@@ -28,7 +29,6 @@ const text = {
     reviews: 'রিভিউ',
     terms: 'শর্তাবলি', privacy: 'প্রাইভেসি পলিসি', disclaimer: 'দায়বদ্ধতা',
     footer: '© ২০২৬ খুঁজি শেরপুর', credit: 'Developed by ASRAFUL',
-    justNow: 'এইমাত্র', minutesAgo: (n) => `${n} মিনিট আগে`, hoursAgo: (n) => `${n} ঘণ্টা আগে`, daysAgo: (n) => `${n} দিন আগে`,
   },
   en: {
     tagline1: 'What you\u2019re looking for in Sherpur', tagline2: 'find it all in one place',
@@ -46,19 +46,8 @@ const text = {
     reviews: 'reviews',
     terms: 'Terms', privacy: 'Privacy Policy', disclaimer: 'Disclaimer',
     footer: '© 2026 Khuji Sherpur', credit: 'Developed by ASRAFUL',
-    justNow: 'Just now', minutesAgo: (n) => `${n}m ago`, hoursAgo: (n) => `${n}h ago`, daysAgo: (n) => `${n}d ago`,
   },
 };
-
-function timeAgo(dateStr, t) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return t.justNow;
-  if (mins < 60) return t.minutesAgo(mins);
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return t.hoursAgo(hours);
-  return t.daysAgo(Math.floor(hours / 24));
-}
 
 function categoryHref(cat) {
   if (cat.type === 'external') return cat.external_url;
@@ -70,6 +59,8 @@ function categoryHref(cat) {
 export default async function HomePage() {
   const lang = getLang();
   const t = text[lang];
+  const num = (n) => (lang === 'bn' ? toBn(n) : n);
+
   const { data: settingsRows } = await supabase.from('site_settings').select('key, value');
   const settings = Object.fromEntries((settingsRows || []).map((r) => [r.key, r.value]));
 
@@ -155,7 +146,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen">
-    {settings.announcement_enabled === 'true' && settings.announcement_text && (
+      {settings.announcement_enabled === 'true' && settings.announcement_text && (
         <AnnouncementBar text={settings.announcement_text} link={settings.announcement_link} />
       )}
       <header className="sticky top-0 z-40 bg-gradient-to-r from-green-dark to-green shadow-md">
@@ -220,7 +211,7 @@ export default async function HomePage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-75" />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green" />
             </span>
-            <span className="text-xs text-ink/70 font-medium">{t.liveCount(totalActiveCount)}</span>
+            <span className="text-xs text-ink/70 font-medium">{t.liveCount(num(totalActiveCount))}</span>
           </div>
         </section>
 
@@ -281,7 +272,7 @@ export default async function HomePage() {
                     {isExternal ? (
                       <span className="text-[10px] text-ink/30 flex-shrink-0">↗</span>
                     ) : count > 0 ? (
-                      <span className="text-[9px] bg-paper text-ink/50 px-1 py-0.5 rounded-full font-numeric flex-shrink-0">{count}</span>
+                      <span className="text-[9px] bg-paper text-ink/50 px-1 py-0.5 rounded-full font-numeric flex-shrink-0">{num(count)}</span>
                     ) : null}
                   </div>
                   <p className="font-semibold text-[11px] mt-1.5 leading-tight line-clamp-1">{label[lang].name}</p>
@@ -324,8 +315,12 @@ export default async function HomePage() {
                     <div className="p-2.5">
                       <p className="text-xs font-medium line-clamp-1">{item.title}</p>
                       <p className="text-[10px] text-ink/50 mt-1">📍 {item.area}</p>
-                      {item.price && <p className="text-xs text-green font-numeric font-medium mt-1">{item.price}</p>}
-                      <p className="text-[9px] text-ink/30 mt-1">{timeAgo(item.date, t)}</p>
+                      {item.price && (
+                        <p className="text-xs text-green font-numeric font-semibold mt-1">
+                          {formatPrice(item.price, lang)}
+                        </p>
+                      )}
+                      <p className="text-[9px] text-ink/30 mt-1">{timeAgoFmt(item.date, lang)}</p>
                     </div>
                   </a>
                 );
@@ -349,7 +344,7 @@ export default async function HomePage() {
                         {step.icon}
                       </span>
                       <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-marigold text-ink text-[10px] font-bold flex items-center justify-center font-numeric">
-                        {i + 1}
+                        {num(i + 1)}
                       </span>
                     </div>
                     <p className="font-medium text-xs mt-2">{step.title}</p>
@@ -367,7 +362,7 @@ export default async function HomePage() {
           <section className="pb-10">
             <div className="flex items-center justify-between px-4 mb-3">
               <h2 className="text-lg font-semibold">{t.providersTitle}</h2>
-              <a href="/search" className="text-sm text-green font-medium">{t.seeAll}</a>
+              <a href="/category/service-provider" className="text-sm text-green font-medium">{t.seeAll}</a>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2 px-4 snap-x snap-mandatory scrollbar-hide">
               {providersWithRating.map((p) => {
@@ -394,7 +389,7 @@ export default async function HomePage() {
                     </p>
                     {p.reviewCount > 0 && (
                       <p className="text-[10px] text-marigold mt-1 font-numeric">
-                        ⭐ {p.avgRating.toFixed(1)} ({p.reviewCount} {t.reviews})
+                        ⭐ {num(p.avgRating.toFixed(1))} ({num(p.reviewCount)} {t.reviews})
                       </p>
                     )}
                   </a>
