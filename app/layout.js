@@ -1,18 +1,5 @@
-import { Hind_Siliguri, Noto_Serif_Bengali } from 'next/font/google';
 import './globals.css';
 import MaintenanceGate from '../components/MaintenanceGate';
-
-const hind = Hind_Siliguri({
-  subsets: ['bengali', 'latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-hind',
-});
-
-const notoSerifBn = Noto_Serif_Bengali({
-  subsets: ['bengali'],
-  weight: ['500', '600', '700'],
-  variable: '--font-noto-serif-bn',
-});
 
 export const metadata = {
   title: 'খুঁজি শেরপুর | শেরপুরে যা খুঁজছেন, এক জায়গায় খুঁজে নিন',
@@ -29,7 +16,21 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="bn" className={`${hind.variable} ${notoSerifBn.variable}`}>
+    <html
+      lang="bn"
+      style={{
+        '--font-hind': "'Hind Siliguri', system-ui, sans-serif",
+        '--font-noto-serif-bn': "'Noto Serif Bengali', Georgia, serif",
+      }}
+    >
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@500;600;700&display=swap"
+        />
+      </head>
       <body className="bg-paper text-ink font-sans antialiased">
         <MaintenanceGate>{children}</MaintenanceGate>
       </body>
