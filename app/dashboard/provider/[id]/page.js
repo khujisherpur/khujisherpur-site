@@ -5,6 +5,7 @@ import { supabase } from '../../../../lib/supabaseClient';
 import ImageCropper from '../../../../components/ImageCropper';
 import SiteHeader from '../../../../components/SiteHeader';
 import { locations, upazilaList } from '../../../../lib/locations';
+import { cleanPhone, isValidBdPhone } from '../../../../lib/format';
 
 function extractStoragePath(publicUrl) {
   if (!publicUrl) return null;
@@ -25,10 +26,11 @@ function PageShell({ children }) {
 
 export default function EditProviderPage({ params }) {
   const [form, setForm] = useState({
-    name: '', area: '', phone: '', description: '',
+    name: '', area: '', phone: '', whatsapp: '', description: '',
     experienceYears: '', vehicleType: 'ac',
     nameEn: '', upazila: '', unionName: '',
   });
+  const [waSame, setWaSame] = useState(false);
   const [categorySlug, setCategorySlug] = useState(null);
   const [slug, setSlug] = useState(null);
   const [primarySubcategoryId, setPrimarySubcategoryId] = useState(null);
@@ -57,7 +59,7 @@ export default function EditProviderPage({ params }) {
     const { data, error } = await supabase
       .from('providers')
       .select(`
-        name, area, phone, description, photo_url, experience_years, vehicle_type,
+        name, area, phone, whatsapp, description, photo_url, experience_years, vehicle_type,
         name_en, slug, upazila, union_name, primary_subcategory_id, category_id,
         categories(slug)
       `)
@@ -71,10 +73,12 @@ export default function EditProviderPage({ params }) {
     }
 
     setForm({
-      name: data.name, area: data.area, phone: data.phone, description: data.description || '',
+      name: data.name, area: data.area, phone: data.phone, whatsapp: data.whatsapp || '',
+      description: data.description || '',
       experienceYears: data.experience_years || '', vehicleType: data.vehicle_type || 'ac',
       nameEn: data.name_en || '', upazila: data.upazila || '', unionName: data.union_name || '',
     });
+    setWaSame(!!data.whatsapp && cleanPhone(data.whatsapp) === cleanPhone(data.phone || ''));
     setCurrentPhotoUrl(data.photo_url);
     setCategorySlug(data.categories?.slug);
     setSlug(data.slug);
@@ -148,6 +152,17 @@ export default function EditProviderPage({ params }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!user) return;
+
+    const waValue = waSame ? form.phone : form.whatsapp;
+    if (!isValidBdPhone(form.phone)) {
+      setError('সঠিক মোবাইল নম্বর দিন (যেমন: 01XXXXXXXXX)');
+      return;
+    }
+    if (waValue && !isValidBdPhone(waValue)) {
+      setError('হোয়াটসঅ্যাপ নম্বরটি সঠিক নয় (যেমন: 01XXXXXXXXX)');
+      return;
+    }
+
     setSaving(true);
     setError(null);
     let uploadedUrl = null;
@@ -164,7 +179,8 @@ export default function EditProviderPage({ params }) {
       const payload = {
         name: form.name,
         area: form.area,
-        phone: form.phone,
+        phone: cleanPhone(form.phone),
+        whatsapp: waValue ? cleanPhone(waValue) : null,
         description: form.description,
         photo_url: photoUrl,
         experience_years: form.experienceYears ? parseInt(form.experienceYears) : null,
@@ -372,11 +388,33 @@ export default function EditProviderPage({ params }) {
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">ফোন নম্বর</label>
             <input
-              type="tel" required value={form.phone}
+              type="tel" required inputMode="tel" value={form.phone}
               onChange={(e) => updateField('phone', e.target.value)}
               className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
+              placeholder="01XXXXXXXXX"
             />
           </div>
+
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">হোয়াটসঅ্যাপ নম্বর (ঐচ্ছিক)</label>
+            <label className="flex items-center gap-2 text-xs text-ink/60 mb-1.5">
+              <input
+                type="checkbox" checked={waSame}
+                onChange={(e) => setWaSame(e.target.checked)}
+                className="w-4 h-4"
+              />
+              ফোন নম্বরেই হোয়াটসঅ্যাপ আছে
+            </label>
+            <input
+              type="tel" inputMode="tel" disabled={waSame}
+              value={waSame ? '' : form.whatsapp}
+              onChange={(e) => updateField('whatsapp', e.target.value)}
+              className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green disabled:bg-paper disabled:text-ink/30"
+              placeholder={waSame ? 'ফোন নম্বরই ব্যবহার হবে' : '01XXXXXXXXX'}
+            />
+            <p className="text-[11px] text-ink/45 mt-1">দিলে প্রোফাইলে সবুজ WhatsApp বাটন দেখাবে, ফাঁকা রাখলে বাটন আসবে না।</p>
+          </div>
+
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">অভিজ্ঞতা (বছর, ঐচ্ছিক)</label>
             <input
