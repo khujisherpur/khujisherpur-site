@@ -255,7 +255,7 @@ export default async function HomePage() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">{t.whatLooking}</h2>
             <a
-              href="#categories"
+              href="/post/new"
               className="bg-marigold text-ink text-sm font-semibold px-4 py-2 rounded-full flex-shrink-0 whitespace-nowrap"
             >
               + {t.postButton}
