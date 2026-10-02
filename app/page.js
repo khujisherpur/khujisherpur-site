@@ -10,7 +10,20 @@ import HeaderBell from '../components/HeaderBell';
 import HeroIntro from '../components/HeroIntro';
 import HeroSearch from '../components/HeroSearch';
 import AnnouncementBar from '../components/AnnouncementBar';
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+import { supabase } from '../lib/supabaseClient';
+import { getLang } from '../lib/getLang';
+import { categoryLabels } from '../lib/categoryLabels';
+import LanguageToggle from '../components/LanguageToggle';
+import AuthButton from '../components/AuthButton';
+import BottomNav from '../components/BottomNav';
+import HeaderBell from '../components/HeaderBell';
+import HeroIntro from '../components/HeroIntro';
+import HeroSearch from '../components/HeroSearch';
+import AnnouncementBar from '../components/AnnouncementBar';
 import { formatPrice, timeAgo as timeAgoFmt, toBn } from '../lib/format';
+import { getServicesFor, providerHref } from '../lib/services';
 
 const text = {
   bn: {
@@ -100,7 +113,7 @@ export default async function HomePage() {
   const [{ data: recentProviders }, { data: recentListings }] = await Promise.all([
     supabase
       .from('providers')
-      .select('id, name, area, photo_url, created_at, categories(slug)')
+      .select('id, name, slug, area, photo_url, created_at, primary_subcategory_id, categories(slug)')
       .eq('status', 'approved')
       .order('created_at', { ascending: false })
       .limit(6),
@@ -113,14 +126,23 @@ export default async function HomePage() {
       .limit(8),
   ]);
 
+  // সেবাদাতার আসল সেবার নাম (ইলেকট্রিশিয়ান, প্লাম্বার...)
+  const svc = await getServicesFor(recentProviders || [], lang);
+  const providerBadge = (p) => {
+    const s = svc[p.id]?.[0];
+    return s ? `${s.icon} ${s.label}` : categoryLabels[p.categories?.slug]?.[lang].name || '';
+  };
+
   const recentItems = [
     ...(recentProviders || []).map((p) => ({
       id: p.id, type: 'provider', title: p.name, area: p.area,
       image: p.photo_url, date: p.created_at, slug: p.categories?.slug,
+      badge: providerBadge(p), href: providerHref(p, svc[p.id]),
     })),
     ...(recentListings || []).map((l) => ({
       id: l.id, type: 'listing', title: l.title, area: l.area, price: l.price_or_salary,
       image: l.photos?.[0] || null, date: l.posted_at, slug: l.categories?.slug,
+      badge: categoryLabels[l.categories?.slug]?.[lang].name || '', href: `/listing/${l.id}`,
     })),
   ]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
@@ -293,11 +315,10 @@ export default async function HomePage() {
             <div className="flex gap-3 overflow-x-auto pb-2 px-4 snap-x snap-mandatory scrollbar-hide">
               {recentItems.map((item) => {
                 const label = categoryLabels[item.slug];
-                const href = item.type === 'provider' ? `/provider/${item.id}` : `/listing/${item.id}`;
                 return (
                   <a
                     key={`${item.type}-${item.id}`}
-                    href={href}
+                    href={item.href}
                     className="flex-shrink-0 w-36 snap-start bg-white rounded-xl border border-ink/10 overflow-hidden hover:shadow-md transition-shadow"
                   >
                     <div className="relative h-24 bg-paper flex items-center justify-center overflow-hidden">
@@ -306,9 +327,9 @@ export default async function HomePage() {
                       ) : (
                         <span className="text-3xl opacity-30">{label?.icon || '📍'}</span>
                       )}
-                      {label && (
+                      {item.badge && (
                         <span className="absolute top-1.5 left-1.5 text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-white/90 text-ink/70">
-                          {label[lang].name}
+                          {item.badge}
                         </span>
                       )}
                     </div>
@@ -365,36 +386,33 @@ export default async function HomePage() {
               <a href="/category/service-provider" className="text-sm text-green font-medium">{t.seeAll}</a>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2 px-4 snap-x snap-mandatory scrollbar-hide">
-              {providersWithRating.map((p) => {
-                const label = categoryLabels[p.categories?.slug];
-                return (
-                  <a
-                    key={p.id}
-                    href={`/provider/${p.id}`}
-                    className="flex-shrink-0 w-44 snap-start bg-white rounded-xl border border-ink/10 p-3 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-center gap-2">
-                      {p.photo_url ? (
-                        <img src={p.photo_url} alt={p.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-paper flex items-center justify-center text-sm text-ink/30 flex-shrink-0">
-                          {p.name?.charAt(0)}
-                        </div>
-                      )}
-                      <span className="text-blue-500 text-xs flex-shrink-0" title="Verified">✓</span>
-                    </div>
-                    <p className="text-sm font-medium mt-2 line-clamp-1">{p.name}</p>
-                    <p className="text-[10px] text-ink/50 mt-0.5 line-clamp-1">
-                      {label ? label[lang].name : ''} · {p.area}
-                    </p>
-                    {p.reviewCount > 0 && (
-                      <p className="text-[10px] text-marigold mt-1 font-numeric">
-                        ⭐ {num(p.avgRating.toFixed(1))} ({num(p.reviewCount)} {t.reviews})
-                      </p>
+              {providersWithRating.map((p) => (
+                <a
+                  key={p.id}
+                  href={providerHref(p, svc[p.id])}
+                  className="flex-shrink-0 w-44 snap-start bg-white rounded-xl border border-ink/10 p-3 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-center gap-2">
+                    {p.photo_url ? (
+                      <img src={p.photo_url} alt={p.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-paper flex items-center justify-center text-sm text-ink/30 flex-shrink-0">
+                        {p.name?.charAt(0)}
+                      </div>
                     )}
-                  </a>
-                );
-              })}
+                    <span className="text-blue-500 text-xs flex-shrink-0" title="Verified">✓</span>
+                  </div>
+                  <p className="text-sm font-medium mt-2 line-clamp-1">{p.name}</p>
+                  <p className="text-[10px] text-ink/50 mt-0.5 line-clamp-1">
+                    {providerBadge(p)} · {p.area}
+                  </p>
+                  {p.reviewCount > 0 && (
+                    <p className="text-[10px] text-marigold mt-1 font-numeric">
+                      ⭐ {num(p.avgRating.toFixed(1))} ({num(p.reviewCount)} {t.reviews})
+                    </p>
+                  )}
+                </a>
+              ))}
             </div>
           </section>
         )}
