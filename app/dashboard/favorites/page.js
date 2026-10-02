@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
+import { getServicesFor } from '../../../lib/services';
 import BottomNav from '../../../components/BottomNav';
 import SiteHeader from '../../../components/SiteHeader';
 
@@ -113,6 +114,7 @@ export default function SavedPage() {
   const [providers, setProviders] = useState([]);
   const [listings, setListings] = useState([]);
   const [searches, setSearches] = useState([]);
+  const [svcMap, setSvcMap] = useState({});
   const [undo, setUndo] = useState(null);
 
   useEffect(() => {
@@ -147,9 +149,10 @@ export default function SavedPage() {
     if (providerIds.length > 0) {
       const { data } = await supabase
         .from('providers')
-        .select('id, name, area, photo_url, status, categories(name)')
+        .select('id, name, slug, area, photo_url, status, primary_subcategory_id, categories(name)')
         .in('id', providerIds);
       setProviders(data || []);
+      setSvcMap(await getServicesFor(data || [], 'bn'));
     } else {
       setProviders([]);
     }
@@ -334,40 +337,47 @@ export default function SavedPage() {
                 </div>
               ))}
 
-              {shownProviders.map((p) => (
-                <div
-                  key={`p-${p.id}`}
-                  className="bg-white rounded-xl border-l-4 border-l-green border-t border-r border-b border-ink/10 flex"
-                >
-                  <a href={`/provider/${p.id}`} className="flex gap-3 flex-1 min-w-0 p-3">
-                    {p.photo_url ? (
-                      <img src={p.photo_url} alt="" className="w-20 h-20 rounded-full object-cover flex-shrink-0" />
-                    ) : (
-                      <span className="w-20 h-20 rounded-full bg-[#EEF1F8] text-green-dark text-2xl font-semibold flex items-center justify-center flex-shrink-0">
-                        {p.name?.charAt(0)}
-                      </span>
-                    )}
-                    <div className="min-w-0 self-center">
-                      <p className="font-medium leading-tight line-clamp-1">{p.name}</p>
-                      <p className="text-xs text-ink/55 mt-1 line-clamp-1">
-                        {p.categories?.name} · {p.area}
-                      </p>
-                      {p.status !== 'approved' && (
-                        <span className="inline-block text-[10px] bg-ink/5 text-ink/50 px-2 py-0.5 rounded-full mt-1">
-                          {t.inactive}
+              {shownProviders.map((p) => {
+                const services = svcMap[p.id] || [];
+                const primary = services.find((s) => s.primary);
+                const href = p.slug && primary ? `/${primary.slug}/${p.slug}` : `/provider/${p.id}`;
+                const serviceText = services.length
+                  ? services.slice(0, 2).map((s) => `${s.icon} ${s.names[lang]}`).join(', ')
+                  : p.categories?.name;
+                return (
+                  <div
+                    key={`p-${p.id}`}
+                    className="bg-white rounded-xl border-l-4 border-l-green border-t border-r border-b border-ink/10 flex"
+                  >
+                    <a href={href} className="flex gap-3 flex-1 min-w-0 p-3">
+                      {p.photo_url ? (
+                        <img src={p.photo_url} alt="" className="w-20 h-20 rounded-full object-cover flex-shrink-0" />
+                      ) : (
+                        <span className="w-20 h-20 rounded-full bg-[#EEF1F8] text-green-dark text-2xl font-semibold flex items-center justify-center flex-shrink-0">
+                          {p.name?.charAt(0)}
                         </span>
                       )}
-                    </div>
-                  </a>
-                  <button
-                    onClick={() => removeFavorite('provider', p)}
-                    aria-label={t.remove}
-                    className="px-3.5 self-start pt-3 text-2xl text-red-500 leading-none"
-                  >
-                    ♥
-                  </button>
-                </div>
-              ))}
+                      <div className="min-w-0 self-center">
+                        <p className="font-medium leading-tight line-clamp-1">{p.name}</p>
+                        <p className="text-xs text-ink/55 mt-1 line-clamp-1">{serviceText}</p>
+                        <p className="text-xs text-ink/45 mt-0.5 line-clamp-1">📍 {p.area}</p>
+                        {p.status !== 'approved' && (
+                          <span className="inline-block text-[10px] bg-ink/5 text-ink/50 px-2 py-0.5 rounded-full mt-1">
+                            {t.inactive}
+                          </span>
+                        )}
+                      </div>
+                    </a>
+                    <button
+                      onClick={() => removeFavorite('provider', p)}
+                      aria-label={t.remove}
+                      className="px-3.5 self-start pt-3 text-2xl text-red-500 leading-none"
+                    >
+                      ♥
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </>
         )}
