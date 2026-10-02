@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { getLang } from '../../lib/getLang';
 import { categoryLabels } from '../../lib/categoryLabels';
 import { formatPrice, timeAgo, toBn } from '../../lib/format';
+import { getServicesFor, providerHref } from '../../lib/services';
 import SiteHeader from '../../components/SiteHeader';
 import BottomNav from '../../components/BottomNav';
 import LocationFilter from '../../components/LocationFilter';
@@ -16,7 +17,6 @@ const text = {
     noResults: 'কোনো ফলাফল পাওয়া যায়নি। অন্য শব্দ দিয়ে চেষ্টা করুন।',
     noneYet: 'এখনো কোনো পোস্ট নেই।',
     foundFor: 'এর জন্য', results: 'টি ফলাফল পাওয়া গেছে', inArea: 'এলাকায়',
-    countOnly: 'টি',
   },
   en: {
     placeholder: 'e.g. house rent, electrician...', search: 'Search',
@@ -24,7 +24,6 @@ const text = {
     noResults: 'No results found. Try a different word.',
     noneYet: 'No posts yet.',
     foundFor: 'results found for', results: '', inArea: 'in',
-    countOnly: '',
   },
 };
 
@@ -40,7 +39,7 @@ export default async function SearchPage({ searchParams }) {
 
   let providersQuery = supabase
     .from('providers')
-    .select('id, name, area, upazila, union_name, photo_url, created_at, categories(slug)')
+    .select('id, name, slug, area, upazila, union_name, photo_url, created_at, primary_subcategory_id, categories(slug)')
     .eq('status', 'approved');
   let listingsQuery = supabase
     .from('listings')
@@ -73,14 +72,22 @@ export default async function SearchPage({ searchParams }) {
     listingsQuery.order('posted_at', { ascending: false }).limit(LIMIT),
   ]);
 
+  const svc = await getServicesFor(p || [], lang);
+
   const items = [
-    ...(p || []).map((x) => ({
-      type: 'provider', id: x.id, title: x.name, area: x.area, upazila: x.upazila,
-      image: x.photo_url, date: x.created_at, slug: x.categories?.slug,
-    })),
+    ...(p || []).map((x) => {
+      const first = svc[x.id]?.[0];
+      return {
+        type: 'provider', id: x.id, title: x.name, area: x.area, upazila: x.upazila,
+        image: x.photo_url, date: x.created_at, slug: x.categories?.slug,
+        badge: first ? `${first.icon} ${first.label}` : categoryLabels[x.categories?.slug]?.[lang].name || '',
+        href: providerHref(x, svc[x.id]),
+      };
+    }),
     ...(l || []).map((x) => ({
       type: 'listing', id: x.id, title: x.title, area: x.area, upazila: x.upazila,
       price: x.price_or_salary, image: x.photos?.[0] || null, date: x.posted_at, slug: x.categories?.slug,
+      badge: categoryLabels[x.categories?.slug]?.[lang].name || '', href: `/listing/${x.id}`,
     })),
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -136,11 +143,10 @@ export default async function SearchPage({ searchParams }) {
           {items.map((item) => {
             const label = categoryLabels[item.slug];
             const isProvider = item.type === 'provider';
-            const href = isProvider ? `/provider/${item.id}` : `/listing/${item.id}`;
             return (
               <a
                 key={`${item.type}-${item.id}`}
-                href={href}
+                href={item.href}
                 className={`flex gap-3 bg-white rounded-xl p-3 border-l-4 ${
                   isProvider ? 'border-l-green' : 'border-l-marigold'
                 } border-t border-r border-b border-ink/10 hover:shadow-md transition-shadow`}
@@ -162,7 +168,7 @@ export default async function SearchPage({ searchParams }) {
                 )}
                 <div className="min-w-0 flex-1 flex flex-col">
                   <p className={`text-[11px] font-medium ${isProvider ? 'text-green' : 'text-marigold'}`}>
-                    {label ? label[lang].name : ''}
+                    {item.badge}
                   </p>
                   <p className="font-medium leading-snug line-clamp-2 mt-0.5">{item.title}</p>
                   <p className="text-xs text-ink/55 mt-1 truncate">
