@@ -1,10 +1,12 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+import { redirect } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import { getLang } from '../../../lib/getLang';
 import { categoryLabels } from '../../../lib/categoryLabels';
 import { upazilaList } from '../../../lib/locations';
 import { formatPrice, parsePrice, timeAgo, toBn } from '../../../lib/format';
+import { subcategoryIcons } from '../../../lib/services';
 import SiteHeader from '../../../components/SiteHeader';
 
 const text = {
@@ -19,7 +21,7 @@ const text = {
     unavailable: 'অনুপলব্ধ', notFound: 'এই ক্যাটাগরি খুঁজে পাওয়া যায়নি।', backHome: 'হোমপেজে ফিরে যান',
     all: 'সব', house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য',
     allAreas: 'সব উপজেলা',
-    whichService: 'কোন সেবা খুঁজছেন?', backToServices: '← সব সেবা',
+    whichService: 'কোন সেবা খুঁজছেন?',
     sortNew: 'নতুন আগে', sortLow: 'কম দাম', sortHigh: 'বেশি দাম',
     profilesWord: 'টি প্রোফাইল', postsWord: 'টি পোস্ট',
     exp: 'বছর অভিজ্ঞতা',
@@ -35,7 +37,7 @@ const text = {
     unavailable: 'Unavailable', notFound: 'Category not found.', backHome: 'Back to Home',
     all: 'All', house: 'House', shop: 'Shop', mess: 'Mess', other: 'Other',
     allAreas: 'All areas',
-    whichService: 'Which service are you looking for?', backToServices: '← All services',
+    whichService: 'Which service are you looking for?',
     sortNew: 'Newest', sortLow: 'Price: low', sortHigh: 'Price: high',
     profilesWord: ' profiles', postsWord: ' posts',
     exp: 'yrs experience',
@@ -43,13 +45,6 @@ const text = {
 };
 
 const rentTypeTabs = ['house', 'shop', 'mess', 'other'];
-
-const subcategoryIcons = {
-  electrician: '⚡', plumber: '🚰', 'ac-technician': '❄️', 'fridge-technician': '🧊',
-  mechanic: '⚙️', carpenter: '🪚', mason: '🧱', painter: '🎨', cleaning: '🧹',
-  'mobile-repair': '📱', 'computer-repair': '💻', cctv: '📹',
-  'internet-wifi': '📶', driver: '🚗', 'transport-shifting': '🚚',
-};
 
 function buildHref(base, params, overrides = {}) {
   const merged = { ...params, ...overrides };
@@ -106,24 +101,36 @@ export default async function CategoryPage({ params, searchParams }) {
   const isServiceProvider = category.slug === 'service-provider';
   const name = label[lang].name;
 
-  if (isServiceProvider && !activeSub) {
-    const { data: subcats } = await supabase
-      .from('subcategories')
-      .select('id, slug, name_bn, name_en')
-      .eq('category_id', category.id)
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
+  // পুরোনো লিংক (?sub=electrician) নতুন তালিকায় নিয়ে যাই
+  if (isServiceProvider && activeSub) {
+    redirect(`/${activeSub}`);
+  }
 
-    const subWithCounts = await Promise.all(
-      (subcats || []).map(async (s) => {
-        const { count } = await supabase
-          .from('providers')
-          .select('id', { count: 'exact', head: true })
-          .eq('subcategory_id', s.id)
-          .eq('status', 'approved');
-        return { ...s, count: count || 0 };
-      })
-    );
+  // সেবাদাতা: সাব-ক্যাটাগরি বাছাইয়ের পেজ
+  if (isServiceProvider) {
+    const [{ data: subcats }, { data: links }, { data: approved }] = await Promise.all([
+      supabase
+        .from('subcategories')
+        .select('id, slug, name_bn, name_en')
+        .eq('category_id', category.id)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true }),
+      supabase.from('provider_subcategories').select('provider_id, subcategory_id'),
+      supabase.from('providers').select('id, primary_subcategory_id').eq('status', 'approved'),
+    ]);
+
+    // প্রতিটা সেবায় কতজন (প্রধান বা অতিরিক্ত, একজন একবারই গোনা হয়)
+    const approvedIds = new Set((approved || []).map((p) => p.id));
+    const perSub = {};
+    const seen = new Set();
+    const add = (subId, pid) => {
+      const key = `${subId}:${pid}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      perSub[subId] = (perSub[subId] || 0) + 1;
+    };
+    (links || []).forEach((l) => approvedIds.has(l.provider_id) && add(l.subcategory_id, l.provider_id));
+    (approved || []).forEach((p) => p.primary_subcategory_id && add(p.primary_subcategory_id, p.id));
 
     return (
       <>
@@ -139,20 +146,20 @@ export default async function CategoryPage({ params, searchParams }) {
           </div>
 
           <section className="pb-16 grid grid-cols-3 sm:grid-cols-4 gap-2.5">
-            {subWithCounts.map((s) => (
+            {(subcats || []).map((s) => (
               <a
                 key={s.id}
-                href={`/category/service-provider?sub=${s.slug}`}
+                href={`/${s.slug}`}
                 className="bg-white rounded-xl border border-ink/10 border-b-4 border-b-green p-3 hover:shadow-md transition-shadow text-center"
               >
                 <span className="w-11 h-11 mx-auto rounded-lg flex items-center justify-center text-xl bg-[#EEF1F8]">
                   {subcategoryIcons[s.slug] || '🛠️'}
                 </span>
                 <p className="font-medium text-xs mt-2 leading-tight">
-                  {lang === 'bn' ? s.name_bn : (s.name_en || s.name_bn)}
+                  {lang === 'bn' ? s.name_bn : s.name_en || s.name_bn}
                 </p>
-                {s.count > 0 && (
-                  <p className="text-[10px] text-ink/40 mt-0.5 font-numeric">{num(s.count)}</p>
+                {perSub[s.id] > 0 && (
+                  <p className="text-[10px] text-ink/40 mt-0.5 font-numeric">{num(perSub[s.id])}</p>
                 )}
               </a>
             ))}
@@ -163,7 +170,6 @@ export default async function CategoryPage({ params, searchParams }) {
   }
 
   let items = [];
-  let activeSubcategory = null;
 
   if (isService) {
     let query = supabase
@@ -171,16 +177,6 @@ export default async function CategoryPage({ params, searchParams }) {
       .select('id, name, slug, area, upazila, is_available, photo_url, experience_years')
       .eq('category_id', category.id)
       .eq('status', 'approved');
-
-    if (isServiceProvider && activeSub) {
-      const { data: subRow } = await supabase
-        .from('subcategories')
-        .select('id, name_bn, name_en')
-        .eq('slug', activeSub)
-        .single();
-      activeSubcategory = subRow;
-      if (subRow) query = query.eq('subcategory_id', subRow.id);
-    }
     if (activeUpazila) query = query.eq('upazila', activeUpazila);
 
     const { data } = await query.order('created_at', { ascending: false });
@@ -212,34 +208,24 @@ export default async function CategoryPage({ params, searchParams }) {
   }
 
   const base = `/category/${category.slug}`;
-  const baseParams = { type: isRent ? activeRentType : '', sub: activeSub || '', upazila: activeUpazila, sort };
+  const baseParams = { type: isRent ? activeRentType : '', upazila: activeUpazila, sort };
   const hasFilter = !!activeUpazila || (isRent && activeRentType !== 'all') || sort !== 'new';
-  const clearHref = buildHref(base, { sub: activeSub || '' });
-
-  const title =
-    isServiceProvider && activeSubcategory
-      ? lang === 'bn' ? activeSubcategory.name_bn : activeSubcategory.name_en || activeSubcategory.name_bn
-      : name;
-  const icon = isServiceProvider && activeSubcategory ? subcategoryIcons[activeSub] || '🛠️' : label.icon;
-  const postHref = isServiceProvider
-    ? `/post/new?category=${category.slug}&sub=${activeSub}`
-    : `/post/new?category=${category.slug}`;
+  const clearHref = base;
+  const postHref = `/post/new?category=${category.slug}`;
 
   return (
     <>
       <SiteHeader lang={lang} />
       <main className="max-w-4xl mx-auto px-4">
         <div className="pt-5 pb-4">
-          <a href={isServiceProvider ? '/category/service-provider' : '/'} className="text-sm text-ink/50 hover:text-ink">
-            {isServiceProvider ? t.backToServices : t.home}
-          </a>
+          <a href="/" className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
 
           <div className="flex items-center gap-3 mt-3">
             <span className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-[#EEF1F8] flex-shrink-0">
-              {icon}
+              {label.icon}
             </span>
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl md:text-2xl font-semibold leading-tight truncate">{title}</h1>
+              <h1 className="text-xl md:text-2xl font-semibold leading-tight truncate">{name}</h1>
               <p className="text-xs text-ink/50 mt-0.5">
                 {num(items.length)}
                 {isService ? t.profilesWord : t.postsWord}
@@ -327,48 +313,45 @@ export default async function CategoryPage({ params, searchParams }) {
           )}
 
           {isService
-            ? items.map((p) => {
-                const href = isServiceProvider && activeSub && p.slug ? `/${activeSub}/${p.slug}` : `/provider/${p.id}`;
-                return (
-                  <a
-                    key={p.id}
-                    href={href}
-                    className="flex gap-3 bg-white rounded-xl p-3 border-l-4 border-l-green border-t border-r border-b border-ink/10 hover:shadow-md transition-shadow"
-                  >
-                    {p.photo_url ? (
-                      <img src={p.photo_url} alt="" className="w-16 h-16 rounded-full object-cover flex-shrink-0" />
-                    ) : (
-                      <span className="w-16 h-16 rounded-full bg-[#EEF1F8] text-green-dark text-xl font-semibold flex items-center justify-center flex-shrink-0">
-                        {p.name?.charAt(0)}
+            ? items.map((p) => (
+                <a
+                  key={p.id}
+                  href={`/provider/${p.id}`}
+                  className="flex gap-3 bg-white rounded-xl p-3 border-l-4 border-l-green border-t border-r border-b border-ink/10 hover:shadow-md transition-shadow"
+                >
+                  {p.photo_url ? (
+                    <img src={p.photo_url} alt="" className="w-16 h-16 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <span className="w-16 h-16 rounded-full bg-[#EEF1F8] text-green-dark text-xl font-semibold flex items-center justify-center flex-shrink-0">
+                      {p.name?.charAt(0)}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1 self-center">
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-medium leading-tight truncate">{p.name}</p>
+                      <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] flex items-center justify-center flex-shrink-0">
+                        ✓
                       </span>
-                    )}
-                    <div className="min-w-0 flex-1 self-center">
-                      <div className="flex items-center gap-1.5">
-                        <p className="font-medium leading-tight truncate">{p.name}</p>
-                        <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] flex items-center justify-center flex-shrink-0">
-                          ✓
-                        </span>
-                      </div>
-                      <p className="text-sm text-ink/60 mt-0.5 truncate">
-                        📍 {p.area}
-                        {p.upazila ? `, ${p.upazila}` : ''}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {p.experience_years ? (
-                          <span className="text-[11px] text-ink/50">
-                            🛠️ {num(p.experience_years)} {t.exp}
-                          </span>
-                        ) : null}
-                        {!p.is_available && (
-                          <span className="text-[11px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full">
-                            {t.unavailable}
-                          </span>
-                        )}
-                      </div>
                     </div>
-                  </a>
-                );
-              })
+                    <p className="text-sm text-ink/60 mt-0.5 truncate">
+                      📍 {p.area}
+                      {p.upazila && p.upazila !== p.area ? `, ${p.upazila}` : ''}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {p.experience_years ? (
+                        <span className="text-[11px] text-ink/50">
+                          🛠️ {num(p.experience_years)} {t.exp}
+                        </span>
+                      ) : null}
+                      {!p.is_available && (
+                        <span className="text-[11px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full">
+                          {t.unavailable}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </a>
+              ))
             : items.map((l) => (
                 <a
                   key={l.id}
@@ -391,7 +374,7 @@ export default async function CategoryPage({ params, searchParams }) {
                     <p className="font-medium leading-snug line-clamp-2">{l.title}</p>
                     <p className="text-xs text-ink/55 mt-1 truncate">
                       📍 {l.area}
-                      {l.upazila ? `, ${l.upazila}` : ''}
+                      {l.upazila && l.upazila !== l.area ? `, ${l.upazila}` : ''}
                     </p>
                     <div className="flex items-end justify-between mt-auto pt-1">
                       <p className="text-green font-semibold font-numeric">{formatPrice(l.price_or_salary, lang)}</p>
