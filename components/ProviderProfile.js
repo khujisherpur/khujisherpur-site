@@ -79,7 +79,7 @@ export default function ProviderProfile({
               <div className="flex items-center justify-center gap-1.5">
                 <h1 className="text-2xl font-semibold">{provider.name}</h1>
                 <span
-                  className="w-5 h-5 rounded-full bg-blue-500 text-white text-[11px] flex items-center justify-center"
+                  className={provider.is_verified ? 'w-5 h-5 rounded-full bg-blue-500 text-white text-[11px] flex items-center justify-center' : 'hidden'}
                   title={t.verified}
                 >
                   ✓
