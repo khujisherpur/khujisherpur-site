@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import NotificationBell from '../../components/NotificationBell';
 import BottomNav from '../../components/BottomNav';
 import SiteHeader from '../../components/SiteHeader';
+import PushToggle from '../../components/PushToggle';
 
 const text = {
   bn: {
@@ -284,6 +285,7 @@ export default function DashboardPage() {
           </div>
         )}
 
+        <PushToggle lang={lang} />
         {/* Quick links */}
         <div className="grid grid-cols-2 gap-2 mt-4">
           <a
