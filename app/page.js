@@ -101,7 +101,7 @@ export default async function HomePage() {
   const [{ data: recentProviders }, { data: recentListings }] = await Promise.all([
     supabase
       .from('providers')
-      .select('id, name, slug, area, photo_url, created_at, primary_subcategory_id, categories(slug)')
+      .select('id, name, slug, area, photo_url, created_at, primary_subcategory_id, is_verified, categories(slug)')
       .eq('status', 'approved')
       .order('created_at', { ascending: false })
       .limit(6),
@@ -388,7 +388,7 @@ export default async function HomePage() {
                         {p.name?.charAt(0)}
                       </div>
                     )}
-                    <span className="text-blue-500 text-xs flex-shrink-0" title="Verified">✓</span>
+                    {p.is_verified && <span className="text-blue-500 text-xs flex-shrink-0" title="Verified">✓</span>}
                   </div>
                   <p className="text-sm font-medium mt-2 line-clamp-1">{p.name}</p>
                   <p className="text-[10px] text-ink/50 mt-0.5 line-clamp-1">
