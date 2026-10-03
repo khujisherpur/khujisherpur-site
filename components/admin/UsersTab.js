@@ -109,7 +109,7 @@ export default function UsersTab({ currentUserId, currentRole }) {
         .order('posted_at', { ascending: false }),
       supabase
         .from('providers')
-        .select('id, name, area, phone, status, photo_url, created_at, categories(name)')
+        .select('id, name, area, phone, status, photo_url, created_at, is_verified, categories(name)')
         .eq('user_id', userId)
         .order('created_at', { ascending: false }),
     ]);
@@ -231,7 +231,25 @@ export default function UsersTab({ currentUserId, currentRole }) {
             </div>
           </div>
         </div>
-        <div className="flex gap-2 mt-3">
+        {!isListing && (
+          <button
+            onClick={async () => {
+              const { error: err } = await supabase
+                .from('providers')
+                .update({ is_verified: !item.is_verified })
+                .eq('id', item.id);
+              if (err) { alert('যাচাই বদলানো যায়নি: ' + err.message); return; }
+              setToast(item.is_verified ? 'যাচাই সরানো হয়েছে' : 'যাচাইকৃত করা হয়েছে');
+              loadItems(selected.id);
+            }}
+            className={`w-full mt-3 text-xs py-2 rounded-lg border ${
+              item.is_verified ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-ink/20 text-ink/70'
+            }`}
+          >
+            {item.is_verified ? '✓ যাচাইকৃত (সরাতে চাপুন)' : '✓ যাচাইকৃত করুন'}
+          </button>
+        )}
+                <div className="flex gap-2 mt-3">
           <a
             href={isListing ? `/listing/${item.id}` : `/provider/${item.id}`}
             target="_blank"
