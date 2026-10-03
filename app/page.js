@@ -10,18 +10,6 @@ import HeaderBell from '../components/HeaderBell';
 import HeroIntro from '../components/HeroIntro';
 import HeroSearch from '../components/HeroSearch';
 import AnnouncementBar from '../components/AnnouncementBar';
-export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
-import { supabase } from '../lib/supabaseClient';
-import { getLang } from '../lib/getLang';
-import { categoryLabels } from '../lib/categoryLabels';
-import LanguageToggle from '../components/LanguageToggle';
-import AuthButton from '../components/AuthButton';
-import BottomNav from '../components/BottomNav';
-import HeaderBell from '../components/HeaderBell';
-import HeroIntro from '../components/HeroIntro';
-import HeroSearch from '../components/HeroSearch';
-import AnnouncementBar from '../components/AnnouncementBar';
 import { formatPrice, timeAgo as timeAgoFmt, toBn } from '../lib/format';
 import { getServicesFor, providerHref } from '../lib/services';
 
