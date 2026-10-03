@@ -54,7 +54,7 @@ export default async function SubcategoryPage({ params, searchParams }) {
 
   let query = supabase
     .from('providers')
-    .select('id, slug, name, area, upazila, is_available, photo_url, experience_years, primary_subcategory_id')
+    .select('id, slug, name, area, upazila, is_available, photo_url, experience_years, primary_subcategory_id, is_verified')
     .eq('status', 'approved')
     .or(orFilter);
   if (activeUpazila) query = query.eq('upazila', activeUpazila);
@@ -152,7 +152,7 @@ export default async function SubcategoryPage({ params, searchParams }) {
                 <div className="min-w-0 flex-1 self-center">
                   <div className="flex items-center gap-1.5">
                     <p className="font-medium leading-tight truncate">{p.name}</p>
-                    <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] flex items-center justify-center flex-shrink-0">
+                    <span className={p.is_verified ? 'w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] flex items-center justify-center flex-shrink-0' : 'hidden'}>
                       ✓
                     </span>
                   </div>
