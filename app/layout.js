@@ -3,6 +3,8 @@ import MaintenanceGate from '../components/MaintenanceGate';
 import AutoPushPrompt from '../components/AutoPushPrompt';
 
 export const metadata = {
+  manifest: '/manifest.json',
+  appleWebApp: { capable: true, title: 'খুঁজি শেরপুর', statusBarStyle: 'default' },
   title: 'খুঁজি শেরপুর | শেরপুরে যা খুঁজছেন, এক জায়গায় খুঁজে নিন',
   description:
     'শেরপুর জেলায় বাসা ভাড়া, মেস ভাড়া, চাকরি বিজ্ঞপ্তি, ইলেকট্রিশিয়ান ও প্লাম্বার — সব এক জায়গায় খুঁজুন।',
