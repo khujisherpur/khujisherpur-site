@@ -84,6 +84,7 @@ export default function PushToggle({ lang = 'bn' }) {
       });
       if (error) throw error;
       setSubscribed(true);
+      try { localStorage.removeItem('push_opt_out'); } catch (e) {}
     } catch (e) {
       alert(t.fail + (e.message || e));
     }
@@ -100,6 +101,7 @@ export default function PushToggle({ lang = 'bn' }) {
         await sub.unsubscribe();
       }
       setSubscribed(false);
+      try { localStorage.setItem('push_opt_out', '1'); } catch (e) {}
     } catch (e) {}
     setBusy(false);
   }
