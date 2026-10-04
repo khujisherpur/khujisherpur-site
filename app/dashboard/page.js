@@ -376,7 +376,7 @@ export default function DashboardPage() {
                       </span>
                     </div>
                     <p className="text-xs text-ink/60 mt-0.5 line-clamp-1">
-                      {p.categories?.name} · {p.area}
+                      {(p.serviceNames?.[lang] || []).join(', ') || p.categories?.name} · {p.area}
                     </p>
                     <p className="text-[11px] text-ink/40 mt-1">
                       👁️ {p.view_count || 0} {t.views}
