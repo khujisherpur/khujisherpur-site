@@ -5,11 +5,14 @@ import { categoryLabels } from '../../lib/categoryLabels';
 import UsersTab from '../../components/admin/UsersTab';
 import SettingsTab from '../../components/admin/SettingsTab';
 
+import ReviewsTab from '../../components/admin/ReviewsTab';
+
 const sidebarItems = [
   { key: 'dashboard', icon: '🏠', label: 'ড্যাশবোর্ড', enabled: true },
   { key: 'posts', icon: '📄', label: 'পোস্ট ব্যবস্থাপনা', enabled: true },
   { key: 'profiles', icon: '👤', label: 'প্রোফাইল ব্যবস্থাপনা', enabled: true },
   { key: 'reports', icon: '⚠️', label: 'রিপোর্ট/অভিযোগ', enabled: true },
+  { key: 'reviews', icon: '⭐', label: 'রিভিউ ব্যবস্থাপনা', enabled: true },
   { key: 'banners', icon: '🖼️', label: 'ব্যানার ব্যবস্থাপনা', enabled: true },
   { key: 'users', icon: '👥', label: 'ব্যবহারকারী ব্যবস্থাপনা', enabled: true },
   { key: 'categories', icon: '📁', label: 'ক্যাটাগরি ব্যবস্থাপনা', enabled: true },
@@ -333,6 +336,7 @@ export default function AdminPage() {
           <span className="text-sm bg-green text-white px-3 py-1 rounded-full flex-shrink-0">{role}</span>
         </div>
 {activeTab === 'users' && <UsersTab currentUserId={user.id} currentRole={role} />}
+  {activeTab === 'reviews' && <ReviewsTab />}
   {activeTab === 'settings' && (
           role === 'admin'
             ? <SettingsTab />
