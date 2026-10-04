@@ -1,5 +1,6 @@
 import './globals.css';
 import MaintenanceGate from '../components/MaintenanceGate';
+import AutoPushPrompt from '../components/AutoPushPrompt';
 
 export const metadata = {
   title: 'খুঁজি শেরপুর | শেরপুরে যা খুঁজছেন, এক জায়গায় খুঁজে নিন',
@@ -33,6 +34,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="bg-paper text-ink font-sans antialiased">
         <MaintenanceGate>{children}</MaintenanceGate>
+            <AutoPushPrompt />
       </body>
     </html>
   );
