@@ -142,8 +142,34 @@ export default function DashboardPage() {
       .select('id, name, area, status, is_available, photo_url, view_count, categories(name)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-    setProviders(p || []);
-
+    const mine = p || [];
+    const ids = mine.map((x) => x.id);
+    let enriched = mine;
+    if (ids.length) {
+      const [{ data: links }, { data: prim }, { data: subs }] = await Promise.all([
+        supabase.from('provider_subcategories').select('provider_id, subcategory_id').in('provider_id', ids),
+        supabase.from('providers').select('id, primary_subcategory_id').in('id', ids),
+        supabase.from('subcategories').select('id, name_bn, name_en'),
+      ]);
+      const nameBn = Object.fromEntries((subs || []).map((s) => [s.id, s.name_bn]));
+      const nameEn = Object.fromEntries((subs || []).map((s) => [s.id, s.name_en || s.name_bn]));
+      const primary = Object.fromEntries((prim || []).map((x) => [x.id, x.primary_subcategory_id]));
+      enriched = mine.map((x) => {
+        const subIds = [
+          primary[x.id],
+          ...(links || []).filter((l) => l.provider_id === x.id).map((l) => l.subcategory_id),
+        ];
+        const uniq = [...new Set(subIds.filter(Boolean))];
+        return {
+          ...x,
+          serviceNames: {
+            bn: uniq.map((id) => nameBn[id]).filter(Boolean),
+            en: uniq.map((id) => nameEn[id]).filter(Boolean),
+          },
+        };
+      });
+    }
+    setProviders(enriched);
     const { data: l } = await supabase
       .from('listings')
       .select('id, title, area, status, photos, view_count, price_or_salary, categories(name)')
