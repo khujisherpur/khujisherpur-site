@@ -4,19 +4,29 @@ import { supabase } from '../../lib/supabaseClient';
 import { categoryLabels } from '../../lib/categoryLabels';
 import UsersTab from '../../components/admin/UsersTab';
 import SettingsTab from '../../components/admin/SettingsTab';
-
 import ReviewsTab from '../../components/admin/ReviewsTab';
+import ModerationTab from '../../components/admin/ModerationTab';
+import ReportsTab from '../../components/admin/ReportsTab';
+import PendingBadge from '../../components/admin/PendingBadge';
+
+const navIcon = (emoji, short, badge) => (
+  <span className="relative flex flex-col items-center md:block leading-tight">
+    <span>{emoji}</span>
+    <span className="text-[10px] md:hidden">{short}</span>
+    {badge && <PendingBadge type={badge} />}
+  </span>
+);
 
 const sidebarItems = [
-  { key: 'dashboard', icon: '🏠', label: 'ড্যাশবোর্ড', enabled: true },
-  { key: 'posts', icon: '📄', label: 'পোস্ট ব্যবস্থাপনা', enabled: true },
-  { key: 'profiles', icon: '👤', label: 'প্রোফাইল ব্যবস্থাপনা', enabled: true },
-  { key: 'reports', icon: '⚠️', label: 'রিপোর্ট/অভিযোগ', enabled: true },
-  { key: 'reviews', icon: '⭐', label: 'রিভিউ ব্যবস্থাপনা', enabled: true },
-  { key: 'banners', icon: '🖼️', label: 'ব্যানার ব্যবস্থাপনা', enabled: true },
-  { key: 'users', icon: '👥', label: 'ব্যবহারকারী ব্যবস্থাপনা', enabled: true },
-  { key: 'categories', icon: '📁', label: 'ক্যাটাগরি ব্যবস্থাপনা', enabled: true },
-  { key: 'settings', icon: '⚙️', label: 'সাইট সেটিংস', enabled: true },
+  { key: 'dashboard', icon: navIcon('🏠', 'হোম'), label: 'ড্যাশবোর্ড', enabled: true },
+  { key: 'mod_posts', icon: navIcon('📄', 'পোস্ট', 'listings'), label: 'পোস্ট ব্যবস্থাপনা', enabled: true },
+  { key: 'mod_profiles', icon: navIcon('👤', 'প্রোফাইল', 'providers'), label: 'প্রোফাইল ব্যবস্থাপনা', enabled: true },
+  { key: 'mod_reports', icon: navIcon('⚠️', 'রিপোর্ট', 'reports'), label: 'রিপোর্ট/অভিযোগ', enabled: true },
+  { key: 'reviews', icon: navIcon('⭐', 'রিভিউ'), label: 'রিভিউ ব্যবস্থাপনা', enabled: true },
+  { key: 'banners', icon: navIcon('🖼️', 'ব্যানার'), label: 'ব্যানার ব্যবস্থাপনা', enabled: true },
+  { key: 'users', icon: navIcon('👥', 'ইউজার'), label: 'ব্যবহারকারী ব্যবস্থাপনা', enabled: true },
+  { key: 'categories', icon: navIcon('📁', 'ক্যাটাগরি'), label: 'ক্যাটাগরি ব্যবস্থাপনা', enabled: true },
+  { key: 'settings', icon: navIcon('⚙️', 'সেটিংস'), label: 'সাইট সেটিংস', enabled: true },
 ];
 
 export default function AdminPage() {
@@ -25,9 +35,6 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  const [providers, setProviders] = useState([]);
-  const [listings, setListings] = useState([]);
-  const [reports, setReports] = useState([]);
   const [stats, setStats] = useState({ totalListings: 0, totalProviders: 0, totalUsers: 0, openReports: 0 });
   const [categoryBreakdown, setCategoryBreakdown] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -65,32 +72,9 @@ export default function AdminPage() {
     setRole(profile?.role || 'user');
 
     if (profile?.role === 'admin' || profile?.role === 'moderator') {
-      await Promise.all([loadPending(), loadReports(), loadStats(), loadBanners(), loadCategoryData()]);
+      await Promise.all([loadStats(), loadBanners(), loadCategoryData()]);
     }
     setLoading(false);
-  }
-
-  async function loadPending() {
-    const { data: p } = await supabase
-      .from('providers')
-      .select('id, name, area, phone, description, status, categories(name)')
-      .eq('status', 'pending');
-    setProviders(p || []);
-
-    const { data: l } = await supabase
-      .from('listings')
-      .select('id, title, area, price_or_salary, description, status, categories(name)')
-      .eq('status', 'pending');
-    setListings(l || []);
-  }
-
-  async function loadReports() {
-    const { data } = await supabase
-      .from('reports')
-      .select('id, target_type, target_id, reason, status, created_at, users(name)')
-      .eq('status', 'open')
-      .order('created_at', { ascending: false });
-    setReports(data || []);
   }
 
   async function loadStats() {
@@ -131,26 +115,6 @@ export default function AdminPage() {
     setRecentActivity(activity);
   }
 
-  async function approveProvider(id) {
-    await supabase.from('providers').update({ status: 'approved' }).eq('id', id);
-    loadPending(); loadStats();
-  }
-  async function rejectProvider(id) {
-    await supabase.from('providers').update({ status: 'rejected' }).eq('id', id);
-    loadPending(); loadStats();
-  }
-  async function approveListing(id) {
-    await supabase.from('listings').update({ status: 'active' }).eq('id', id);
-    loadPending(); loadStats();
-  }
-  async function rejectListing(id) {
-    await supabase.from('listings').update({ status: 'rejected' }).eq('id', id);
-    loadPending(); loadStats();
-  }
-  async function resolveReport(id, status) {
-    await supabase.from('reports').update({ status }).eq('id', id);
-    loadReports(); loadStats();
-  }
   async function loadBanners() {
     const { data } = await supabase
       .from('homepage_banners')
@@ -280,6 +244,8 @@ export default function AdminPage() {
     approved: { text: 'অনুমোদিত', color: 'text-green bg-green/10' },
     active: { text: 'অনুমোদিত', color: 'text-green bg-green/10' },
     rejected: { text: 'বাতিল', color: 'text-red-500 bg-red-50' },
+    expired: { text: 'মেয়াদোত্তীর্ণ', color: 'text-ink/50 bg-ink/5' },
+    filled: { text: 'পূরণ হয়েছে', color: 'text-ink/50 bg-ink/5' },
   };
 
   if (loading) return <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>;
@@ -327,7 +293,7 @@ export default function AdminPage() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 p-4 md:p-6 max-w-4xl">
+      <main className="flex-1 p-4 md:p-6 max-w-4xl min-w-0">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-xl md:text-2xl font-semibold">অ্যাডমিন ড্যাশবোর্ড</h1>
@@ -335,13 +301,7 @@ export default function AdminPage() {
           </div>
           <span className="text-sm bg-green text-white px-3 py-1 rounded-full flex-shrink-0">{role}</span>
         </div>
-{activeTab === 'users' && <UsersTab currentUserId={user.id} currentRole={role} />}
-  {activeTab === 'reviews' && <ReviewsTab />}
-  {activeTab === 'settings' && (
-          role === 'admin'
-            ? <SettingsTab />
-            : <p className="text-sm text-ink/60">সাইট সেটিংস শুধু অ্যাডমিন বদলাতে পারবেন।</p>
-        )}
+
         {activeTab === 'dashboard' && (
           <>
             {/* Stat cards */}
@@ -408,72 +368,11 @@ export default function AdminPage() {
           </>
         )}
 
-        {activeTab === 'posts' && (
-          <div>
-            <h2 className="text-lg font-medium mb-3">পোস্ট ব্যবস্থাপনা — অপেক্ষমান ({listings.length})</h2>
-            {listings.length === 0 && <p className="text-ink/50 text-sm">কোনো অপেক্ষমান পোস্ট নেই।</p>}
-            <div className="space-y-3">
-              {listings.map((l) => (
-                <div key={l.id} className="bg-white border border-ink/10 p-4">
-                  <p className="font-medium">{l.title} <span className="text-ink/50 text-sm">({l.categories?.name})</span></p>
-                  <p className="text-sm text-ink/60">{l.area} · {l.price_or_salary}</p>
-                  <p className="text-sm text-ink/70 mt-1">{l.description}</p>
-                  <div className="flex gap-2 mt-3">
-                    <button onClick={() => approveListing(l.id)} className="bg-green text-white text-sm px-4 py-1.5">অ্যাপ্রুভ</button>
-                    <button onClick={() => rejectListing(l.id)} className="border border-red-400 text-red-600 text-sm px-4 py-1.5">রিজেক্ট</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'profiles' && (
-          <div>
-            <h2 className="text-lg font-medium mb-3">প্রোফাইল ব্যবস্থাপনা — অপেক্ষমান ({providers.length})</h2>
-            {providers.length === 0 && <p className="text-ink/50 text-sm">কোনো অপেক্ষমান প্রোফাইল নেই।</p>}
-            <div className="space-y-3">
-              {providers.map((p) => (
-                <div key={p.id} className="bg-white border border-ink/10 p-4">
-                  <p className="font-medium">{p.name} <span className="text-ink/50 text-sm">({p.categories?.name})</span></p>
-                  <p className="text-sm text-ink/60">{p.area} · {p.phone}</p>
-                  <p className="text-sm text-ink/70 mt-1">{p.description}</p>
-                  <div className="flex gap-2 mt-3">
-                    <button onClick={() => approveProvider(p.id)} className="bg-green text-white text-sm px-4 py-1.5">অ্যাপ্রুভ</button>
-                    <button onClick={() => rejectProvider(p.id)} className="border border-red-400 text-red-600 text-sm px-4 py-1.5">রিজেক্ট</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'reports' && (
-          <div>
-            <h2 className="text-lg font-medium mb-3">রিপোর্ট/অভিযোগ ({reports.length})</h2>
-            {reports.length === 0 && <p className="text-ink/50 text-sm">কোনো নতুন রিপোর্ট নেই।</p>}
-            <div className="space-y-3">
-              {reports.map((r) => (
-                <div key={r.id} className="bg-white border border-red-200 p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">
-                      {r.target_type === 'provider' ? 'প্রোভাইডার' : 'লিস্টিং'}
-                    </span>
-                    <a href={`/${r.target_type}/${r.target_id}`} target="_blank" className="text-xs text-green underline">পেজ দেখুন →</a>
-                  </div>
-                  <p className="text-sm mt-2">{r.reason}</p>
-                  <p className="text-xs text-ink/40 mt-1">
-                    রিপোর্টকারী: {r.users?.name || 'অজানা'} · {new Date(r.created_at).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
-                  </p>
-                  <div className="flex gap-2 mt-3">
-                    <button onClick={() => resolveReport(r.id, 'reviewed')} className="bg-green text-white text-sm px-4 py-1.5">পর্যালোচনা সম্পন্ন</button>
-                    <button onClick={() => resolveReport(r.id, 'dismissed')} className="border border-ink/20 text-sm px-4 py-1.5">বাতিল করুন</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {activeTab === 'mod_posts' && <ModerationTab key="mod-posts" kind="listing" />}
+        {activeTab === 'mod_profiles' && <ModerationTab key="mod-profiles" kind="provider" />}
+        {activeTab === 'mod_reports' && <ReportsTab />}
+        {activeTab === 'reviews' && <ReviewsTab />}
+        {activeTab === 'users' && <UsersTab currentUserId={user.id} currentRole={role} />}
 
         {activeTab === 'banners' && (
           <div>
@@ -668,6 +567,12 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'settings' && (
+          role === 'admin'
+            ? <SettingsTab />
+            : <p className="text-sm text-ink/60">সাইট সেটিংস শুধু অ্যাডমিন বদলাতে পারবেন।</p>
         )}
       </main>
     </div>
