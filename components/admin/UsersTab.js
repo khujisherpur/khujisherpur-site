@@ -91,7 +91,11 @@ export default function UsersTab({ currentUserId, currentRole }) {
       setLoading(false);
       return;
     }
-    const list = (u.data || []).slice().sort((a, c) => new Date(c.created_at || 0) - new Date(a.created_at || 0));
+    const { data: emailRows } = await supabase.rpc('admin_user_info', { uids: (u.data || []).map((x) => x.id) });
+    const emailMap = Object.fromEntries((emailRows || []).map((e) => [e.id, e.email]));
+    const list = (u.data || [])
+      .map((x) => ({ ...x, email: emailMap[x.id] || null }))
+      .sort((a, c) => new Date(c.created_at || 0) - new Date(a.created_at || 0));
     setUsers(list);
     setBans(Object.fromEntries((b.data || []).map((x) => [x.user_id, x])));
     setPostCounts(tally(l.data));
