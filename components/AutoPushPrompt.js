@@ -43,12 +43,38 @@ async function subscribeAndSave(userId) {
 }
 
 export default function AutoPushPrompt() {
-  const [show, setShow] = useState(false);
+  const [mode, setMode] = useState(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
+    const ua = navigator.userAgent || '';
+    const isIos =
+      /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const standalone =
+      window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    const pushSupported =
+      'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     let cancelled = false;
+
+    if (!pushSupported) {
+      if (!isIos || standalone) return;
+      const hint = (user) => {
+        if (!user || cancelled) return;
+        const until = Number(store('get', 'ios_hint_until') || 0);
+        if (Date.now() > until) setMode('ios');
+      };
+      supabase.auth.getUser().then(({ data }) => hint(data.user));
+      const { data: l1 } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN') hint(session?.user);
+        if (event === 'SIGNED_OUT') setMode(null);
+      });
+      return () => {
+        cancelled = true;
+        l1.subscription.unsubscribe();
+      };
+    }
+
     navigator.serviceWorker.register('/sw.js').catch(() => {});
 
     async function check(user) {
@@ -66,14 +92,14 @@ export default function AutoPushPrompt() {
       }
       if (perm === 'default') {
         const until = Number(store('get', 'push_snooze_until') || 0);
-        if (Date.now() > until) setShow(true);
+        if (Date.now() > until) setMode('push');
       }
     }
 
     supabase.auth.getUser().then(({ data }) => check(data.user));
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN') check(session?.user);
-      if (event === 'SIGNED_OUT') setShow(false);
+      if (event === 'SIGNED_OUT') setMode(null);
     });
     return () => {
       cancelled = true;
@@ -92,18 +118,44 @@ export default function AutoPushPrompt() {
       }
     } catch (e) {}
     setBusy(false);
-    setShow(false);
+    setMode(null);
   }
 
   function later() {
     store('set', 'push_snooze_until', String(Date.now() + 3 * 24 * 3600 * 1000));
-    setShow(false);
+    setMode(null);
   }
 
-  if (!show) return null;
+  function dismissIos() {
+    store('set', 'ios_hint_until', String(Date.now() + 7 * 24 * 3600 * 1000));
+    setMode(null);
+  }
+
+  if (!mode) return null;
+
+  const box =
+    'fixed bottom-20 inset-x-3 md:max-w-md md:mx-auto z-50 bg-white border border-ink/10 rounded-2xl shadow-lg p-4';
+
+  if (mode === 'ios') {
+    return (
+      <div className={box}>
+        <p className="font-semibold text-sm">📲 Get notifications on iPhone</p>
+        <p className="text-xs text-ink/60 mt-1 leading-relaxed">
+          Tap the Share button in Safari, choose "Add to Home Screen", then open the app from your home screen and
+          turn on notifications.
+        </p>
+        <button
+          onClick={dismissIos}
+          className="mt-3 w-full bg-green text-white text-sm font-medium py-2.5 rounded-xl"
+        >
+          Got it
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="fixed bottom-20 inset-x-3 md:max-w-md md:mx-auto z-50 bg-white border border-ink/10 rounded-2xl shadow-lg p-4">
+    <div className={box}>
       <p className="font-semibold text-sm">🔔 Get updates on your phone</p>
       <p className="text-xs text-ink/60 mt-1 leading-relaxed">
         Post approvals, reviews and urgent blood requests will arrive as notifications.
@@ -122,4 +174,4 @@ export default function AutoPushPrompt() {
       </div>
     </div>
   );
-    }
+}
