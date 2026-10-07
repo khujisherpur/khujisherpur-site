@@ -1,5 +1,7 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import { supabase } from '../../../lib/supabaseClient';
 import PhotoLightbox from '../../../components/PhotoLightbox';
 import ReportButton from '../../../components/ReportButton';
@@ -9,32 +11,41 @@ import ContactBar from '../../../components/ContactBar';
 import SiteHeader from '../../../components/SiteHeader';
 import { getLang } from '../../../lib/getLang';
 import { categoryLabels } from '../../../lib/categoryLabels';
-import { formatPrice, timeAgo, toBn, cleanPhone, waLink } from '../../../lib/format';
+import { formatPrice, parsePrice, timeAgo, toBn, cleanPhone, waLink } from '../../../lib/format';
 
 export async function generateMetadata({ params }) {
   const { data: listing } = await supabase
     .from('listings')
-    .select('title, area, price_or_salary, description, categories(name)')
+    .select('title, area, price_or_salary, description, photos, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'active')
-    .single();
+    .gt('expiry_date', new Date().toISOString())
+    .maybeSingle();
 
   if (!listing) {
-    return { title: 'পোস্ট পাওয়া যায়নি | খুঁজি শেরপুর' };
+    return { title: 'পোস্ট পাওয়া যায়নি | খুঁজি শেরপুর', robots: { index: false } };
   }
 
-  const title = `${listing.title} - ${listing.price_or_salary} | খুঁজি শেরপুর`;
-  const description = listing.description
-    ? listing.description.slice(0, 150)
-    : `শেরপুরের ${listing.area} এলাকায় ${listing.categories?.name}। এখনই দেখুন খুঁজি শেরপুরে।`;
+  const price = formatPrice(listing.price_or_salary, 'bn');
+  const title = `${listing.title}${price ? ` - ${price}` : ''} | খুঁজি শেরপুর`;
+  const catName = categoryLabels[listing.categories?.slug]?.bn?.name || '';
+  const cleanDesc = (listing.description || '').replace(/\s+/g, ' ').trim();
+  const description = cleanDesc
+    ? cleanDesc.slice(0, 150)
+    : `শেরপুরের ${listing.area} এলাকায় ${catName}। এখনই দেখুন খুঁজি শেরপুরে।`;
+  const image = listing.photos?.[0];
 
-  return { title, description, openGraph: { title, description } };
+  return {
+    title,
+    description,
+    openGraph: { title, description, ...(image ? { images: [image] } : {}) },
+    twitter: { card: image ? 'summary_large_image' : 'summary', title, description },
+  };
 }
 
 const text = {
   bn: {
     back: '← তালিকায় ফিরে যান', desc: 'বিবরণ', noDesc: 'কোনো বিবরণ দেওয়া হয়নি।',
-    notFound: 'এই পোস্টটি খুঁজে পাওয়া যায়নি বা মেয়াদ শেষ হয়ে গেছে।', backHome: 'হোমপেজে ফিরে যান',
     details: 'বিস্তারিত', category: 'ক্যাটাগরি', location: 'এলাকা', type: 'ধরন', owner: 'মালিক', posted: 'পোস্ট করা হয়েছে',
     views: 'ভিউ',
     contact: 'যোগাযোগ', phone: 'মোবাইল', whatsapp: 'হোয়াটসঅ্যাপ', email: 'ইমেইল',
@@ -43,7 +54,6 @@ const text = {
   },
   en: {
     back: '← Back to list', desc: 'Description', noDesc: 'No description provided.',
-    notFound: 'This post was not found or has expired.', backHome: 'Back to Home',
     details: 'Details', category: 'Category', location: 'Location', type: 'Type', owner: 'Owner', posted: 'Posted',
     views: 'views',
     contact: 'Contact', phone: 'Phone', whatsapp: 'WhatsApp', email: 'Email',
@@ -72,6 +82,13 @@ function Linkify({ value }) {
   );
 }
 
+// JSON-LD নিরাপদ করা: '<' চিহ্ন এস্কেপ, যাতে </script> ঢোকানো না যায়
+function safeJsonLd(obj) {
+  return JSON.stringify(obj).replace(/</g, '\\u003c');
+}
+
+const BOT_UA = /bot|crawl|spider|slurp|facebookexternalhit|preview|whatsapp|telegram|headless/i;
+
 export default async function ListingDetailPage({ params }) {
   const lang = getLang();
   const t = text[lang];
@@ -81,21 +98,17 @@ export default async function ListingDetailPage({ params }) {
     .select('id, title, area, upazila, union_name, price_or_salary, description, photos, rent_type, owner_name, posted_at, view_count, contact_phone, whatsapp, contact_email, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'active')
-    .single();
+    .gt('expiry_date', new Date().toISOString())
+    .maybeSingle();
 
-  if (!listing) {
-    return (
-      <>
-        <SiteHeader lang={lang} />
-        <main className="max-w-2xl mx-auto px-4 py-20 text-center">
-          <p className="text-ink/70">{t.notFound}</p>
-          <a href="/" className="text-green underline mt-2 inline-block">{t.backHome}</a>
-        </main>
-      </>
-    );
+  if (!listing) notFound();
+
+  // বট ও লিংক-প্রিভিউয়ের ভিউ গোনা হয় না
+  const ua = headers().get('user-agent') || '';
+  const counted = !BOT_UA.test(ua);
+  if (counted) {
+    await supabase.rpc('increment_listing_view', { lid: listing.id });
   }
-
-  await supabase.rpc('increment_listing_view', { lid: listing.id });
 
   const label = categoryLabels[listing.categories?.slug];
   const categoryName = label ? label[lang].name : '';
@@ -104,7 +117,7 @@ export default async function ListingDetailPage({ params }) {
     new Set([listing.area, listing.union_name, listing.upazila].map((v) => (v || '').trim()).filter(Boolean))
   ).join(', ');
   const price = formatPrice(listing.price_or_salary, lang);
-  const views = (listing.view_count || 0) + 1;
+  const views = (listing.view_count || 0) + (counted ? 1 : 0);
 
   const hasPhone = !!listing.contact_phone;
   const waUrl = waLink(listing.whatsapp);
@@ -117,6 +130,29 @@ export default async function ListingDetailPage({ params }) {
     listing.owner_name ? { k: t.owner, v: listing.owner_name } : null,
     { k: t.posted, v: timeAgo(listing.posted_at, lang) },
   ].filter((r) => r && r.v);
+
+  // স্ট্রাকচার্ড ডেটা: চাকরির জন্য নিয়োগকর্তার নাম নেই বলে এখনই দেওয়া হচ্ছে না
+  const numericPrice = parsePrice(listing.price_or_salary);
+  const jsonLd =
+    listing.categories?.slug === 'job'
+      ? null
+      : {
+          '@context': 'https://schema.org',
+          '@type': 'Product',
+          name: listing.title,
+          description: (listing.description || listing.title).slice(0, 500),
+          ...(photos[0] ? { image: photos } : {}),
+          ...(numericPrice
+            ? {
+                offers: {
+                  '@type': 'Offer',
+                  priceCurrency: 'BDT',
+                  price: numericPrice,
+                  availability: 'https://schema.org/InStock',
+                },
+              }
+            : {}),
+        };
 
   return (
     <>
@@ -241,18 +277,12 @@ export default async function ListingDetailPage({ params }) {
           </div>
         </div>
 
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': listing.categories?.slug === 'job' ? 'JobPosting' : 'Product',
-              name: listing.title,
-              description: listing.description,
-              ...(photos[0] ? { image: photos[0] } : {}),
-            }),
-          }}
-        />
+        {jsonLd && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
+          />
+        )}
       </main>
 
       <ContactBar
