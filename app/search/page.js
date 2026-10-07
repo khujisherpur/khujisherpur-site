@@ -10,6 +10,11 @@ import BottomNav from '../../components/BottomNav';
 import LocationFilter from '../../components/LocationFilter';
 import SaveSearchButton from '../../components/SaveSearchButton';
 
+export const metadata = {
+  title: 'খুঁজুন | খুঁজি শেরপুর',
+  robots: { index: false, follow: true },
+};
+
 const text = {
   bn: {
     placeholder: 'যেমন: বাসা ভাড়া, ইলেকট্রিশিয়ান...', search: 'খুঁজুন',
@@ -27,11 +32,20 @@ const text = {
   },
 };
 
+// সার্চ শব্দ থেকে ফিল্টার ভাঙার অক্ষর সরানো
+function cleanQuery(raw) {
+  return String(raw || '')
+    .replace(/[,()%_*\\"'`;:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 50);
+}
+
 export default async function SearchPage({ searchParams }) {
   const lang = getLang();
   const t = text[lang];
   const num = (n) => (lang === 'bn' ? toBn(n) : n);
-  const query = searchParams?.q?.trim() || '';
+  const query = cleanQuery(searchParams?.q);
   const upazila = searchParams?.upazila || '';
   const unionName = searchParams?.union || '';
   const hasSearch = !!(query || upazila);
@@ -48,15 +62,40 @@ export default async function SearchPage({ searchParams }) {
     .gt('expiry_date', new Date().toISOString());
 
   if (query) {
-    const { data: matchedCategories } = await supabase
-      .from('categories')
-      .select('id')
-      .ilike('name', `%${query}%`);
-    const categoryIds = (matchedCategories || []).map((c) => c.id);
-    const categoryFilter = categoryIds.length > 0 ? `,category_id.in.(${categoryIds.join(',')})` : '';
+    const [{ data: matchedCategories }, { data: matchedSubs }] = await Promise.all([
+      supabase.from('categories').select('id').ilike('name', `%${query}%`),
+      supabase
+        .from('subcategories')
+        .select('id')
+        .eq('is_active', true)
+        .or(`name_bn.ilike.%${query}%,name_en.ilike.%${query}%`),
+    ]);
 
-    providersQuery = providersQuery.or(`name.ilike.%${query}%,area.ilike.%${query}%${categoryFilter}`);
-    listingsQuery = listingsQuery.or(`title.ilike.%${query}%,area.ilike.%${query}%${categoryFilter}`);
+    const categoryIds = (matchedCategories || []).map((c) => c.id);
+    const subIds = (matchedSubs || []).map((s) => s.id);
+
+    let linkedProviderIds = [];
+    if (subIds.length > 0) {
+      const { data: links } = await supabase
+        .from('provider_subcategories')
+        .select('provider_id')
+        .in('subcategory_id', subIds);
+      linkedProviderIds = (links || []).map((l) => l.provider_id);
+    }
+
+    const like = `%${query}%`;
+    const categoryFilter = categoryIds.length > 0 ? `,category_id.in.(${categoryIds.join(',')})` : '';
+    const subFilter =
+      subIds.length > 0 ? `,primary_subcategory_id.in.(${subIds.join(',')})` : '';
+    const linkFilter =
+      linkedProviderIds.length > 0 ? `,id.in.(${linkedProviderIds.join(',')})` : '';
+
+    providersQuery = providersQuery.or(
+      `name.ilike.${like},area.ilike.${like},union_name.ilike.${like},upazila.ilike.${like}${categoryFilter}${subFilter}${linkFilter}`
+    );
+    listingsQuery = listingsQuery.or(
+      `title.ilike.${like},area.ilike.${like},description.ilike.${like},union_name.ilike.${like},upazila.ilike.${like}${categoryFilter}`
+    );
   }
   if (upazila) {
     providersQuery = providersQuery.eq('upazila', upazila);
@@ -102,6 +141,7 @@ export default async function SearchPage({ searchParams }) {
                 type="text"
                 name="q"
                 defaultValue={query}
+                maxLength={50}
                 placeholder={t.placeholder}
                 className="flex-1 bg-transparent outline-none px-3 py-2 text-base placeholder:text-ink/40"
               />
@@ -154,7 +194,8 @@ export default async function SearchPage({ searchParams }) {
                 {item.image ? (
                   <img
                     src={item.image}
-                    alt=""
+                    alt={item.title || ''}
+                    loading="lazy"
                     className={`w-20 h-20 object-cover flex-shrink-0 ${isProvider ? 'rounded-full' : 'rounded-lg'}`}
                   />
                 ) : (
