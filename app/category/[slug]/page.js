@@ -1,6 +1,6 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
-import { redirect } from 'next/navigation';
+import { redirect, notFound } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import { getLang } from '../../../lib/getLang';
 import { categoryLabels } from '../../../lib/categoryLabels';
@@ -8,6 +8,25 @@ import { upazilaList } from '../../../lib/locations';
 import { formatPrice, parsePrice, timeAgo, toBn } from '../../../lib/format';
 import { subcategoryIcons } from '../../../lib/services';
 import SiteHeader from '../../../components/SiteHeader';
+
+export function generateMetadata({ params, searchParams }) {
+  const lang = getLang();
+  const label = categoryLabels[params.slug];
+  if (!label) return { title: 'খুঁজি শেরপুর' };
+
+  const name = label[lang].name;
+  const title =
+    lang === 'bn' ? `শেরপুরে ${name} | খুঁজি শেরপুর` : `${name} in Sherpur | Khuji Sherpur`;
+  const description = label[lang].desc || title;
+  const hasFilter = Object.keys(searchParams || {}).length > 0;
+
+  return {
+    title,
+    description,
+    openGraph: { title, description },
+    ...(hasFilter ? { robots: { index: false, follow: true } } : {}),
+  };
+}
 
 const text = {
   bn: {
@@ -18,7 +37,7 @@ const text = {
     beFirst: 'প্রথমটা আপনিই যোগ করুন!',
     noMatch: 'এই ফিল্টারে কিছু পাওয়া যায়নি।',
     clearFilters: 'ফিল্টার মুছুন',
-    unavailable: 'অনুপলব্ধ', notFound: 'এই ক্যাটাগরি খুঁজে পাওয়া যায়নি।', backHome: 'হোমপেজে ফিরে যান',
+    unavailable: 'অনুপলব্ধ',
     all: 'সব', house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য',
     allAreas: 'সব উপজেলা',
     whichService: 'কোন সেবা খুঁজছেন?',
@@ -34,7 +53,7 @@ const text = {
     beFirst: 'Be the first to add one!',
     noMatch: 'Nothing found with these filters.',
     clearFilters: 'Clear filters',
-    unavailable: 'Unavailable', notFound: 'Category not found.', backHome: 'Back to Home',
+    unavailable: 'Unavailable',
     all: 'All', house: 'House', shop: 'Shop', mess: 'Mess', other: 'Other',
     allAreas: 'All areas',
     whichService: 'Which service are you looking for?',
@@ -78,32 +97,27 @@ export default async function CategoryPage({ params, searchParams }) {
   const activeUpazila = searchParams?.upazila || '';
   const sort = searchParams?.sort || 'new';
 
+  if (!label) notFound();
+
   const { data: category } = await supabase
     .from('categories')
     .select('id, slug, type')
     .eq('slug', params.slug)
-    .single();
+    .maybeSingle();
 
-  if (!category || !label) {
-    return (
-      <>
-        <SiteHeader lang={lang} />
-        <main className="max-w-4xl mx-auto px-4 py-20 text-center">
-          <p className="text-ink/70">{t.notFound}</p>
-          <a href="/" className="text-green underline mt-2 inline-block">{t.backHome}</a>
-        </main>
-      </>
-    );
-  }
+  if (!category) notFound();
 
   const isService = category.type === 'service';
   const isRent = category.slug === 'rent';
   const isServiceProvider = category.slug === 'service-provider';
   const name = label[lang].name;
 
-  // পুরোনো লিংক (?sub=electrician) নতুন তালিকায় নিয়ে যাই
+  // পুরোনো লিংক (?sub=electrician) নতুন তালিকায় নিয়ে যাই (শুধু নিরাপদ slug হলে)
   if (isServiceProvider && activeSub) {
-    redirect(`/${activeSub}`);
+    if (/^[a-z0-9-]+$/.test(activeSub)) {
+      redirect(`/${activeSub}`);
+    }
+    redirect('/category/service-provider');
   }
 
   // সেবাদাতা: সাব-ক্যাটাগরি বাছাইয়ের পেজ
@@ -119,7 +133,6 @@ export default async function CategoryPage({ params, searchParams }) {
       supabase.from('providers').select('id, primary_subcategory_id').eq('status', 'approved'),
     ]);
 
-    // প্রতিটা সেবায় কতজন (প্রধান বা অতিরিক্ত, একজন একবারই গোনা হয়)
     const approvedIds = new Set((approved || []).map((p) => p.id));
     const perSub = {};
     const seen = new Set();
@@ -174,7 +187,7 @@ export default async function CategoryPage({ params, searchParams }) {
   if (isService) {
     let query = supabase
       .from('providers')
-      .select('id, name, slug, area, upazila, is_available, photo_url, experience_years')
+      .select('id, name, slug, area, upazila, is_available, photo_url, experience_years, is_verified')
       .eq('category_id', category.id)
       .eq('status', 'approved');
     if (activeUpazila) query = query.eq('upazila', activeUpazila);
@@ -320,7 +333,7 @@ export default async function CategoryPage({ params, searchParams }) {
                   className="flex gap-3 bg-white rounded-xl p-3 border-l-4 border-l-green border-t border-r border-b border-ink/10 hover:shadow-md transition-shadow"
                 >
                   {p.photo_url ? (
-                    <img src={p.photo_url} alt="" className="w-16 h-16 rounded-full object-cover flex-shrink-0" />
+                    <img src={p.photo_url} alt={p.name || ''} loading="lazy" className="w-16 h-16 rounded-full object-cover flex-shrink-0" />
                   ) : (
                     <span className="w-16 h-16 rounded-full bg-[#EEF1F8] text-green-dark text-xl font-semibold flex items-center justify-center flex-shrink-0">
                       {p.name?.charAt(0)}
@@ -329,9 +342,11 @@ export default async function CategoryPage({ params, searchParams }) {
                   <div className="min-w-0 flex-1 self-center">
                     <div className="flex items-center gap-1.5">
                       <p className="font-medium leading-tight truncate">{p.name}</p>
-                      <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] flex items-center justify-center flex-shrink-0">
-                        ✓
-                      </span>
+                      {p.is_verified && (
+                        <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] flex items-center justify-center flex-shrink-0">
+                          ✓
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-ink/60 mt-0.5 truncate">
                       📍 {p.area}
@@ -359,7 +374,7 @@ export default async function CategoryPage({ params, searchParams }) {
                   className="flex gap-3 bg-white rounded-xl p-3 border-l-4 border-l-marigold border-t border-r border-b border-ink/10 hover:shadow-md transition-shadow"
                 >
                   {l.photos?.[0] ? (
-                    <img src={l.photos[0]} alt="" className="w-24 h-24 rounded-lg object-cover flex-shrink-0" />
+                    <img src={l.photos[0]} alt={l.title || ''} loading="lazy" className="w-24 h-24 rounded-lg object-cover flex-shrink-0" />
                   ) : (
                     <span className="w-24 h-24 rounded-lg bg-[#EEF1F8] flex items-center justify-center text-3xl opacity-70 flex-shrink-0">
                       {label.icon}
