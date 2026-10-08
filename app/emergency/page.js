@@ -2,6 +2,7 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 import { supabase } from '../../lib/supabaseClient';
 import { getLang } from '../../lib/getLang';
+import { cleanPhone } from '../../lib/format';
 import LanguageToggle from '../../components/LanguageToggle';
 
 const groupOrder = ['national', 'fire', 'police', 'government', 'pourashava', 'health', 'family_planning'];
@@ -46,17 +47,13 @@ export async function generateMetadata() {
   };
 }
 
-const bnDigits = '০১২৩৪৫৬৭৮৯';
-
 // একটা ঘরে একাধিক নম্বর (কমা, স্ল্যাশ, "বা"/"or" দিয়ে) থাকলে আলাদা করে প্রতিটার কল বোতাম
 function parsePhones(raw) {
   return String(raw || '')
     .split(/[,;/]|\s+(?:বা|or)\s+/i)
     .map((p) => p.trim())
     .map((p) => {
-      const digits = p
-        .replace(/[০-৯]/g, (c) => bnDigits.indexOf(c))
-        .replace(/[^\d+]/g, '');
+      const digits = cleanPhone(p);
       return { label: p, tel: digits.length >= 3 ? digits : null };
     })
     .filter((p) => p.tel);
