@@ -1,5 +1,6 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 import { getLang } from '../../lib/getLang';
@@ -25,19 +26,53 @@ const text = {
   },
 };
 
+// বট-সুরক্ষা: শুধু a-z, 0-9, হাইফেন; .ico/.txt/.xml ইত্যাদি ও অদ্ভুত পাথ ডাটাবেসে যাওয়ার আগেই বাদ
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+const getSubcategory = cache(async (slug) => {
+  if (typeof slug !== 'string' || slug.length > 60 || !SLUG_RE.test(slug)) return null;
+  const { data } = await supabase
+    .from('subcategories')
+    .select('id, slug, name_bn, name_en, category_id')
+    .eq('slug', slug)
+    .eq('is_active', true)
+    .maybeSingle();
+  return data || null;
+});
+
+function cleanUpazila(v) {
+  return typeof v === 'string' && upazilaList.includes(v) ? v : '';
+}
+
+export async function generateMetadata({ params, searchParams }) {
+  const lang = getLang();
+  const sub = await getSubcategory(params.slug);
+  if (!sub) {
+    return { title: lang === 'bn' ? 'পাওয়া যায়নি' : 'Not found', robots: { index: false, follow: false } };
+  }
+  const name = lang === 'bn' ? sub.name_bn : sub.name_en || sub.name_bn;
+  const title = lang === 'bn' ? `${name} — খুঁজি শেরপুর` : `${name} in Sherpur — Khuji Sherpur`;
+  const description =
+    lang === 'bn'
+      ? `শেরপুর জেলার ${name} সেবাদাতাদের তালিকা — এলাকা, অভিজ্ঞতা ও যোগাযোগ এক জায়গায়।`
+      : `List of ${name} service providers in Sherpur district — area, experience and contact in one place.`;
+  const filtered = !!cleanUpazila(searchParams?.upazila);
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: 'website', locale: lang === 'bn' ? 'bn_BD' : 'en_US' },
+    // ফিল্টার করা পাতা সার্চ ইঞ্জিনে ডুপ্লিকেট হয়, তাই noindex
+    robots: filtered ? { index: false, follow: true } : undefined,
+  };
+}
+
 export default async function SubcategoryPage({ params, searchParams }) {
   const lang = getLang();
   const t = text[lang];
   const num = (n) => (lang === 'bn' ? toBn(n) : n);
-  const activeUpazila = searchParams?.upazila || '';
+  const activeUpazila = cleanUpazila(searchParams?.upazila);
 
-  const { data: subcategory } = await supabase
-    .from('subcategories')
-    .select('id, slug, name_bn, name_en, category_id')
-    .eq('slug', params.slug)
-    .eq('is_active', true)
-    .maybeSingle();
-
+  const subcategory = await getSubcategory(params.slug);
   if (!subcategory) {
     notFound();
   }
@@ -59,7 +94,7 @@ export default async function SubcategoryPage({ params, searchParams }) {
     .or(orFilter);
   if (activeUpazila) query = query.eq('upazila', activeUpazila);
 
-  const { data: providers } = await query.order('created_at', { ascending: false });
+  const { data: providers } = await query.order('created_at', { ascending: false }).limit(200);
   const items = providers || [];
   const svc = await getServicesFor(items, lang);
 
