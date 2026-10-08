@@ -1,5 +1,7 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import ProviderProfile from '../../../components/ProviderProfile';
@@ -12,40 +14,68 @@ const subcategoryIcons = {
   'internet-wifi': '📶', driver: '🚗', 'transport-shifting': '🚚',
 };
 
+const BOT_UA = /bot|crawl|spider|slurp|facebookexternalhit|preview|whatsapp|telegram|headless/i;
+
+function safeJsonLd(obj) {
+  return JSON.stringify(obj).replace(/</g, '\\u003c');
+}
+
 export async function generateMetadata({ params }) {
-  const { data: provider } = await supabase
-    .from('providers')
-    .select('name, name_en, area')
-    .eq('slug', params.providerSlug)
-    .eq('status', 'approved')
-    .maybeSingle();
+  const lang = getLang();
+
+  const [{ data: provider }, { data: sub }] = await Promise.all([
+    supabase
+      .from('providers')
+      .select('name, area, description, photo_url, experience_years')
+      .eq('slug', params.providerSlug)
+      .eq('status', 'approved')
+      .maybeSingle(),
+    supabase
+      .from('subcategories')
+      .select('name_bn, name_en')
+      .eq('slug', params.slug)
+      .maybeSingle(),
+  ]);
 
   if (!provider) {
-    return { title: 'প্রোফাইল পাওয়া যায়নি | খুঁজি শেরপুর' };
+    return { title: 'প্রোফাইল পাওয়া যায়নি | খুঁজি শেরপুর', robots: { index: false } };
   }
 
-  const title = `${provider.name} - ${provider.area} | খুঁজি শেরপুর`;
-  return { title, openGraph: { title } };
+  const subName = sub ? (lang === 'bn' ? sub.name_bn : sub.name_en || sub.name_bn) : '';
+  const title = `${provider.name}${subName ? `, ${subName}` : ''} - ${provider.area}, শেরপুর | খুঁজি শেরপুর`;
+
+  const parts = [`${provider.name}, ${provider.area}-এর ${subName || 'সেবাদাতা'}।`];
+  if (provider.experience_years) parts.push(`${provider.experience_years} বছরের অভিজ্ঞতা।`);
+  const about = (provider.description || '').replace(/\s+/g, ' ').trim();
+  if (about) parts.push(about.slice(0, 70));
+  parts.push('রিভিউ দেখে সরাসরি যোগাযোগ করুন।');
+  const description = parts.join(' ').slice(0, 155);
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      ...(provider.photo_url ? { images: [provider.photo_url] } : {}),
+    },
+    twitter: { card: provider.photo_url ? 'summary_large_image' : 'summary', title, description },
+  };
 }
 
 const text = {
-  bn: { back: '← তালিকায় ফিরে যান', notFound: 'এই প্রোফাইলটি খুঁজে পাওয়া যায়নি।', backHome: 'হোমপেজে ফিরে যান' },
-  en: { back: '← Back to list', notFound: 'This profile was not found.', backHome: 'Back to Home' },
+  bn: { back: '← তালিকায় ফিরে যান' },
+  en: { back: '← Back to list' },
 };
 
 export default async function ProviderSlugPage({ params }) {
   const lang = getLang();
   const t = text[lang];
 
-  const notFoundView = (
-    <>
-      <SiteHeader lang={lang} />
-      <main className="max-w-2xl mx-auto px-4 py-20 text-center">
-        <p className="text-ink/70">{t.notFound}</p>
-        <a href="/" className="text-green underline mt-2 inline-block">{t.backHome}</a>
-      </main>
-    </>
-  );
+  // ক্যাটাগরির ভুল slug হলে (যেমন /wp-login.php) ডাটাবেস ছোঁয়ার আগেই ৪০৪
+  if (!/^[a-z0-9-]+$/.test(params.slug) || !/^[a-z0-9-]+$/.test(params.providerSlug)) {
+    notFound();
+  }
 
   const { data: subcategory } = await supabase
     .from('subcategories')
@@ -53,7 +83,7 @@ export default async function ProviderSlugPage({ params }) {
     .eq('slug', params.slug)
     .maybeSingle();
 
-  if (!subcategory) return notFoundView;
+  if (!subcategory) notFound();
 
   const { data: provider } = await supabase
     .from('providers')
@@ -63,9 +93,13 @@ export default async function ProviderSlugPage({ params }) {
     .eq('status', 'approved')
     .maybeSingle();
 
-  if (!provider) return notFoundView;
+  if (!provider) notFound();
 
-  await supabase.rpc('increment_provider_view', { pid: provider.id });
+  // বট ও লিংক-প্রিভিউয়ের ভিউ গোনা হয় না
+  const ua = headers().get('user-agent') || '';
+  if (!BOT_UA.test(ua)) {
+    await supabase.rpc('increment_provider_view', { pid: provider.id });
+  }
 
   const [{ data: allSubcats }, { data: reviews }] = await Promise.all([
     supabase
@@ -92,6 +126,30 @@ export default async function ProviderSlugPage({ params }) {
   const count = reviews?.length || 0;
   const avg = count > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / count : 0;
 
+  // স্ট্রাকচার্ড ডেটা (ফোন নম্বর ইচ্ছে করে বাদ)
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'LocalBusiness',
+    name: provider.name,
+    description: (provider.description || `${provider.name}, ${subName(subcategory)}`).slice(0, 500),
+    ...(provider.photo_url ? { image: provider.photo_url } : {}),
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: provider.area,
+      addressRegion: 'Sherpur',
+      addressCountry: 'BD',
+    },
+    ...(count > 0
+      ? {
+          aggregateRating: {
+            '@type': 'AggregateRating',
+            ratingValue: Number(avg.toFixed(1)),
+            reviewCount: count,
+          },
+        }
+      : {}),
+  };
+
   return (
     <>
       <SiteHeader lang={lang} />
@@ -103,6 +161,10 @@ export default async function ProviderSlugPage({ params }) {
         headline={`${subName(subcategory)} · ${provider.area}`}
         services={services}
         rating={{ avg, count }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
       />
     </>
   );
