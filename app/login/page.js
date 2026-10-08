@@ -9,6 +9,17 @@ function getCookieLang() {
   return match && match[1] === 'en' ? 'en' : 'bn';
 }
 
+// লগইনের পর ফেরার ঠিকানা (?next=): শুধু সাইটের ভেতরের পাথ চলবে, বাইরের লিংকে পাঠানো যাবে না
+function getNextPath() {
+  if (typeof window === 'undefined') return '/dashboard';
+  const next = new URLSearchParams(window.location.search).get('next');
+  if (!next || next.length > 300) return '/dashboard';
+  if (!next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return '/dashboard';
+  if (/[\u0000-\u001f]/.test(next)) return '/dashboard';
+  if (next.startsWith('/login')) return '/dashboard';
+  return next;
+}
+
 const text = {
   bn: {
     login: 'লগইন', signup: 'নিবন্ধন', google: 'Google দিয়ে চালিয়ে যান', or: 'অথবা',
@@ -225,7 +236,7 @@ export default function LoginPage() {
       } else if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) setError(friendly(error.message));
-        else window.location.href = '/dashboard';
+        else window.location.href = getNextPath();
       } else if (mode === 'forgot') {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/login`,
@@ -252,7 +263,7 @@ export default function LoginPage() {
   async function handleGoogleLogin() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: { redirectTo: `${window.location.origin}${getNextPath()}` },
     });
   }
 
@@ -340,6 +351,7 @@ export default function LoginPage() {
                   <input
                     type="text"
                     required
+                    maxLength={80}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className={inputClass}
@@ -357,6 +369,7 @@ export default function LoginPage() {
                   <input
                     type="email"
                     required
+                    maxLength={120}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className={inputClass}
