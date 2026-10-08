@@ -2,6 +2,7 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 import { supabase } from '../../lib/supabaseClient';
 import { getLang } from '../../lib/getLang';
+import { toBn } from '../../lib/format';
 import LanguageToggle from '../../components/LanguageToggle';
 
 const text = {
@@ -27,15 +28,35 @@ const text = {
   },
 };
 
+export async function generateMetadata() {
+  const lang = getLang();
+  if (lang === 'bn') {
+    return {
+      title: 'রক্তদাতা ও রক্তের অনুরোধ — খুঁজি শেরপুর',
+      description: 'শেরপুরে জরুরি রক্তের অনুরোধ দেখুন, রক্তের জন্য অনুরোধ করুন বা রক্তদাতা হিসেবে নিবন্ধন করুন।',
+    };
+  }
+  return {
+    title: 'Blood Donors & Requests — Khuji Sherpur',
+    description: 'See urgent blood requests in Sherpur, post a request, or register as a blood donor.',
+  };
+}
+
 export default async function BloodPage() {
   const lang = getLang();
   const t = text[lang];
+  const num = (n) => (lang === 'bn' ? toBn(n) : n);
+
+  // ৭ দিনের পুরোনো অনুরোধ আর দেখানো হবে না (ভুলে সক্রিয় থেকে গেলেও)
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const { data: requests } = await supabase
     .from('blood_requests')
     .select('id, blood_group, bags_needed, hospital_or_area, created_at')
     .eq('status', 'active')
-    .order('created_at', { ascending: false });
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(50);
 
   return (
     <main className="max-w-2xl mx-auto px-4">
@@ -92,7 +113,7 @@ export default async function BloodPage() {
               <span className="text-2xl font-bold text-red-500 flex-shrink-0">{r.blood_group}</span>
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{r.hospital_or_area}</p>
-                <p className="text-sm text-ink/60">{r.bags_needed} {t.bags}</p>
+                <p className="text-sm text-ink/60">{num(r.bags_needed)} {t.bags}</p>
               </div>
             </a>
           ))}
