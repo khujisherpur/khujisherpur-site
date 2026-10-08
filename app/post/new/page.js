@@ -8,6 +8,9 @@ import { locations, upazilaList } from '../../../lib/locations';
 import { categoryLabels } from '../../../lib/categoryLabels';
 import { cleanPhone, isValidBdPhone } from '../../../lib/format';
 
+// ডোমেইন বসানোর সময় শুধু এই এক লাইন বদলাবেন (https:// ছাড়া)
+const SITE_HOST = 'khujisherpur-site.pages.dev';
+
 const rentTypeLabels = { house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য' };
 const roomOptions = ['১', '২', '৩', '৪+'];
 
@@ -28,6 +31,28 @@ function slugify(text) {
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
+}
+
+// কাঁচা ইংরেজি এরর বদলে বাংলা বার্তা
+function friendlyError(err) {
+  const msg = (err && err.message) || '';
+  const code = err && err.code;
+  // ডাটাবেস ট্রিগারের নিজের বাংলা বার্তা (সাসপেন্ড, দৈনিক সীমা ইত্যাদি) সরাসরি দেখাই
+  if (/[\u0980-\u09FF]/.test(msg)) return msg;
+  if (code === '23505' || /duplicate key|unique/i.test(msg)) {
+    if (/slug/i.test(msg)) return 'এই প্রোফাইল লিংকটি আগেই নেওয়া হয়েছে, অন্য একটি লিংক দিন';
+    return 'আপনার ইতিমধ্যে একটি প্রোফাইল আছে। ড্যাশবোর্ড থেকে সেটা দেখুন';
+  }
+  if (/row-level security|permission denied|not authorized/i.test(msg)) {
+    return 'এই কাজের অনুমতি নেই। লগআউট করে আবার লগইন করে চেষ্টা করুন';
+  }
+  if (/failed to fetch|networkerror|network request|load failed/i.test(msg)) {
+    return 'ইন্টারনেট সংযোগ চেক করে আবার চেষ্টা করুন';
+  }
+  if (/jwt|token|session/i.test(msg)) {
+    return 'আপনার সেশনের মেয়াদ শেষ। আবার লগইন করুন';
+  }
+  return 'কিছু একটা সমস্যা হয়েছে, একটু পরে আবার চেষ্টা করুন';
 }
 
 function PageShell({ children }) {
@@ -208,14 +233,17 @@ function NewPostForm() {
     const { error: uploadError } = await supabase.storage.from('images').upload(path, blob, {
       contentType: 'image/jpeg',
     });
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('upload error', uploadError);
+      throw new Error('ছবি আপলোড করা যায়নি। ছবি ছোট করে বা ইন্টারনেট চেক করে আবার চেষ্টা করুন');
+    }
     const { data } = supabase.storage.from('images').getPublicUrl(path);
     return data.publicUrl;
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!user || !category) return;
+    if (!user || !category || submitting) return;
     if (!form.upazila || !form.unionName) {
       setError('উপজেলা ও ইউনিয়ন বাছাই করুন');
       return;
@@ -276,7 +304,12 @@ function NewPostForm() {
 
         if (isServiceProvider && inserted) {
           const rows = form.selectedSubcategoryIds.map((sid) => ({ provider_id: inserted.id, subcategory_id: sid }));
-          await supabase.from('provider_subcategories').insert(rows);
+          const { error: linkError } = await supabase.from('provider_subcategories').insert(rows);
+          if (linkError) {
+            // সেবার তালিকা না বসলে অর্ধেক প্রোফাইল রাখা ঠিক না, তুলে নিয়ে আবার চেষ্টা করতে বলি
+            await supabase.from('providers').delete().eq('id', inserted.id);
+            throw linkError;
+          }
         }
       } else {
         let photoUrls = [];
@@ -334,7 +367,8 @@ function NewPostForm() {
       setAutoApproved(approveSetting?.value === 'true');
       setSuccess(true);
     } catch (err) {
-      setError(err.message);
+      console.error('submit error', err);
+      setError(friendlyError(err));
     }
     setSubmitting(false);
   }
@@ -348,11 +382,12 @@ function NewPostForm() {
   }
 
   if (!user) {
+    const nextUrl = categorySlug ? `/post/new?category=${categorySlug}` : '/post/new';
     return (
       <PageShell>
         <main className="max-w-md mx-auto px-4 py-20 text-center">
           <p className="text-ink/70 mb-4">পোস্ট দিতে হলে আগে লগইন করুন।</p>
-          <a href="/login" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5">লগইন করুন</a>
+          <a href={`/login?next=${encodeURIComponent(nextUrl)}`} className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5">লগইন করুন</a>
         </main>
       </PageShell>
     );
@@ -502,7 +537,7 @@ function NewPostForm() {
         ফোন নম্বরেই হোয়াটসঅ্যাপ আছে
       </label>
       <input
-        type="tel" inputMode="tel" disabled={waSame}
+        type="tel" inputMode="tel" disabled={waSame} maxLength={20}
         value={waSame ? '' : form.whatsapp}
         onChange={(e) => updateField('whatsapp', e.target.value)}
         className={`${inputCls} disabled:bg-paper disabled:text-ink/30`}
@@ -557,7 +592,7 @@ function NewPostForm() {
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">আপনার নাম (বাংলা)</label>
               <input
-                type="text" required value={form.name}
+                type="text" required maxLength={80} value={form.name}
                 onChange={(e) => updateField('name', e.target.value)}
                 className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
                 placeholder="যেমন: রহিম উদ্দিন"
@@ -567,7 +602,7 @@ function NewPostForm() {
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">শিরোনাম</label>
               <input
-                type="text" required value={form.title}
+                type="text" required maxLength={120} value={form.title}
                 onChange={(e) => updateField('title', e.target.value)}
                 className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
                 placeholder={categoryFieldText[category.slug]?.titlePh || 'শিরোনাম লিখুন'}
@@ -580,7 +615,7 @@ function NewPostForm() {
               <div>
                 <label className="block text-sm mb-1.5 text-ink/70">আপনার নাম (ইংরেজি)</label>
                 <input
-                  type="text" required value={form.nameEn}
+                  type="text" required maxLength={80} value={form.nameEn}
                   onChange={(e) => updateField('nameEn', e.target.value)}
                   className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
                   placeholder="যেমন: Rahim Uddin"
@@ -591,7 +626,7 @@ function NewPostForm() {
               <div>
                 <label className="block text-sm mb-1.5 text-ink/70">প্রোফাইল লিংক (URL)</label>
                 <input
-                  type="text" required value={form.slug}
+                  type="text" required maxLength={60} value={form.slug}
                   onChange={(e) => { setSlugTouched(true); updateField('slug', slugify(e.target.value)); }}
                   className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green font-numeric"
                   placeholder="rahim-uddin"
@@ -600,7 +635,7 @@ function NewPostForm() {
                   <div className="mt-2 bg-[#EEF1F8] border border-ink/10 rounded-md px-3 py-2 text-xs">
                     <p className="text-ink/60">
                       আপনার লিংক: <span className="font-medium text-green">
-                        khujisherpur-site.pages.dev/{subcategories.find((s) => s.id === form.primarySubcategoryId)?.slug || '...'}/{slugStatus === 'checking' ? form.slug : (finalSlug || form.slug)}
+                        {SITE_HOST}/{subcategories.find((s) => s.id === form.primarySubcategoryId)?.slug || '...'}/{slugStatus === 'checking' ? form.slug : (finalSlug || form.slug)}
                       </span>
                     </p>
                     {slugStatus === 'checking' && <p className="text-ink/40 mt-1">চেক করা হচ্ছে...</p>}
@@ -653,7 +688,7 @@ function NewPostForm() {
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">বাড়ি/দোকান মালিকের নাম</label>
               <input
-                type="text" required value={form.ownerName}
+                type="text" required maxLength={80} value={form.ownerName}
                 onChange={(e) => updateField('ownerName', e.target.value)}
                 className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
                 placeholder="মালিকের নাম"
@@ -722,7 +757,7 @@ function NewPostForm() {
               <div>
                 <label className="block text-sm mb-1.5 text-ink/70">আয়তন (বর্গ-স্কয়ার ফিট, ঐচ্ছিক)</label>
                 <input
-                  type="text" value={form.sqft}
+                  type="text" maxLength={10} value={form.sqft}
                   onChange={(e) => updateField('sqft', e.target.value)}
                   className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
                   placeholder="যেমন: ৮৫০"
@@ -731,7 +766,7 @@ function NewPostForm() {
               <div>
                 <label className="block text-sm mb-1.5 text-ink/70">সুযোগ-সুবিধা (ঐচ্ছিক)</label>
                 <textarea
-                  rows={2} value={form.amenities}
+                  rows={2} maxLength={300} value={form.amenities}
                   onChange={(e) => updateField('amenities', e.target.value)}
                   className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green resize-none"
                   placeholder="যেমন: গ্যাস, পার্কিং, লিফট"
@@ -775,7 +810,7 @@ function NewPostForm() {
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">সুনির্দিষ্ট এলাকা/বাজার</label>
             <input
-              type="text" required value={form.area}
+              type="text" required maxLength={100} value={form.area}
               onChange={(e) => updateField('area', e.target.value)}
               className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
               placeholder="যেমন: নিউ মার্কেট, শেখ হাটি বাজার"
@@ -787,7 +822,7 @@ function NewPostForm() {
               <div>
                 <label className="block text-sm mb-1.5 text-ink/70">ফোন নম্বর</label>
                 <input
-                  type="tel" required inputMode="tel" value={form.phone}
+                  type="tel" required inputMode="tel" maxLength={20} value={form.phone}
                   onChange={(e) => updateField('phone', e.target.value)}
                   className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
                   placeholder="01XXXXXXXXX"
@@ -797,7 +832,7 @@ function NewPostForm() {
               <div>
                 <label className="block text-sm mb-1.5 text-ink/70">অভিজ্ঞতা (বছর, ঐচ্ছিক)</label>
                 <input
-                  type="number" min="0" value={form.experienceYears}
+                  type="number" min="0" max="70" value={form.experienceYears}
                   onChange={(e) => updateField('experienceYears', e.target.value)}
                   className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
                   placeholder="যেমন: ৫"
@@ -836,7 +871,7 @@ function NewPostForm() {
               <div className="flex items-center border border-ink/20 focus-within:border-green">
                 <span className="pl-3 pr-1 text-ink/50 text-lg font-numeric select-none">৳</span>
                 <input
-                  type="text" required value={form.priceOrSalary}
+                  type="text" required maxLength={20} value={form.priceOrSalary}
                   onChange={(e) => updateField('priceOrSalary', e.target.value)}
                   className="flex-1 py-2.5 pr-3 outline-none text-lg font-numeric tracking-wide"
                   placeholder={categoryFieldText[category.slug]?.pricePh || '০'}
@@ -860,7 +895,7 @@ function NewPostForm() {
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">বিবরণ</label>
             <textarea
-              required rows={4} value={form.description}
+              required rows={4} maxLength={2000} value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
               className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green resize-none"
               placeholder="বিস্তারিত লিখুন..."
@@ -871,7 +906,7 @@ function NewPostForm() {
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">গুগল ম্যাপ লিংক (ঐচ্ছিক)</label>
               <input
-                type="url" value={form.mapLink}
+                type="url" maxLength={300} value={form.mapLink}
                 onChange={(e) => updateField('mapLink', e.target.value)}
                 className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
                 placeholder="https://maps.google.com/..."
@@ -929,7 +964,7 @@ function NewPostForm() {
                   মোবাইল নম্বর <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="tel" required inputMode="tel" value={form.contact_phone}
+                  type="tel" required inputMode="tel" maxLength={20} value={form.contact_phone}
                   onChange={(e) => updateField('contact_phone', e.target.value)}
                   className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
                   placeholder="01XXXXXXXXX"
@@ -939,7 +974,7 @@ function NewPostForm() {
               <div>
                 <label className="block text-sm mb-1.5 text-ink/70">ইমেইল (ঐচ্ছিক, চাকরির আবেদনে কাজে লাগে)</label>
                 <input
-                  type="email" value={form.contact_email}
+                  type="email" maxLength={120} value={form.contact_email}
                   onChange={(e) => updateField('contact_email', e.target.value)}
                   className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
                   placeholder="you@example.com"
