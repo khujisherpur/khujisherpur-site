@@ -1,8 +1,29 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
+import { cleanPhone, isValidBdPhone } from '../../../lib/format';
 
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+// কাঁচা ইংরেজি এরর বদলে বাংলা বার্তা; ডাটাবেস ট্রিগারের নিজের বাংলা বার্তা (সাসপেন্ড, দৈনিক সীমা) সরাসরি দেখাই
+function friendlyError(err) {
+  const msg = (err && err.message) || '';
+  const code = err && err.code;
+  if (/[\u0980-\u09FF]/.test(msg)) return msg;
+  if (code === '23505' || /duplicate key|unique/i.test(msg)) {
+    return 'এই অনুরোধ ইতিমধ্যে পোস্ট করা আছে';
+  }
+  if (/row-level security|permission denied|not authorized/i.test(msg)) {
+    return 'এই কাজের অনুমতি নেই। লগআউট করে আবার লগইন করে চেষ্টা করুন';
+  }
+  if (/failed to fetch|networkerror|network request|load failed/i.test(msg)) {
+    return 'ইন্টারনেট সংযোগ চেক করে আবার চেষ্টা করুন';
+  }
+  if (/jwt|token|session/i.test(msg)) {
+    return 'আপনার সেশনের মেয়াদ শেষ। আবার লগইন করুন';
+  }
+  return 'কিছু একটা সমস্যা হয়েছে, একটু পরে আবার চেষ্টা করুন';
+}
 
 export default function BloodRequestPage() {
   const [user, setUser] = useState(null);
@@ -29,24 +50,44 @@ export default function BloodRequestPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!user || submitting) return;
+    if (!isValidBdPhone(form.contactPhone)) {
+      setError('সঠিক যোগাযোগ নম্বর দিন (যেমন: 01XXXXXXXXX)');
+      return;
+    }
+    if (form.altPhone && !isValidBdPhone(form.altPhone)) {
+      setError('বিকল্প নম্বরটি সঠিক নয় (যেমন: 01XXXXXXXXX)');
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
-    const { error } = await supabase.from('blood_requests').insert({
-      user_id: user.id,
-      applicant_name: form.applicantName,
-      relation_to_patient: form.relationToPatient,
-      patient_name: form.patientName,
-      blood_group: form.bloodGroup,
-      bags_needed: parseInt(form.bagsNeeded) || 1,
-      hospital_or_area: form.hospitalOrArea,
-      contact_phone: form.contactPhone,
-      alt_phone: form.altPhone,
-      note: form.note,
-    });
+    const bags = Math.min(Math.max(parseInt(form.bagsNeeded) || 1, 1), 10);
 
-    if (error) setError(error.message);
-    else setSuccess(true);
+    try {
+      const { error } = await supabase.from('blood_requests').insert({
+        user_id: user.id,
+        applicant_name: form.applicantName.trim(),
+        relation_to_patient: form.relationToPatient.trim(),
+        patient_name: form.patientName.trim(),
+        blood_group: form.bloodGroup,
+        bags_needed: bags,
+        hospital_or_area: form.hospitalOrArea.trim(),
+        contact_phone: cleanPhone(form.contactPhone),
+        alt_phone: cleanPhone(form.altPhone),
+        note: form.note.trim(),
+      });
+
+      if (error) {
+        console.error('blood request error', error);
+        setError(friendlyError(error));
+      } else {
+        setSuccess(true);
+      }
+    } catch (err) {
+      console.error('blood request error', err);
+      setError(friendlyError(err));
+    }
     setSubmitting(false);
   }
 
@@ -56,7 +97,7 @@ export default function BloodRequestPage() {
     return (
       <main className="max-w-md mx-auto px-4 py-20 text-center">
         <p className="text-ink/70 mb-4">রক্তের অনুরোধ করতে হলে লগইন করুন।</p>
-        <a href="/login" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5">লগইন করুন</a>
+        <a href="/login?next=%2Fblood%2Frequest" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5">লগইন করুন</a>
       </main>
     );
   }
@@ -89,7 +130,7 @@ export default function BloodRequestPage() {
         <div>
           <label className="block text-sm mb-1.5 text-ink/70">আপনার নাম (আবেদনকারী)</label>
           <input
-            type="text" required value={form.applicantName}
+            type="text" required maxLength={80} value={form.applicantName}
             onChange={(e) => updateField('applicantName', e.target.value)}
             className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
           />
@@ -98,7 +139,7 @@ export default function BloodRequestPage() {
         <div>
           <label className="block text-sm mb-1.5 text-ink/70">রোগীর সাথে সম্পর্ক</label>
           <input
-            type="text" required value={form.relationToPatient}
+            type="text" required maxLength={40} value={form.relationToPatient}
             onChange={(e) => updateField('relationToPatient', e.target.value)}
             className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
             placeholder="যেমন: ভাই, স্বামী, বন্ধু"
@@ -108,7 +149,7 @@ export default function BloodRequestPage() {
         <div>
           <label className="block text-sm mb-1.5 text-ink/70">রোগীর নাম (ঐচ্ছিক)</label>
           <input
-            type="text" value={form.patientName}
+            type="text" maxLength={80} value={form.patientName}
             onChange={(e) => updateField('patientName', e.target.value)}
             className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
           />
@@ -128,7 +169,7 @@ export default function BloodRequestPage() {
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">ব্যাগ সংখ্যা</label>
             <input
-              type="number" min="1" required value={form.bagsNeeded}
+              type="number" min="1" max="10" required value={form.bagsNeeded}
               onChange={(e) => updateField('bagsNeeded', e.target.value)}
               className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
             />
@@ -138,7 +179,7 @@ export default function BloodRequestPage() {
         <div>
           <label className="block text-sm mb-1.5 text-ink/70">হাসপাতাল/এলাকা</label>
           <input
-            type="text" required value={form.hospitalOrArea}
+            type="text" required maxLength={120} value={form.hospitalOrArea}
             onChange={(e) => updateField('hospitalOrArea', e.target.value)}
             className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
             placeholder="যেমন: শেরপুর সদর হাসপাতাল"
@@ -149,17 +190,19 @@ export default function BloodRequestPage() {
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">যোগাযোগ নম্বর</label>
             <input
-              type="tel" required value={form.contactPhone}
+              type="tel" required inputMode="tel" maxLength={20} value={form.contactPhone}
               onChange={(e) => updateField('contactPhone', e.target.value)}
               className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
+              placeholder="01XXXXXXXXX"
             />
           </div>
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">বিকল্প নম্বর (ঐচ্ছিক)</label>
             <input
-              type="tel" value={form.altPhone}
+              type="tel" inputMode="tel" maxLength={20} value={form.altPhone}
               onChange={(e) => updateField('altPhone', e.target.value)}
               className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
+              placeholder="01XXXXXXXXX"
             />
           </div>
         </div>
@@ -167,7 +210,7 @@ export default function BloodRequestPage() {
         <div>
           <label className="block text-sm mb-1.5 text-ink/70">নোট (ঐচ্ছিক)</label>
           <textarea
-            rows={3} value={form.note}
+            rows={3} maxLength={500} value={form.note}
             onChange={(e) => updateField('note', e.target.value)}
             className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400 resize-none"
           />
