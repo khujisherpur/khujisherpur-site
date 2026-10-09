@@ -1,10 +1,13 @@
-'use client';
-import { useState } from 'react';
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+import { getLang } from '../../lib/getLang';
+import LanguageToggle from '../../components/LanguageToggle';
 
 const content = {
   bn: {
     title: 'শর্তাবলি',
     updated: 'সর্বশেষ হালনাগাদ: সেপ্টেম্বর ২০২৬',
+    back: '← হোমপেজে ফিরে যান',
     sections: [
       {
         h: '১. সাইট সম্পর্কে',
@@ -31,6 +34,7 @@ const content = {
   en: {
     title: 'Terms of Service',
     updated: 'Last updated: September 2026',
+    back: '← Back to Home',
     sections: [
       {
         h: '1. About the Site',
@@ -56,28 +60,26 @@ const content = {
   },
 };
 
+export async function generateMetadata() {
+  const lang = getLang();
+  return {
+    title: lang === 'bn' ? 'শর্তাবলি — খুঁজি শেরপুর' : 'Terms of Service — Khuji Sherpur',
+    description:
+      lang === 'bn'
+        ? 'খুঁজি শেরপুর ব্যবহারের শর্তাবলি: অ্যাকাউন্ট, পোস্ট অনুমোদন ও দায়বদ্ধতার সীমাবদ্ধতা।'
+        : 'Terms of using Khuji Sherpur: accounts, post approval and limitation of liability.',
+  };
+}
+
 export default function TermsPage() {
-  const [lang, setLang] = useState('bn');
+  const lang = getLang();
   const t = content[lang];
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-10">
       <header className="flex items-center justify-between mb-8">
         <a href="/"><img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-9 w-auto" /></a>
-        <div className="flex border border-ink/20 rounded-full overflow-hidden text-sm">
-          <button
-            onClick={() => setLang('bn')}
-            className={`px-3 py-1 ${lang === 'bn' ? 'bg-green text-white' : 'text-ink/60'}`}
-          >
-            বাংলা
-          </button>
-          <button
-            onClick={() => setLang('en')}
-            className={`px-3 py-1 ${lang === 'en' ? 'bg-green text-white' : 'text-ink/60'}`}
-          >
-            English
-          </button>
-        </div>
+        <LanguageToggle lang={lang} />
       </header>
 
       <h1 className="text-2xl font-semibold mb-2">{t.title}</h1>
@@ -93,7 +95,7 @@ export default function TermsPage() {
       </div>
 
       <a href="/" className="inline-block mt-10 text-green underline text-sm">
-        {lang === 'bn' ? '← হোমপেজে ফিরে যান' : '← Back to Home'}
+        {t.back}
       </a>
     </main>
   );
