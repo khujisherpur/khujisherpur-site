@@ -1,8 +1,29 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
+import { cleanPhone, isValidBdPhone } from '../../../lib/format';
 
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+// কাঁচা ইংরেজি এরর বদলে বাংলা বার্তা; ডাটাবেস ট্রিগারের নিজের বাংলা বার্তা (সাসপেন্ড, সীমা) সরাসরি দেখাই
+function friendlyError(err) {
+  const msg = (err && err.message) || '';
+  const code = err && err.code;
+  if (/[\u0980-\u09FF]/.test(msg)) return msg;
+  if (code === '23505' || /duplicate key|unique/i.test(msg)) {
+    return 'আপনি ইতিমধ্যে ডোনার হিসেবে নিবন্ধিত। পাতাটি রিফ্রেশ করে প্রোফাইল আপডেট করুন';
+  }
+  if (/row-level security|permission denied|not authorized/i.test(msg)) {
+    return 'এই কাজের অনুমতি নেই। লগআউট করে আবার লগইন করে চেষ্টা করুন';
+  }
+  if (/failed to fetch|networkerror|network request|load failed/i.test(msg)) {
+    return 'ইন্টারনেট সংযোগ চেক করে আবার চেষ্টা করুন';
+  }
+  if (/jwt|token|session/i.test(msg)) {
+    return 'আপনার সেশনের মেয়াদ শেষ। আবার লগইন করুন';
+  }
+  return 'কিছু একটা সমস্যা হয়েছে, একটু পরে আবার চেষ্টা করুন';
+}
 
 export default function BloodDonorPage() {
   const [user, setUser] = useState(null);
@@ -18,18 +39,22 @@ export default function BloodDonorPage() {
   }, []);
 
   async function init() {
-    const { data } = await supabase.auth.getUser();
-    setUser(data.user);
-    if (data.user) {
-      const { data: donor } = await supabase
-        .from('blood_donors')
-        .select('*')
-        .eq('user_id', data.user.id)
-        .maybeSingle();
-      if (donor) {
-        setExistingDonor(donor);
-        setForm({ name: donor.name, bloodGroup: donor.blood_group, phone: donor.phone, area: donor.area || '' });
+    try {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+      if (data.user) {
+        const { data: donor } = await supabase
+          .from('blood_donors')
+          .select('id, name, blood_group, phone, area, is_active')
+          .eq('user_id', data.user.id)
+          .maybeSingle();
+        if (donor) {
+          setExistingDonor(donor);
+          setForm({ name: donor.name, bloodGroup: donor.blood_group, phone: donor.phone, area: donor.area || '' });
+        }
       }
+    } catch (err) {
+      console.error('donor init error', err);
     }
     setLoading(false);
   }
@@ -40,32 +65,52 @@ export default function BloodDonorPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!user || submitting) return;
+    if (!isValidBdPhone(form.phone)) {
+      setError('সঠিক মোবাইল নম্বর দিন (যেমন: 01XXXXXXXXX)');
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
     const payload = {
       user_id: user.id,
-      name: form.name,
+      name: form.name.trim(),
       blood_group: form.bloodGroup,
-      phone: form.phone,
-      area: form.area,
+      phone: cleanPhone(form.phone),
+      area: form.area.trim(),
     };
 
-    const { error } = existingDonor
-      ? await supabase.from('blood_donors').update(payload).eq('id', existingDonor.id)
-      : await supabase.from('blood_donors').insert(payload);
+    try {
+      const { error } = existingDonor
+        ? await supabase.from('blood_donors').update(payload).eq('id', existingDonor.id)
+        : await supabase.from('blood_donors').insert(payload);
 
-    if (error) setError(error.message);
-    else setSuccess(true);
+      if (error) {
+        console.error('donor save error', error);
+        setError(friendlyError(error));
+      } else {
+        setSuccess(true);
+      }
+    } catch (err) {
+      console.error('donor save error', err);
+      setError(friendlyError(err));
+    }
     setSubmitting(false);
   }
 
   async function toggleActive() {
+    setError(null);
     const { error } = await supabase
       .from('blood_donors')
       .update({ is_active: !existingDonor.is_active })
       .eq('id', existingDonor.id);
-    if (!error) init();
+    if (error) {
+      console.error('donor toggle error', error);
+      setError(friendlyError(error));
+    } else {
+      init();
+    }
   }
 
   if (loading) return <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>;
@@ -74,7 +119,7 @@ export default function BloodDonorPage() {
     return (
       <main className="max-w-md mx-auto px-4 py-20 text-center">
         <p className="text-ink/70 mb-4">ডোনার হতে হলে আগে লগইন করুন।</p>
-        <a href="/login" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5">লগইন করুন</a>
+        <a href="/login?next=%2Fblood%2Fdonor" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5">লগইন করুন</a>
       </main>
     );
   }
@@ -116,7 +161,7 @@ export default function BloodDonorPage() {
               {existingDonor.is_active ? 'সক্রিয়' : 'নিষ্ক্রিয়'}
             </span>
           </p>
-          <button onClick={toggleActive} className="text-sm border border-ink/20 px-3 py-1.5 hover:bg-white">
+          <button type="button" onClick={toggleActive} className="text-sm border border-ink/20 px-3 py-1.5 hover:bg-white">
             {existingDonor.is_active ? 'নিষ্ক্রিয় করুন' : 'সক্রিয় করুন'}
           </button>
         </div>
@@ -126,7 +171,7 @@ export default function BloodDonorPage() {
         <div>
           <label className="block text-sm mb-1.5 text-ink/70">নাম</label>
           <input
-            type="text" required value={form.name}
+            type="text" required maxLength={80} value={form.name}
             onChange={(e) => updateField('name', e.target.value)}
             className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
           />
@@ -146,16 +191,17 @@ export default function BloodDonorPage() {
         <div>
           <label className="block text-sm mb-1.5 text-ink/70">ফোন নম্বর</label>
           <input
-            type="tel" required value={form.phone}
+            type="tel" required inputMode="tel" maxLength={20} value={form.phone}
             onChange={(e) => updateField('phone', e.target.value)}
             className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
+            placeholder="01XXXXXXXXX"
           />
         </div>
 
         <div>
           <label className="block text-sm mb-1.5 text-ink/70">এলাকা</label>
           <input
-            type="text" required value={form.area}
+            type="text" required maxLength={100} value={form.area}
             onChange={(e) => updateField('area', e.target.value)}
             className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
             placeholder="যেমন: শেরপুর সদর"
