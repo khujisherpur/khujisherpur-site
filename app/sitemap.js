@@ -1,39 +1,106 @@
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
 import { supabase } from '../lib/supabaseClient';
+import { categoryLabels } from '../lib/categoryLabels';
+import { SITE_URL } from '../lib/site';
+
+const staticPages = [
+  { path: '/', changeFrequency: 'daily', priority: 1.0 },
+  { path: '/emergency', changeFrequency: 'monthly', priority: 0.6 },
+  { path: '/blood', changeFrequency: 'daily', priority: 0.5 },
+  { path: '/terms', changeFrequency: 'yearly', priority: 0.2 },
+  { path: '/privacy', changeFrequency: 'yearly', priority: 0.2 },
+  { path: '/disclaimer', changeFrequency: 'yearly', priority: 0.2 },
+];
 
 export default async function sitemap() {
-  const baseUrl = 'https://khujisherpur-site.pages.dev';
-
-  const staticPages = [
-    { url: baseUrl, lastModified: new Date() },
-    { url: `${baseUrl}/search`, lastModified: new Date() },
-    { url: `${baseUrl}/terms`, lastModified: new Date() },
-    { url: `${baseUrl}/privacy`, lastModified: new Date() },
-    { url: `${baseUrl}/disclaimer`, lastModified: new Date() },
-  ];
-
-  const { data: categories } = await supabase.from('categories').select('slug');
-  const categoryPages = (categories || []).map((c) => ({
-    url: `${baseUrl}/category/${c.slug}`,
-    lastModified: new Date(),
+  const now = new Date();
+  const entries = staticPages.map((p) => ({
+    url: `${SITE_URL}${p.path}`,
+    lastModified: now,
+    changeFrequency: p.changeFrequency,
+    priority: p.priority,
   }));
 
-  const { data: providers } = await supabase
-    .from('providers')
-    .select('id, updated_at')
-    .eq('status', 'approved');
-  const providerPages = (providers || []).map((p) => ({
-    url: `${baseUrl}/provider/${p.id}`,
-    lastModified: new Date(p.updated_at),
-  }));
+  try {
+    const [
+      { data: categories },
+      { data: subcategories },
+      { data: providers },
+      { data: listings },
+    ] = await Promise.all([
+      supabase.from('categories').select('slug, type, is_active'),
+      supabase.from('subcategories').select('id, slug, is_active'),
+      supabase
+        .from('providers')
+        .select('id, slug, primary_subcategory_id, updated_at, created_at')
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(1000),
+      supabase
+        .from('listings')
+        .select('id, updated_at, posted_at')
+        .eq('status', 'active')
+        .gt('expiry_date', now.toISOString())
+        .order('posted_at', { ascending: false })
+        .limit(1000),
+    ]);
 
-  const { data: listings } = await supabase
-    .from('listings')
-    .select('id, updated_at')
-    .eq('status', 'active');
-  const listingPages = (listings || []).map((l) => ({
-    url: `${baseUrl}/listing/${l.id}`,
-    lastModified: new Date(l.updated_at),
-  }));
+    // ক্যাটাগরি পাতা (হোমের মতো একই ছাঁকনি)
+    (categories || [])
+      .filter(
+        (c) =>
+          categoryLabels[c.slug] &&
+          c.is_active !== false &&
+          (c.type === 'listing' || c.type === 'service')
+      )
+      .forEach((c) => {
+        entries.push({
+          url: `${SITE_URL}/category/${c.slug}`,
+          lastModified: now,
+          changeFrequency: 'daily',
+          priority: 0.8,
+        });
+      });
 
-  return [...staticPages, ...categoryPages, ...providerPages, ...listingPages];
+    // সেবার তালিকা পাতা (/electrician ইত্যাদি), শুধু সক্রিয়গুলো
+    (subcategories || [])
+      .filter((s) => s.is_active !== false && s.slug)
+      .forEach((s) => {
+        entries.push({
+          url: `${SITE_URL}/${s.slug}`,
+          lastModified: now,
+          changeFrequency: 'daily',
+          priority: 0.8,
+        });
+      });
+
+    // সেবাদাতার প্রোফাইল: providerHref-এর একই নিয়ম
+    const subById = Object.fromEntries((subcategories || []).map((s) => [s.id, s]));
+    (providers || []).forEach((p) => {
+      const primary = p.primary_subcategory_id ? subById[p.primary_subcategory_id] : null;
+      const path = p.slug && primary?.slug ? `/${primary.slug}/${p.slug}` : `/provider/${p.id}`;
+      entries.push({
+        url: `${SITE_URL}${path}`,
+        lastModified: new Date(p.updated_at || p.created_at || now),
+        changeFrequency: 'weekly',
+        priority: 0.6,
+      });
+    });
+
+    // সক্রিয় ও মেয়াদ-না-ফুরানো পোস্ট
+    (listings || []).forEach((l) => {
+      entries.push({
+        url: `${SITE_URL}/listing/${l.id}`,
+        lastModified: new Date(l.updated_at || l.posted_at || now),
+        changeFrequency: 'weekly',
+        priority: 0.6,
+      });
+    });
+  } catch (err) {
+    // ডাটাবেস সমস্যা হলে অন্তত স্থির পাতাগুলো ফেরত যাবে
+    console.error('sitemap error', err);
+  }
+
+  return entries;
 }
