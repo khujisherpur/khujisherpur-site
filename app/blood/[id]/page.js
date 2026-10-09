@@ -1,12 +1,40 @@
 export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+import { cache } from 'react';
+import { notFound } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
+import { cleanPhone } from '../../../lib/format';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
+
+const getRequest = cache(async (id) => {
+  if (typeof id !== 'string' || !UUID_RE.test(id)) return null;
+  const { data } = await supabase
+    .from('blood_requests')
+    .select('id, blood_group, bags_needed, hospital_or_area, patient_name, applicant_name, relation_to_patient, note, contact_phone, alt_phone, status, created_at')
+    .eq('id', id)
+    .maybeSingle();
+  return data || null;
+});
+
+export async function generateMetadata({ params }) {
+  const request = await getRequest(params.id);
+  // ব্যক্তিগত ফোন নম্বর থাকে, তাই এই পাতা সার্চ ইঞ্জিনে যাবে না
+  const robots = { index: false, follow: false };
+  if (!request) return { title: 'পাওয়া যায়নি — খুঁজি শেরপুর', robots };
+  return {
+    title: `${request.blood_group} রক্ত প্রয়োজন — খুঁজি শেরপুর`,
+    description: 'শেরপুরে জরুরি রক্তের অনুরোধ।',
+    robots,
+  };
+}
 
 export default async function BloodRequestDetailPage({ params }) {
-  const { data: request } = await supabase
-    .from('blood_requests')
-    .select('*')
-    .eq('id', params.id)
-    .single();
+  // ভুল/অদ্ভুত ঠিকানা ডাটাবেসে না গিয়েই ৪০৪
+  if (typeof params.id !== 'string' || !UUID_RE.test(params.id)) notFound();
+
+  const request = await getRequest(params.id);
 
   if (!request) {
     return (
@@ -17,7 +45,10 @@ export default async function BloodRequestDetailPage({ params }) {
     );
   }
 
-  const isActive = request.status === 'active';
+  // ৭ দিনের বেশি পুরোনো অনুরোধ সক্রিয় থাকলেও মেয়াদ-শেষ ধরা হবে
+  const tooOld = Date.now() - new Date(request.created_at).getTime() > EXPIRY_MS;
+  const isActive = request.status === 'active' && !tooOld;
+  const statusLabel = request.status === 'fulfilled' ? 'পূরণ হয়েছে' : 'মেয়াদ শেষ';
 
   return (
     <main className="max-w-2xl mx-auto px-4">
@@ -34,7 +65,7 @@ export default async function BloodRequestDetailPage({ params }) {
             <p className="font-semibold text-lg">{request.bags_needed} ব্যাগ রক্ত প্রয়োজন</p>
             {!isActive && (
               <span className="inline-block text-xs bg-ink/10 text-ink/50 px-2 py-0.5 rounded-full mt-1">
-                {request.status === 'fulfilled' ? 'পূরণ হয়েছে' : 'মেয়াদ শেষ'}
+                {statusLabel}
               </span>
             )}
           </div>
@@ -45,17 +76,20 @@ export default async function BloodRequestDetailPage({ params }) {
             <p className="text-ink/50">স্থান</p>
             <p className="font-medium">{request.hospital_or_area}</p>
           </div>
-          {request.patient_name && (
+          {/* রোগী ও আবেদনকারীর তথ্য শুধু সক্রিয় অনুরোধে দেখানো হয় */}
+          {isActive && request.patient_name && (
             <div>
               <p className="text-ink/50">রোগীর নাম</p>
               <p className="font-medium">{request.patient_name}</p>
             </div>
           )}
-          <div>
-            <p className="text-ink/50">আবেদনকারী</p>
-            <p className="font-medium">{request.applicant_name} ({request.relation_to_patient})</p>
-          </div>
-          {request.note && (
+          {isActive && (
+            <div>
+              <p className="text-ink/50">আবেদনকারী</p>
+              <p className="font-medium">{request.applicant_name} ({request.relation_to_patient})</p>
+            </div>
+          )}
+          {isActive && request.note && (
             <div>
               <p className="text-ink/50">নোট</p>
               <p>{request.note}</p>
@@ -66,20 +100,26 @@ export default async function BloodRequestDetailPage({ params }) {
         {isActive && (
           <div className="mt-6 space-y-2">
             <a
-              href={`tel:${request.contact_phone}`}
+              href={`tel:${cleanPhone(request.contact_phone)}`}
               className="block text-center bg-red-500 text-white font-semibold py-2.5 hover:bg-red-600 transition-colors"
             >
               📞 কল করুন: <span className="font-numeric">{request.contact_phone}</span>
             </a>
             {request.alt_phone && (
               <a
-                href={`tel:${request.alt_phone}`}
+                href={`tel:${cleanPhone(request.alt_phone)}`}
                 className="block text-center border border-ink/20 py-2.5 hover:bg-paper transition-colors"
               >
                 📞 বিকল্প নম্বর: <span className="font-numeric">{request.alt_phone}</span>
               </a>
             )}
           </div>
+        )}
+
+        {!isActive && (
+          <p className="mt-6 text-xs text-ink/45">
+            গোপনীয়তার জন্য এই অনুরোধের নাম ও ফোন নম্বর আর দেখানো হচ্ছে না।
+          </p>
         )}
       </div>
     </main>
