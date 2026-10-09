@@ -10,6 +10,7 @@ import HeaderBell from '../components/HeaderBell';
 import HeroIntro from '../components/HeroIntro';
 import HeroSearch from '../components/HeroSearch';
 import AnnouncementBar from '../components/AnnouncementBar';
+import HomeJsonLd from '../components/HomeJsonLd';
 import { formatPrice, timeAgo as timeAgoFmt, toBn } from '../lib/format';
 import { getServicesFor, providerHref } from '../lib/services';
 
@@ -156,6 +157,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen">
+      <HomeJsonLd />
       {settings.announcement_enabled === 'true' && settings.announcement_text && (
         <AnnouncementBar text={settings.announcement_text} link={settings.announcement_link} />
       )}
