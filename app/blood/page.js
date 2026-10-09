@@ -48,7 +48,7 @@ export default async function BloodPage() {
   const num = (n) => (lang === 'bn' ? toBn(n) : n);
 
   // ৭ দিনের পুরোনো অনুরোধ আর দেখানো হবে না (ভুলে সক্রিয় থেকে গেলেও)
-  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
 
   const { data: requests } = await supabase
     .from('blood_requests')
