@@ -11,6 +11,7 @@ import ContactBar from '../../../components/ContactBar';
 import SiteHeader from '../../../components/SiteHeader';
 import { getLang } from '../../../lib/getLang';
 import { categoryLabels } from '../../../lib/categoryLabels';
+import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../../lib/site';
 import { formatPrice, parsePrice, timeAgo, toBn, cleanPhone, waLink } from '../../../lib/format';
 
 export async function generateMetadata({ params }) {
@@ -34,12 +35,25 @@ export async function generateMetadata({ params }) {
     ? cleanDesc.slice(0, 150)
     : `শেরপুরের ${listing.area} এলাকায় ${catName}। এখনই দেখুন খুঁজি শেরপুরে।`;
   const image = listing.photos?.[0];
+  const images = image ? [image] : [DEFAULT_OG_IMAGE];
+
+  // ?fbclid= ইত্যাদি যোগ হওয়া লিংকও একই পাতা বলে গণ্য হবে
+  const canonical = `/listing/${params.id}`;
 
   return {
     title,
     description,
-    openGraph: { title, description, ...(image ? { images: [image] } : {}) },
-    twitter: { card: image ? 'summary_large_image' : 'summary', title, description },
+    alternates: { canonical },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      siteName: SITE_NAME,
+      type: 'website',
+      locale: 'bn_BD',
+      images,
+    },
+    twitter: { card: 'summary_large_image', title, description, images },
   };
 }
 
