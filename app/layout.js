@@ -1,7 +1,7 @@
 import './globals.css';
 import MaintenanceGate from '../components/MaintenanceGate';
 import AutoPushPrompt from '../components/AutoPushPrompt';
-import { SITE_URL, SITE_NAME } from '../lib/site';
+import { SITE_URL, SITE_NAME, DEFAULT_OG_IMAGE } from '../lib/site';
 
 const TITLE = 'খুঁজি শেরপুর | শেরপুরে যা খুঁজছেন, এক জায়গায় খুঁজে নিন';
 const DESCRIPTION =
@@ -19,11 +19,13 @@ export const metadata = {
     siteName: SITE_NAME,
     type: 'website',
     locale: 'bn_BD',
+    images: [DEFAULT_OG_IMAGE],
   },
   twitter: {
     card: 'summary_large_image',
     title: TITLE,
     description: DESCRIPTION,
+    images: [DEFAULT_OG_IMAGE],
   },
   icons: {
     icon: [
