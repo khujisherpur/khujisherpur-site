@@ -352,7 +352,11 @@ function NewPostForm() {
         };
         if (isRent) {
           payload.rent_type = form.rentType;
-          payload.owner_name = form.ownerName;
+          payload.owner_name = form.ownerName.trim();
+        }
+        if (isJob) {
+          // চাকরিতে এই কলামে প্রতিষ্ঠান বা নিয়োগকর্তার নাম যায়
+          payload.owner_name = form.ownerName.trim();
         }
 
         const { error } = await supabase.from('listings').insert(payload);
@@ -684,14 +688,16 @@ function NewPostForm() {
             </>
           )}
 
-          {isRent && (
+          {(isRent || isJob) && (
             <div>
-              <label className="block text-sm mb-1.5 text-ink/70">বাড়ি/দোকান মালিকের নাম</label>
+              <label className="block text-sm mb-1.5 text-ink/70">
+                {isJob ? 'প্রতিষ্ঠান বা নিয়োগকর্তার নাম' : 'বাড়ি/দোকান মালিকের নাম'}
+              </label>
               <input
                 type="text" required maxLength={80} value={form.ownerName}
                 onChange={(e) => updateField('ownerName', e.target.value)}
                 className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
-                placeholder="মালিকের নাম"
+                placeholder={isJob ? 'যেমন: আল-আমিন স্টোর (প্রতিষ্ঠান না থাকলে আপনার নাম)' : 'মালিকের নাম'}
               />
             </div>
           )}
