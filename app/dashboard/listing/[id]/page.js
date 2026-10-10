@@ -16,6 +16,22 @@ function extractStoragePath(publicUrl) {
   return publicUrl.slice(idx + marker.length);
 }
 
+// কাঁচা ইংরেজি এরর বদলে বাংলা বার্তা; ডাটাবেস ট্রিগারের নিজের বাংলা বার্তা সরাসরি দেখাই
+function friendlyError(err) {
+  const msg = (err && err.message) || '';
+  if (/[\u0980-\u09FF]/.test(msg)) return msg;
+  if (/row-level security|permission denied|not authorized/i.test(msg)) {
+    return 'এই কাজের অনুমতি নেই। লগআউট করে আবার লগইন করে চেষ্টা করুন';
+  }
+  if (/failed to fetch|networkerror|network request|load failed/i.test(msg)) {
+    return 'ইন্টারনেট সংযোগ চেক করে আবার চেষ্টা করুন';
+  }
+  if (/jwt|token|session/i.test(msg)) {
+    return 'আপনার সেশনের মেয়াদ শেষ। আবার লগইন করুন';
+  }
+  return 'কিছু একটা সমস্যা হয়েছে, একটু পরে আবার চেষ্টা করুন';
+}
+
 function PageShell({ children }) {
   return (
     <>
@@ -28,10 +44,14 @@ function PageShell({ children }) {
 export default function EditListingPage({ params }) {
   const [form, setForm] = useState({
     title: '', area: '', price_or_salary: '', description: '',
-    contact_phone: '', whatsapp: '', contact_email: '',
+    owner_name: '', contact_phone: '', whatsapp: '', contact_email: '',
   });
   const [categoryName, setCategoryName] = useState('');
+  const [categorySlug, setCategorySlug] = useState('');
+  const [originalStatus, setOriginalStatus] = useState('');
+  const [resultStatus, setResultStatus] = useState('');
   const [user, setUser] = useState(null);
+  const [needLogin, setNeedLogin] = useState(false);
   const [photos, setPhotos] = useState([]);
   const [removedUrls, setRemovedUrls] = useState([]);
   const [pendingFile, setPendingFile] = useState(null);
@@ -48,10 +68,15 @@ export default function EditListingPage({ params }) {
   async function load() {
     const { data: authData } = await supabase.auth.getUser();
     setUser(authData.user);
+    if (!authData.user) {
+      setNeedLogin(true);
+      setLoading(false);
+      return;
+    }
 
     const { data, error } = await supabase
       .from('listings')
-      .select('title, area, price_or_salary, description, photos, contact_phone, whatsapp, contact_email, categories(name)')
+      .select('title, area, price_or_salary, description, photos, owner_name, status, contact_phone, whatsapp, contact_email, categories(name, slug)')
       .eq('id', params.id)
       .single();
 
@@ -65,11 +90,14 @@ export default function EditListingPage({ params }) {
       area: data.area || '',
       price_or_salary: data.price_or_salary || '',
       description: data.description || '',
+      owner_name: data.owner_name || '',
       contact_phone: data.contact_phone || '',
       whatsapp: data.whatsapp || '',
       contact_email: data.contact_email || '',
     });
     setCategoryName(data.categories?.name || '');
+    setCategorySlug(data.categories?.slug || '');
+    setOriginalStatus(data.status || '');
     setPhotos((data.photos || []).map((url) => ({ key: url, url, preview: url })));
     setLoading(false);
   }
@@ -113,14 +141,20 @@ export default function EditListingPage({ params }) {
     const { error: uploadError } = await supabase.storage.from('images').upload(path, blob, {
       contentType: 'image/jpeg',
     });
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('upload error', uploadError);
+      throw new Error('ছবি আপলোড করা যায়নি। ছবি ছোট করে বা ইন্টারনেট চেক করে আবার চেষ্টা করুন');
+    }
     const { data } = supabase.storage.from('images').getPublicUrl(path);
     return data.publicUrl;
   }
 
+  // চাকরিতে প্রতিষ্ঠান/নিয়োগকর্তা, ভাড়ায় মালিকের নাম
+  const needsOwner = categorySlug === 'job' || categorySlug === 'rent';
+
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!user) return;
+    if (!user || saving) return;
     if (!isValidBdPhone(form.contact_phone)) {
       setError('সঠিক মোবাইল নম্বর দিন (যেমন: 01XXXXXXXXX)');
       return;
@@ -145,35 +179,42 @@ export default function EditListingPage({ params }) {
         }
       }
 
+      const payload = {
+        title: form.title.trim(),
+        area: form.area.trim(),
+        price_or_salary: form.price_or_salary,
+        description: form.description,
+        photos: finalUrls,
+        contact_phone: cleanPhone(form.contact_phone),
+        whatsapp: form.whatsapp ? cleanPhone(form.whatsapp) : null,
+        contact_email: form.contact_email.trim() || null,
+      };
+      if (needsOwner) payload.owner_name = form.owner_name.trim();
+      // অনুমোদিত পোস্টে নাম, বিবরণ, দাম, ছবি বা যোগাযোগ বদলালে ডাটাবেস নিজেই আবার pending করে।
+      // শুধু প্রত্যাখ্যাত পোস্ট ঠিক করে আবার পাঠালে এখান থেকে pending করতে হয়।
+      if (originalStatus === 'rejected') payload.status = 'pending';
+
       const { data: updated, error: updateError } = await supabase
         .from('listings')
-        .update({
-          title: form.title,
-          area: form.area,
-          price_or_salary: form.price_or_salary,
-          description: form.description,
-          photos: finalUrls,
-          contact_phone: cleanPhone(form.contact_phone),
-          whatsapp: form.whatsapp ? cleanPhone(form.whatsapp) : null,
-          contact_email: form.contact_email.trim() || null,
-          status: 'pending',
-        })
+        .update(payload)
         .eq('id', params.id)
-        .select('id');
+        .select('id, status');
 
       if (updateError) throw updateError;
       if (!updated || updated.length === 0) {
         throw new Error('সেভ করা যায়নি। আপনার অ্যাকাউন্ট সাসপেন্ড থাকতে পারে বা এই পোস্ট এডিটের অনুমতি নেই।');
       }
+      setResultStatus(updated[0].status || '');
 
       const paths = removedUrls.map(extractStoragePath).filter(Boolean);
       if (paths.length > 0) await supabase.storage.from('images').remove(paths);
 
       setSaved(true);
     } catch (err) {
+      console.error('listing edit error', err);
       const cleanup = uploaded.map(extractStoragePath).filter(Boolean);
       if (cleanup.length > 0) await supabase.storage.from('images').remove(cleanup);
-      setError(err.message);
+      setError(friendlyError(err));
     }
     setSaving(false);
   }
@@ -182,6 +223,19 @@ export default function EditListingPage({ params }) {
     return (
       <PageShell>
         <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>
+      </PageShell>
+    );
+  }
+
+  if (needLogin) {
+    return (
+      <PageShell>
+        <main className="max-w-md mx-auto px-4 py-20 text-center">
+          <p className="text-ink/70 mb-4">পোস্ট এডিট করতে হলে আগে লগইন করুন।</p>
+          <a href="/login?next=%2Fdashboard" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5 rounded-lg">
+            লগইন করুন
+          </a>
+        </main>
       </PageShell>
     );
   }
@@ -198,12 +252,18 @@ export default function EditListingPage({ params }) {
   }
 
   if (saved) {
+    const doneText =
+      resultStatus === 'pending'
+        ? 'পরিবর্তনগুলো আবার পর্যালোচনার জন্য পাঠানো হয়েছে।'
+        : resultStatus === 'active'
+        ? 'পরিবর্তনগুলো সাইটে দেখা যাচ্ছে।'
+        : 'পরিবর্তন সেভ হয়েছে।';
     return (
       <PageShell>
         <main className="max-w-md mx-auto px-4 py-20 text-center">
           <p className="text-4xl mb-4">✅</p>
           <h1 className="text-xl font-semibold mb-2">আপডেট হয়েছে!</h1>
-          <p className="text-ink/70 text-sm mb-6">পরিবর্তনগুলো আবার পর্যালোচনার জন্য পাঠানো হয়েছে।</p>
+          <p className="text-ink/70 text-sm mb-6">{doneText}</p>
           <a href="/dashboard" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5 rounded-lg">
             ড্যাশবোর্ডে ফিরে যান
           </a>
@@ -211,6 +271,13 @@ export default function EditListingPage({ params }) {
       </PageShell>
     );
   }
+
+  const notice =
+    originalStatus === 'active'
+      ? 'ℹ️ শিরোনাম, বিবরণ, মূল্য, ছবি, নাম বা যোগাযোগের তথ্য বদলালে পোস্টটি আবার পর্যালোচনায় যাবে এবং অনুমোদনের আগ পর্যন্ত সাইটে দেখা যাবে না। শুধু এলাকা বদলালে যাবে না।'
+      : originalStatus === 'rejected'
+      ? 'ℹ️ সেভ করলে পোস্টটি আবার পর্যালোচনার জন্য পাঠানো হবে।'
+      : null;
 
   return (
     <PageShell>
@@ -281,15 +348,30 @@ export default function EditListingPage({ params }) {
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">শিরোনাম</label>
             <input
-              type="text" required value={form.title}
+              type="text" required maxLength={120} value={form.title}
               onChange={(e) => updateField('title', e.target.value)}
               className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
             />
           </div>
+
+          {needsOwner && (
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">
+                {categorySlug === 'job' ? 'প্রতিষ্ঠান বা নিয়োগকর্তার নাম' : 'বাড়ি/দোকান মালিকের নাম'}
+              </label>
+              <input
+                type="text" required maxLength={80} value={form.owner_name}
+                onChange={(e) => updateField('owner_name', e.target.value)}
+                className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
+                placeholder={categorySlug === 'job' ? 'প্রতিষ্ঠান না থাকলে আপনার নাম' : 'মালিকের নাম'}
+              />
+            </div>
+          )}
+
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">এলাকা</label>
             <input
-              type="text" required value={form.area}
+              type="text" required maxLength={100} value={form.area}
               onChange={(e) => updateField('area', e.target.value)}
               className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
             />
@@ -299,7 +381,7 @@ export default function EditListingPage({ params }) {
             <div className="flex items-center border border-ink/20 rounded-lg focus-within:border-green">
               <span className="pl-3 pr-1 text-ink/50 font-numeric select-none">৳</span>
               <input
-                type="text" required value={form.price_or_salary}
+                type="text" required maxLength={20} value={form.price_or_salary}
                 onChange={(e) => updateField('price_or_salary', e.target.value)}
                 className="flex-1 py-2.5 pr-3 outline-none font-numeric bg-transparent"
               />
@@ -308,20 +390,20 @@ export default function EditListingPage({ params }) {
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">বিবরণ</label>
             <textarea
-              required rows={5} value={form.description}
+              required rows={5} maxLength={2000} value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
               className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green resize-none"
             />
           </div>
 
-                <div className="rounded-xl border border-ink/10 bg-paper p-4 space-y-3">
+          <div className="rounded-xl border border-ink/10 bg-paper p-4 space-y-3">
             <p className="text-sm font-medium">📞 যোগাযোগের তথ্য</p>
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">
                 মোবাইল নম্বর <span className="text-red-500">*</span>
               </label>
               <input
-                type="tel" required inputMode="tel" value={form.contact_phone}
+                type="tel" required inputMode="tel" maxLength={20} value={form.contact_phone}
                 onChange={(e) => updateField('contact_phone', e.target.value)}
                 className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green bg-white"
                 placeholder="01XXXXXXXXX"
@@ -330,7 +412,7 @@ export default function EditListingPage({ params }) {
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">হোয়াটসঅ্যাপ নম্বর (ঐচ্ছিক)</label>
               <input
-                type="tel" inputMode="tel" value={form.whatsapp}
+                type="tel" inputMode="tel" maxLength={20} value={form.whatsapp}
                 onChange={(e) => updateField('whatsapp', e.target.value)}
                 className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green bg-white"
                 placeholder="01XXXXXXXXX"
@@ -339,16 +421,17 @@ export default function EditListingPage({ params }) {
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">ইমেইল (ঐচ্ছিক)</label>
               <input
-                type="email" value={form.contact_email}
+                type="email" maxLength={120} value={form.contact_email}
                 onChange={(e) => updateField('contact_email', e.target.value)}
                 className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green bg-white"
                 placeholder="you@example.com"
               />
             </div>
           </div>
-          <p className="text-xs text-marigold bg-marigold/10 rounded-lg px-3 py-2">
-            ℹ️ সেভ করলে পোস্টটি আবার পর্যালোচনায় যাবে, অনুমোদনের আগ পর্যন্ত সাইটে দেখা যাবে না।
-          </p>
+
+          {notice && (
+            <p className="text-xs text-marigold bg-marigold/10 rounded-lg px-3 py-2">{notice}</p>
+          )}
 
           {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
 
