@@ -15,6 +15,28 @@ function extractStoragePath(publicUrl) {
   return publicUrl.slice(idx + marker.length);
 }
 
+// কাঁচা ইংরেজি এরর বদলে বাংলা বার্তা; ডাটাবেস ট্রিগারের নিজের বাংলা বার্তা সরাসরি দেখাই
+function friendlyError(err) {
+  const msg = (err && err.message) || '';
+  if (/[\u0980-\u09FF]/.test(msg)) return msg;
+  if (/row-level security|permission denied|not authorized/i.test(msg)) {
+    return 'এই কাজের অনুমতি নেই। লগআউট করে আবার লগইন করে চেষ্টা করুন';
+  }
+  if (/failed to fetch|networkerror|network request|load failed/i.test(msg)) {
+    return 'ইন্টারনেট সংযোগ চেক করে আবার চেষ্টা করুন';
+  }
+  if (/jwt|token|session/i.test(msg)) {
+    return 'আপনার সেশনের মেয়াদ শেষ। আবার লগইন করুন';
+  }
+  return 'কিছু একটা সমস্যা হয়েছে, একটু পরে আবার চেষ্টা করুন';
+}
+
+function sameSet(a, b) {
+  if (a.length !== b.length) return false;
+  const s = new Set(a);
+  return b.every((x) => s.has(x));
+}
+
 function PageShell({ children }) {
   return (
     <>
@@ -36,6 +58,9 @@ export default function EditProviderPage({ params }) {
   const [primarySubcategoryId, setPrimarySubcategoryId] = useState(null);
   const [subcategories, setSubcategories] = useState([]);
   const [selectedSubcategoryIds, setSelectedSubcategoryIds] = useState([]);
+  const [originalLinkIds, setOriginalLinkIds] = useState([]);
+  const [originalStatus, setOriginalStatus] = useState('');
+  const [resultStatus, setResultStatus] = useState('');
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(null);
   const [pendingFile, setPendingFile] = useState(null);
   const [newPhoto, setNewPhoto] = useState(null);
@@ -43,6 +68,7 @@ export default function EditProviderPage({ params }) {
   const [removePhoto, setRemovePhoto] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [needLogin, setNeedLogin] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
@@ -55,12 +81,17 @@ export default function EditProviderPage({ params }) {
   async function load() {
     const { data: authData } = await supabase.auth.getUser();
     setUser(authData.user);
+    if (!authData.user) {
+      setNeedLogin(true);
+      setLoading(false);
+      return;
+    }
 
     const { data, error } = await supabase
       .from('providers')
       .select(`
         name, area, phone, whatsapp, description, photo_url, experience_years, vehicle_type,
-        name_en, slug, upazila, union_name, primary_subcategory_id, category_id,
+        name_en, slug, upazila, union_name, primary_subcategory_id, category_id, status,
         categories(slug)
       `)
       .eq('id', params.id)
@@ -83,14 +114,17 @@ export default function EditProviderPage({ params }) {
     setCategorySlug(data.categories?.slug);
     setSlug(data.slug);
     setPrimarySubcategoryId(data.primary_subcategory_id);
+    setOriginalStatus(data.status || '');
 
     if (data.categories?.slug === 'service-provider') {
       const [{ data: allSubs }, { data: mySubs }] = await Promise.all([
         supabase.from('subcategories').select('id, name_bn').eq('category_id', data.category_id).eq('is_active', true).order('sort_order'),
         supabase.from('provider_subcategories').select('subcategory_id').eq('provider_id', params.id),
       ]);
+      const linkIds = (mySubs || []).map((r) => r.subcategory_id);
       setSubcategories(allSubs || []);
-      setSelectedSubcategoryIds((mySubs || []).map((r) => r.subcategory_id));
+      setSelectedSubcategoryIds(linkIds);
+      setOriginalLinkIds(linkIds);
     }
 
     setLoading(false);
@@ -144,14 +178,17 @@ export default function EditProviderPage({ params }) {
     const { error: uploadError } = await supabase.storage.from('images').upload(path, blob, {
       contentType: 'image/jpeg',
     });
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('upload error', uploadError);
+      throw new Error('ছবি আপলোড করা যায়নি। ছবি ছোট করে বা ইন্টারনেট চেক করে আবার চেষ্টা করুন');
+    }
     const { data } = supabase.storage.from('images').getPublicUrl(path);
     return data.publicUrl;
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!user) return;
+    if (!user || saving) return;
 
     const waValue = waSame ? form.phone : form.whatsapp;
     if (!isValidBdPhone(form.phone)) {
@@ -176,9 +213,16 @@ export default function EditProviderPage({ params }) {
         photoUrl = null;
       }
 
+      const isServiceProvider = categorySlug === 'service-provider';
+      const finalIds = isServiceProvider
+        ? Array.from(new Set([...selectedSubcategoryIds, primarySubcategoryId].filter(Boolean)))
+        : [];
+      const baselineIds = Array.from(new Set([...originalLinkIds, primarySubcategoryId].filter(Boolean)));
+      const servicesChanged = isServiceProvider && !sameSet(finalIds, baselineIds);
+
       const payload = {
-        name: form.name,
-        area: form.area,
+        name: form.name.trim(),
+        area: form.area.trim(),
         phone: cleanPhone(form.phone),
         whatsapp: waValue ? cleanPhone(waValue) : null,
         description: form.description,
@@ -186,28 +230,45 @@ export default function EditProviderPage({ params }) {
         experience_years: form.experienceYears ? parseInt(form.experienceYears) : null,
         upazila: form.upazila,
         union_name: form.unionName,
-        status: 'pending',
       };
       if (categorySlug === 'ambulance') payload.vehicle_type = form.vehicleType;
-      if (categorySlug === 'service-provider') payload.name_en = form.nameEn.trim();
+      if (isServiceProvider) payload.name_en = form.nameEn.trim();
+
+      // নাম, ছবি, ফোন, হোয়াটসঅ্যাপ বা বিবরণ বদলালে ডাটাবেস নিজেই আবার pending করে।
+      // প্রত্যাখ্যাত প্রোফাইল ঠিক করে আবার পাঠালে, বা অনুমোদিত প্রোফাইলে সেবার তালিকা বদলালে, এখান থেকে pending করি।
+      if (originalStatus === 'rejected' || (originalStatus === 'approved' && servicesChanged)) {
+        payload.status = 'pending';
+      }
 
       const { data: updated, error: updateError } = await supabase
         .from('providers')
         .update(payload)
         .eq('id', params.id)
-        .select('id');
+        .select('id, status');
       if (updateError) throw updateError;
       if (!updated || updated.length === 0) {
         throw new Error('সেভ করা যায়নি। আপনার অ্যাকাউন্ট সাসপেন্ড থাকতে পারে বা এই প্রোফাইল এডিটের অনুমতি নেই।');
       }
+      setResultStatus(updated[0].status || '');
 
-      if (categorySlug === 'service-provider') {
-        const finalIds = Array.from(
-          new Set([...selectedSubcategoryIds, primarySubcategoryId].filter(Boolean))
-        );
-        await supabase.from('provider_subcategories').delete().eq('provider_id', params.id);
-        const rows = finalIds.map((sid) => ({ provider_id: params.id, subcategory_id: sid }));
-        if (rows.length > 0) await supabase.from('provider_subcategories').insert(rows);
+      if (isServiceProvider) {
+        // সব মুছে নতুন করে বসানো নয়: শুধু বাদ পড়াগুলো মুছি, নতুনগুলো যোগ করি
+        const toRemove = originalLinkIds.filter((id) => !finalIds.includes(id));
+        const toAdd = finalIds.filter((id) => !originalLinkIds.includes(id));
+
+        if (toRemove.length > 0) {
+          const { error: delError } = await supabase
+            .from('provider_subcategories')
+            .delete()
+            .eq('provider_id', params.id)
+            .in('subcategory_id', toRemove);
+          if (delError) throw delError;
+        }
+        if (toAdd.length > 0) {
+          const rows = toAdd.map((sid) => ({ provider_id: params.id, subcategory_id: sid }));
+          const { error: addError } = await supabase.from('provider_subcategories').insert(rows);
+          if (addError) throw addError;
+        }
       }
 
       if ((newPhoto || removePhoto) && currentPhotoUrl) {
@@ -217,11 +278,12 @@ export default function EditProviderPage({ params }) {
 
       setSaved(true);
     } catch (err) {
+      console.error('provider edit error', err);
       if (uploadedUrl) {
         const p = extractStoragePath(uploadedUrl);
         if (p) await supabase.storage.from('images').remove([p]);
       }
-      setError(err.message);
+      setError(friendlyError(err));
     }
     setSaving(false);
   }
@@ -230,6 +292,19 @@ export default function EditProviderPage({ params }) {
     return (
       <PageShell>
         <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>
+      </PageShell>
+    );
+  }
+
+  if (needLogin) {
+    return (
+      <PageShell>
+        <main className="max-w-md mx-auto px-4 py-20 text-center">
+          <p className="text-ink/70 mb-4">প্রোফাইল এডিট করতে হলে আগে লগইন করুন।</p>
+          <a href="/login?next=%2Fdashboard" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5 rounded-lg">
+            লগইন করুন
+          </a>
+        </main>
       </PageShell>
     );
   }
@@ -246,12 +321,18 @@ export default function EditProviderPage({ params }) {
   }
 
   if (saved) {
+    const doneText =
+      resultStatus === 'pending'
+        ? 'পরিবর্তনগুলো আবার পর্যালোচনার জন্য পাঠানো হয়েছে।'
+        : resultStatus === 'approved'
+        ? 'পরিবর্তনগুলো সাইটে দেখা যাচ্ছে।'
+        : 'পরিবর্তন সেভ হয়েছে।';
     return (
       <PageShell>
         <main className="max-w-md mx-auto px-4 py-20 text-center">
           <p className="text-4xl mb-4">✅</p>
           <h1 className="text-xl font-semibold mb-2">আপডেট হয়েছে!</h1>
-          <p className="text-ink/70 text-sm mb-6">পরিবর্তনগুলো আবার পর্যালোচনার জন্য পাঠানো হয়েছে।</p>
+          <p className="text-ink/70 text-sm mb-6">{doneText}</p>
           <a href="/dashboard" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5 rounded-lg">
             ড্যাশবোর্ডে ফিরে যান
           </a>
@@ -265,6 +346,13 @@ export default function EditProviderPage({ params }) {
   const primaryName = subcategories.find((s) => s.id === primarySubcategoryId)?.name_bn;
   const shownPhoto = newPhotoPreview || (removePhoto ? null : currentPhotoUrl);
   const photoChanged = !!newPhoto || removePhoto;
+
+  const notice =
+    originalStatus === 'approved'
+      ? `ℹ️ নাম, ছবি, ফোন, হোয়াটসঅ্যাপ, বিবরণ${isServiceProvider ? ' বা সেবার তালিকা' : ''} বদলালে প্রোফাইলটি আবার পর্যালোচনায় যাবে এবং অনুমোদনের আগ পর্যন্ত সাইটে দেখা যাবে না। শুধু এলাকা, অভিজ্ঞতা বা অনুপলব্ধ-সক্রিয় বদলালে যাবে না।`
+      : originalStatus === 'rejected'
+      ? 'ℹ️ সেভ করলে প্রোফাইলটি আবার পর্যালোচনার জন্য পাঠানো হবে।'
+      : null;
 
   return (
     <PageShell>
@@ -333,7 +421,7 @@ export default function EditProviderPage({ params }) {
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">নাম (বাংলা)</label>
             <input
-              type="text" required value={form.name}
+              type="text" required maxLength={80} value={form.name}
               onChange={(e) => updateField('name', e.target.value)}
               className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
             />
@@ -343,7 +431,7 @@ export default function EditProviderPage({ params }) {
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">নাম (ইংরেজি)</label>
               <input
-                type="text" required value={form.nameEn}
+                type="text" required maxLength={80} value={form.nameEn}
                 onChange={(e) => updateField('nameEn', e.target.value)}
                 className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
               />
@@ -379,7 +467,7 @@ export default function EditProviderPage({ params }) {
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">সুনির্দিষ্ট এলাকা/বাজার</label>
             <input
-              type="text" required value={form.area}
+              type="text" required maxLength={100} value={form.area}
               onChange={(e) => updateField('area', e.target.value)}
               className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
             />
@@ -388,7 +476,7 @@ export default function EditProviderPage({ params }) {
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">ফোন নম্বর</label>
             <input
-              type="tel" required inputMode="tel" value={form.phone}
+              type="tel" required inputMode="tel" maxLength={20} value={form.phone}
               onChange={(e) => updateField('phone', e.target.value)}
               className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
               placeholder="01XXXXXXXXX"
@@ -406,7 +494,7 @@ export default function EditProviderPage({ params }) {
               ফোন নম্বরেই হোয়াটসঅ্যাপ আছে
             </label>
             <input
-              type="tel" inputMode="tel" disabled={waSame}
+              type="tel" inputMode="tel" disabled={waSame} maxLength={20}
               value={waSame ? '' : form.whatsapp}
               onChange={(e) => updateField('whatsapp', e.target.value)}
               className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green disabled:bg-paper disabled:text-ink/30"
@@ -418,7 +506,7 @@ export default function EditProviderPage({ params }) {
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">অভিজ্ঞতা (বছর, ঐচ্ছিক)</label>
             <input
-              type="number" min="0" value={form.experienceYears}
+              type="number" min="0" max="70" value={form.experienceYears}
               onChange={(e) => updateField('experienceYears', e.target.value)}
               className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
             />
@@ -471,15 +559,15 @@ export default function EditProviderPage({ params }) {
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">বিবরণ</label>
             <textarea
-              required rows={4} value={form.description}
+              required rows={4} maxLength={2000} value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
               className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green resize-none"
             />
           </div>
 
-          <p className="text-xs text-marigold bg-marigold/10 rounded-lg px-3 py-2">
-            ℹ️ সেভ করলে প্রোফাইলটি আবার পর্যালোচনায় যাবে, অনুমোদনের আগ পর্যন্ত সাইটে দেখা যাবে না।
-          </p>
+          {notice && (
+            <p className="text-xs text-marigold bg-marigold/10 rounded-lg px-3 py-2">{notice}</p>
+          )}
 
           {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
 
