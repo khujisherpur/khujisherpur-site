@@ -60,7 +60,7 @@ export async function generateMetadata({ params }) {
 const text = {
   bn: {
     back: '← তালিকায় ফিরে যান', desc: 'বিবরণ', noDesc: 'কোনো বিবরণ দেওয়া হয়নি।',
-    details: 'বিস্তারিত', category: 'ক্যাটাগরি', location: 'এলাকা', type: 'ধরন', owner: 'মালিক', posted: 'পোস্ট করা হয়েছে',
+    details: 'বিস্তারিত', category: 'ক্যাটাগরি', location: 'এলাকা', type: 'ধরন', owner: 'মালিক', employer: 'প্রতিষ্ঠান', posted: 'পোস্ট করা হয়েছে',
     views: 'ভিউ',
     contact: 'যোগাযোগ', phone: 'মোবাইল', whatsapp: 'হোয়াটসঅ্যাপ', email: 'ইমেইল',
     noContact: 'এই পোস্টে যোগাযোগের তথ্য দেওয়া হয়নি।',
@@ -68,7 +68,7 @@ const text = {
   },
   en: {
     back: '← Back to list', desc: 'Description', noDesc: 'No description provided.',
-    details: 'Details', category: 'Category', location: 'Location', type: 'Type', owner: 'Owner', posted: 'Posted',
+    details: 'Details', category: 'Category', location: 'Location', type: 'Type', owner: 'Owner', employer: 'Employer', posted: 'Posted',
     views: 'views',
     contact: 'Contact', phone: 'Phone', whatsapp: 'WhatsApp', email: 'Email',
     noContact: 'No contact information was provided for this post.',
@@ -109,7 +109,7 @@ export default async function ListingDetailPage({ params }) {
 
   const { data: listing } = await supabase
     .from('listings')
-    .select('id, title, area, upazila, union_name, price_or_salary, description, photos, rent_type, owner_name, posted_at, view_count, contact_phone, whatsapp, contact_email, categories(slug)')
+    .select('id, title, area, upazila, union_name, price_or_salary, description, photos, rent_type, owner_name, posted_at, expiry_date, view_count, contact_phone, whatsapp, contact_email, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'active')
     .gt('expiry_date', new Date().toISOString())
@@ -124,6 +124,7 @@ export default async function ListingDetailPage({ params }) {
     await supabase.rpc('increment_listing_view', { lid: listing.id });
   }
 
+  const isJob = listing.categories?.slug === 'job';
   const label = categoryLabels[listing.categories?.slug];
   const categoryName = label ? label[lang].name : '';
   const photos = listing.photos || [];
@@ -141,32 +142,61 @@ export default async function ListingDetailPage({ params }) {
     { k: t.category, v: categoryName },
     { k: t.location, v: where },
     listing.rent_type ? { k: t.type, v: t[listing.rent_type] || listing.rent_type } : null,
-    listing.owner_name ? { k: t.owner, v: listing.owner_name } : null,
+    listing.owner_name ? { k: isJob ? t.employer : t.owner, v: listing.owner_name } : null,
     { k: t.posted, v: timeAgo(listing.posted_at, lang) },
   ].filter((r) => r && r.v);
 
-  // স্ট্রাকচার্ড ডেটা: চাকরির জন্য নিয়োগকর্তার নাম নেই বলে এখনই দেওয়া হচ্ছে না
+  // স্ট্রাকচার্ড ডেটা: চাকরির জন্য JobPosting (প্রতিষ্ঠানের নাম থাকলে), বাকিদের জন্য Product
   const numericPrice = parsePrice(listing.price_or_salary);
-  const jsonLd =
-    listing.categories?.slug === 'job'
-      ? null
-      : {
-          '@context': 'https://schema.org',
-          '@type': 'Product',
-          name: listing.title,
-          description: (listing.description || listing.title).slice(0, 500),
-          ...(photos[0] ? { image: photos } : {}),
-          ...(numericPrice
-            ? {
-                offers: {
-                  '@type': 'Offer',
-                  priceCurrency: 'BDT',
-                  price: numericPrice,
-                  availability: 'https://schema.org/InStock',
-                },
-              }
-            : {}),
-        };
+  let jsonLd = null;
+
+  if (isJob) {
+    if (listing.owner_name) {
+      // আবেদনের শেষ তারিখ বিবরণের ভেতরে "আবেদনের শেষ তারিখ: YYYY-MM-DD" আকারে থাকে
+      const deadline = (listing.description || '').match(/আবেদনের শেষ তারিখ:\s*(\d{4}-\d{2}-\d{2})/);
+      const validThrough = deadline
+        ? `${deadline[1]}T23:59:59+06:00`
+        : new Date(listing.expiry_date).toISOString();
+
+      jsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'JobPosting',
+        title: listing.title,
+        description: (listing.description || listing.title).slice(0, 5000),
+        datePosted: new Date(listing.posted_at).toISOString().slice(0, 10),
+        validThrough,
+        hiringOrganization: { '@type': 'Organization', name: listing.owner_name },
+        jobLocation: {
+          '@type': 'Place',
+          address: {
+            '@type': 'PostalAddress',
+            addressLocality: listing.area,
+            addressRegion: listing.upazila || 'Sherpur',
+            addressCountry: 'BD',
+          },
+        },
+        ...(photos[0] ? { image: photos[0] } : {}),
+      };
+    }
+  } else {
+    jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: listing.title,
+      description: (listing.description || listing.title).slice(0, 500),
+      ...(photos[0] ? { image: photos } : {}),
+      ...(numericPrice
+        ? {
+            offers: {
+              '@type': 'Offer',
+              priceCurrency: 'BDT',
+              price: numericPrice,
+              availability: 'https://schema.org/InStock',
+            },
+          }
+        : {}),
+    };
+  }
 
   return (
     <>
