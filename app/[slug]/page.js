@@ -7,6 +7,7 @@ import { getLang } from '../../lib/getLang';
 import { upazilaList } from '../../lib/locations';
 import { toBn } from '../../lib/format';
 import { getServicesFor, providerHref, subcategoryIcons } from '../../lib/services';
+import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../lib/site';
 import SiteHeader from '../../components/SiteHeader';
 
 const text = {
@@ -57,12 +58,24 @@ export async function generateMetadata({ params, searchParams }) {
       ? `শেরপুর জেলার ${name} সেবাদাতাদের তালিকা — এলাকা, অভিজ্ঞতা ও যোগাযোগ এক জায়গায়।`
       : `List of ${name} service providers in Sherpur district — area, experience and contact in one place.`;
   const filtered = !!cleanUpazila(searchParams?.upazila);
+  const canonical = `/${params.slug}`;
   return {
     title,
     description,
-    openGraph: { title, description, type: 'website', locale: lang === 'bn' ? 'bn_BD' : 'en_US' },
-    // ফিল্টার করা পাতা সার্চ ইঞ্জিনে ডুপ্লিকেট হয়, তাই noindex
-    robots: filtered ? { index: false, follow: true } : undefined,
+    // ফিল্টার করা পাতা সার্চ ইঞ্জিনে ডুপ্লিকেট হয়, তাই noindex; ফিল্টারহীন পাতায় canonical
+    ...(filtered
+      ? { robots: { index: false, follow: true } }
+      : { alternates: { canonical } }),
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      siteName: SITE_NAME,
+      type: 'website',
+      locale: lang === 'bn' ? 'bn_BD' : 'en_US',
+      images: [DEFAULT_OG_IMAGE],
+    },
+    twitter: { card: 'summary_large_image', title, description, images: [DEFAULT_OG_IMAGE] },
   };
 }
 
