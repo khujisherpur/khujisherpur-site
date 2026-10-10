@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import ProviderProfile from '../../../components/ProviderProfile';
 import { getLang } from '../../../lib/getLang';
+import { SITE_URL, SITE_NAME, DEFAULT_OG_IMAGE } from '../../../lib/site';
 
 const subcategoryIcons = {
   electrician: '⚡', plumber: '🚰', 'ac-technician': '❄️', 'fridge-technician': '🧊',
@@ -15,6 +16,7 @@ const subcategoryIcons = {
 };
 
 const BOT_UA = /bot|crawl|spider|slurp|facebookexternalhit|preview|whatsapp|telegram|headless/i;
+const SLUG_RE = /^[a-z0-9-]+$/;
 
 function safeJsonLd(obj) {
   return JSON.stringify(obj).replace(/</g, '\\u003c');
@@ -22,26 +24,31 @@ function safeJsonLd(obj) {
 
 export async function generateMetadata({ params }) {
   const lang = getLang();
+  const notFoundMeta = {
+    title: 'প্রোফাইল পাওয়া যায়নি | খুঁজি শেরপুর',
+    robots: { index: false },
+  };
 
-  const [{ data: provider }, { data: sub }] = await Promise.all([
-    supabase
-      .from('providers')
-      .select('name, area, description, photo_url, experience_years')
-      .eq('slug', params.providerSlug)
-      .eq('status', 'approved')
-      .maybeSingle(),
-    supabase
-      .from('subcategories')
-      .select('name_bn, name_en')
-      .eq('slug', params.slug)
-      .maybeSingle(),
-  ]);
+  if (!SLUG_RE.test(params.slug) || !SLUG_RE.test(params.providerSlug)) return notFoundMeta;
 
-  if (!provider) {
-    return { title: 'প্রোফাইল পাওয়া যায়নি | খুঁজি শেরপুর', robots: { index: false } };
-  }
+  const { data: sub } = await supabase
+    .from('subcategories')
+    .select('id, name_bn, name_en')
+    .eq('slug', params.slug)
+    .maybeSingle();
+  if (!sub) return notFoundMeta;
 
-  const subName = sub ? (lang === 'bn' ? sub.name_bn : sub.name_en || sub.name_bn) : '';
+  // পেজের মতোই: প্রধান সেবার slug না মিললে এটা প্রোফাইলই নয়
+  const { data: provider } = await supabase
+    .from('providers')
+    .select('name, area, description, photo_url, experience_years')
+    .eq('slug', params.providerSlug)
+    .eq('primary_subcategory_id', sub.id)
+    .eq('status', 'approved')
+    .maybeSingle();
+  if (!provider) return notFoundMeta;
+
+  const subName = lang === 'bn' ? sub.name_bn : sub.name_en || sub.name_bn;
   const title = `${provider.name}${subName ? `, ${subName}` : ''} - ${provider.area}, শেরপুর | খুঁজি শেরপুর`;
 
   const parts = [`${provider.name}, ${provider.area}-এর ${subName || 'সেবাদাতা'}।`];
@@ -51,15 +58,24 @@ export async function generateMetadata({ params }) {
   parts.push('রিভিউ দেখে সরাসরি যোগাযোগ করুন।');
   const description = parts.join(' ').slice(0, 155);
 
+  const images = provider.photo_url ? [provider.photo_url] : [DEFAULT_OG_IMAGE];
+  // ?fbclid= ইত্যাদি যোগ হওয়া লিংকও একই পাতা বলে গণ্য হবে
+  const canonical = `/${params.slug}/${params.providerSlug}`;
+
   return {
     title,
     description,
+    alternates: { canonical },
     openGraph: {
       title,
       description,
-      ...(provider.photo_url ? { images: [provider.photo_url] } : {}),
+      url: canonical,
+      siteName: SITE_NAME,
+      type: 'website',
+      locale: 'bn_BD',
+      images,
     },
-    twitter: { card: provider.photo_url ? 'summary_large_image' : 'summary', title, description },
+    twitter: { card: 'summary_large_image', title, description, images },
   };
 }
 
@@ -73,7 +89,7 @@ export default async function ProviderSlugPage({ params }) {
   const t = text[lang];
 
   // ক্যাটাগরির ভুল slug হলে (যেমন /wp-login.php) ডাটাবেস ছোঁয়ার আগেই ৪০৪
-  if (!/^[a-z0-9-]+$/.test(params.slug) || !/^[a-z0-9-]+$/.test(params.providerSlug)) {
+  if (!SLUG_RE.test(params.slug) || !SLUG_RE.test(params.providerSlug)) {
     notFound();
   }
 
@@ -131,6 +147,7 @@ export default async function ProviderSlugPage({ params }) {
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
     name: provider.name,
+    url: `${SITE_URL}/${subcategory.slug}/${provider.slug}`,
     description: (provider.description || `${provider.name}, ${subName(subcategory)}`).slice(0, 500),
     ...(provider.photo_url ? { image: provider.photo_url } : {}),
     address: {
