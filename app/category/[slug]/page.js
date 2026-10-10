@@ -7,24 +7,41 @@ import { categoryLabels } from '../../../lib/categoryLabels';
 import { upazilaList } from '../../../lib/locations';
 import { formatPrice, parsePrice, timeAgo, toBn } from '../../../lib/format';
 import { subcategoryIcons } from '../../../lib/services';
+import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../../lib/site';
 import SiteHeader from '../../../components/SiteHeader';
+
+const FILTER_KEYS = ['type', 'upazila', 'sort', 'sub'];
 
 export function generateMetadata({ params, searchParams }) {
   const lang = getLang();
   const label = categoryLabels[params.slug];
-  if (!label) return { title: 'খুঁজি শেরপুর' };
+  if (!label) return { title: 'খুঁজি শেরপুর', robots: { index: false } };
 
   const name = label[lang].name;
   const title =
     lang === 'bn' ? `শেরপুরে ${name} | খুঁজি শেরপুর` : `${name} in Sherpur | Khuji Sherpur`;
   const description = label[lang].desc || title;
-  const hasFilter = Object.keys(searchParams || {}).length > 0;
+
+  // শুধু আসল ফিল্টার থাকলেই noindex; ?fbclid= বা ?utm_ দিয়ে এলে নয়
+  const hasFilter = FILTER_KEYS.some((k) => searchParams?.[k]);
+  const canonical = `/category/${params.slug}`;
 
   return {
     title,
     description,
-    openGraph: { title, description },
-    ...(hasFilter ? { robots: { index: false, follow: true } } : {}),
+    ...(hasFilter
+      ? { robots: { index: false, follow: true } }
+      : { alternates: { canonical } }),
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      siteName: SITE_NAME,
+      type: 'website',
+      locale: lang === 'bn' ? 'bn_BD' : 'en_US',
+      images: [DEFAULT_OG_IMAGE],
+    },
+    twitter: { card: 'summary_large_image', title, description, images: [DEFAULT_OG_IMAGE] },
   };
 }
 
@@ -92,10 +109,11 @@ export default async function CategoryPage({ params, searchParams }) {
   const t = text[lang];
   const num = (n) => (lang === 'bn' ? toBn(n) : n);
   const label = categoryLabels[params.slug];
-  const activeRentType = searchParams?.type || 'all';
+  // অদ্ভুত মান ডাটাবেসে পাঠানো হয় না, জানা মানগুলোই চলে
+  const activeRentType = rentTypeTabs.includes(searchParams?.type) ? searchParams.type : 'all';
   const activeSub = searchParams?.sub || null;
-  const activeUpazila = searchParams?.upazila || '';
-  const sort = searchParams?.sort || 'new';
+  const activeUpazila = upazilaList.includes(searchParams?.upazila) ? searchParams.upazila : '';
+  const sort = ['low', 'high'].includes(searchParams?.sort) ? searchParams.sort : 'new';
 
   if (!label) notFound();
 
@@ -192,7 +210,7 @@ export default async function CategoryPage({ params, searchParams }) {
       .eq('status', 'approved');
     if (activeUpazila) query = query.eq('upazila', activeUpazila);
 
-    const { data } = await query.order('created_at', { ascending: false });
+    const { data } = await query.order('created_at', { ascending: false }).limit(200);
     items = data || [];
   } else {
     let query = supabase
@@ -205,7 +223,7 @@ export default async function CategoryPage({ params, searchParams }) {
     if (isRent && activeRentType !== 'all') query = query.eq('rent_type', activeRentType);
     if (activeUpazila) query = query.eq('upazila', activeUpazila);
 
-    const { data } = await query.order('posted_at', { ascending: false });
+    const { data } = await query.order('posted_at', { ascending: false }).limit(200);
     items = data || [];
 
     if (sort === 'low' || sort === 'high') {
