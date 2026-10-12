@@ -1,5 +1,6 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+import { cache } from 'react';
 import { redirect, notFound } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import { getLang } from '../../../lib/getLang';
@@ -12,19 +13,113 @@ import SiteHeader from '../../../components/SiteHeader';
 
 const FILTER_KEYS = ['type', 'upazila', 'sort', 'sub'];
 
-export function generateMetadata({ params, searchParams }) {
+// গুগল ও ফেসবুকে দেখানো শিরোনাম: মানুষ যা টাইপ করে সেই শব্দ আগে
+const SEO_TITLES = {
+  rent: 'শেরপুরে বাসা, দোকান ও মেস ভাড়া',
+  job: 'শেরপুরে চাকরির খবর ও নতুন জব বিজ্ঞপ্তি',
+  'buy-sell': 'শেরপুরে কেনাবেচা — নতুন ও পুরোনো পণ্য',
+  'agri-product': 'শেরপুরে কৃষিপণ্য কেনাবেচা',
+  teacher: 'শেরপুরে প্রাইভেট টিউটর ও টিউশন',
+  venue: 'শেরপুরে কমিউনিটি সেন্টার ও ভেন্যু ভাড়া',
+  ambulance: 'শেরপুরে অ্যাম্বুলেন্স — ফোন নম্বরসহ',
+  'service-provider': 'শেরপুরে ইলেকট্রিশিয়ান, প্লাম্বারসহ সব মিস্ত্রি',
+};
+
+// সংখ্যা ৩-এর কম হলে সংখ্যা বলা হয় না (কম সংখ্যা দেখালে উল্টো ক্লিক কমে)
+const SEO_DESCS = {
+  rent: (n) =>
+    n
+      ? `শেরপুরে এখন ${n}টি ভাড়ার বিজ্ঞাপন — বাসা, দোকান ও মেস। ছবি, ভাড়া ও ফোন নম্বরসহ।`
+      : 'শেরপুরের বাসা, দোকান ও মেস ভাড়ার বিজ্ঞাপন — ছবি, ভাড়া ও ফোন নম্বরসহ।',
+  job: (n) =>
+    n
+      ? `শেরপুরে এখন ${n}টি চাকরির বিজ্ঞপ্তি — বেতন, প্রতিষ্ঠান ও আবেদনের শেষ তারিখসহ।`
+      : 'শেরপুরের চাকরির বিজ্ঞপ্তি — বেতন, প্রতিষ্ঠান ও আবেদনের শেষ তারিখসহ।',
+  'buy-sell': (n) =>
+    n
+      ? `শেরপুরে ${n}টি পণ্য বিক্রির বিজ্ঞাপন — নতুন ও ব্যবহৃত, দাম ও ছবিসহ।`
+      : 'শেরপুরে নতুন ও ব্যবহৃত পণ্য কেনাবেচা — দাম ও ছবিসহ।',
+  teacher: (n) =>
+    n
+      ? `শেরপুরে ${n}টি টিউশনের বিজ্ঞাপন — বিষয়, এলাকা ও ফিসহ।`
+      : 'শেরপুরে প্রাইভেট টিউটর ও টিউশনের বিজ্ঞাপন — বিষয়, এলাকা ও ফিসহ।',
+  venue: (n) =>
+    n
+      ? `শেরপুরে ${n}টি ভেন্যু ভাড়ার বিজ্ঞাপন — কমিউনিটি সেন্টার, হল ও আরও, ভাড়াসহ।`
+      : 'শেরপুরে কমিউনিটি সেন্টার, হল ও ভেন্যু ভাড়ার বিজ্ঞাপন।',
+};
+
+function seoFor(slug, name, n, type, fallbackDesc) {
+  const title = SEO_TITLES[slug] || `শেরপুরে ${name}`;
+  const fmt = n >= 3 ? toBn(n) : null;
+  let description;
+  if (SEO_DESCS[slug]) {
+    description = SEO_DESCS[slug](fmt);
+  } else if (type === 'service') {
+    description = fmt
+      ? `শেরপুরে ${fmt} জন ${name} — এলাকা, অভিজ্ঞতা ও রিভিউসহ, সরাসরি কল করুন।`
+      : fallbackDesc || `শেরপুরের ${name} — এলাকা ও যোগাযোগসহ।`;
+  } else {
+    description = fmt
+      ? `শেরপুরে এখন ${fmt}টি ${name} বিজ্ঞাপন — ছবি, দাম ও ফোন নম্বরসহ।`
+      : fallbackDesc || `শেরপুরের ${name} বিজ্ঞাপন।`;
+  }
+  return { title: `${title} | খুঁজি শেরপুর`, description };
+}
+
+const getCategory = cache(async (slug) => {
+  const { data } = await supabase
+    .from('categories')
+    .select('id, slug, type')
+    .eq('slug', slug)
+    .maybeSingle();
+  return data || null;
+});
+
+async function countFor(category) {
+  if (!category) return 0;
+  if (category.type === 'service') {
+    const { count } = await supabase
+      .from('providers')
+      .select('id', { count: 'exact', head: true })
+      .eq('category_id', category.id)
+      .eq('status', 'approved');
+    return count || 0;
+  }
+  const { count } = await supabase
+    .from('listings')
+    .select('id', { count: 'exact', head: true })
+    .eq('category_id', category.id)
+    .eq('status', 'active')
+    .gt('expiry_date', new Date().toISOString());
+  return count || 0;
+}
+
+export async function generateMetadata({ params, searchParams }) {
   const lang = getLang();
   const label = categoryLabels[params.slug];
   if (!label) return { title: 'খুঁজি শেরপুর', robots: { index: false } };
 
   const name = label[lang].name;
-  const title =
-    lang === 'bn' ? `শেরপুরে ${name} | খুঁজি শেরপুর` : `${name} in Sherpur | Khuji Sherpur`;
-  const description = label[lang].desc || title;
-
   // শুধু আসল ফিল্টার থাকলেই noindex; ?fbclid= বা ?utm_ দিয়ে এলে নয়
   const hasFilter = FILTER_KEYS.some((k) => searchParams?.[k]);
   const canonical = `/category/${params.slug}`;
+
+  let title;
+  let description;
+  if (lang === 'bn') {
+    let n = 0;
+    let type = null;
+    if (!hasFilter) {
+      const category = await getCategory(params.slug);
+      type = category?.type || null;
+      n = await countFor(category);
+    }
+    ({ title, description } = seoFor(params.slug, name, n, type, label.bn.desc));
+  } else {
+    title = `${name} in Sherpur | Khuji Sherpur`;
+    description = label.en.desc || title;
+  }
 
   return {
     title,
@@ -117,11 +212,7 @@ export default async function CategoryPage({ params, searchParams }) {
 
   if (!label) notFound();
 
-  const { data: category } = await supabase
-    .from('categories')
-    .select('id, slug, type')
-    .eq('slug', params.slug)
-    .maybeSingle();
+  const category = await getCategory(params.slug);
 
   if (!category) notFound();
 
