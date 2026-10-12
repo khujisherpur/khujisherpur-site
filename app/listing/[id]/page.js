@@ -14,10 +14,103 @@ import { categoryLabels } from '../../../lib/categoryLabels';
 import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../../lib/site';
 import { formatPrice, parsePrice, timeAgo, toBn, cleanPhone, waLink } from '../../../lib/format';
 
+const MONTHS_BN = [
+  'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+  'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর',
+];
+
+// "2026-10-02" -> "২ অক্টোবর ২০২৬"
+function formatDateBn(iso) {
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return iso;
+  return `${toBn(parseInt(m[3], 10))} ${MONTHS_BN[parseInt(m[2], 10) - 1]} ${toBn(m[1])}`;
+}
+
+// পোস্ট করার সময় সিস্টেম যেসব লাইন বিবরণের মাথায় বসায় সেগুলো আলাদা করে নিই
+function parseDescription(desc) {
+  const lines = String(desc || '').split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  let deadline = null;
+  let condition = null;
+  let rooms = null;
+  const body = [];
+  for (const line of lines) {
+    const dm = line.match(/^আবেদনের শেষ তারিখ:\s*(\d{4}-\d{2}-\d{2})/);
+    if (dm) { deadline = dm[1]; continue; }
+    if (/^কন্ডিশন:/.test(line)) { condition = line.replace(/^কন্ডিশন:\s*/, ''); continue; }
+    if (/^(সুযোগ-সুবিধা|গুগল ম্যাপ):/.test(line)) continue;
+    if (!rooms && body.length === 0 && /(বেডরুম|বাথরুম|বর্গফুট)/.test(line) && line.length < 60) {
+      rooms = line;
+      continue;
+    }
+    body.push(line);
+  }
+  return { deadline, condition, rooms, body: body.join(' ').replace(/\s+/g, ' ').trim() };
+}
+
+// আবেদনের শেষ তারিখ (বাংলাদেশ সময়ে দিনের শেষ) পেরিয়ে গেছে কিনা
+function isDeadlinePassed(deadline) {
+  if (!deadline) return false;
+  return new Date(`${deadline}T23:59:59+06:00`).getTime() < Date.now();
+}
+
+function placeOf(listing) {
+  return Array.from(
+    new Set([listing.area, listing.upazila].map((v) => (v || '').trim()).filter(Boolean))
+  ).join(', ');
+}
+
+function buildTitle(listing, slug) {
+  const place = placeOf(listing);
+  const t0 = (listing.title || '').trim();
+  const hasPlace = [listing.area, listing.upazila].some((v) => v && t0.includes(v.trim()));
+  const base = hasPlace || !place ? t0 : `${t0}, ${place}`;
+  const price = formatPrice(listing.price_or_salary, 'bn');
+
+  let mid = base;
+  if (slug === 'job') {
+    if (listing.owner_name) mid = `${base} — ${listing.owner_name}`;
+  } else if (price) {
+    mid = `${base} — ${price}`;
+  }
+  return `${mid} | খুঁজি শেরপুর`;
+}
+
+function buildDescription(listing, slug, parsed) {
+  const place = placeOf(listing);
+  const price = formatPrice(listing.price_or_salary, 'bn');
+  const catName = categoryLabels[slug]?.bn?.name || 'বিজ্ঞাপন';
+  const parts = [];
+
+  if (slug === 'job') {
+    parts.push(`${listing.owner_name ? `${listing.owner_name}, ` : ''}${place}।`);
+    if (price) parts.push(`বেতন ${price}।`);
+    if (parsed.deadline) parts.push(`আবেদনের শেষ তারিখ ${formatDateBn(parsed.deadline)}।`);
+  } else if (slug === 'rent') {
+    const lbl = { house: 'বাসা', shop: 'দোকান', mess: 'মেস' }[listing.rent_type];
+    parts.push(`${lbl ? `${lbl} ` : ''}ভাড়ার বিজ্ঞাপন, ${place}।`);
+    if (parsed.rooms) parts.push(`${parsed.rooms}।`);
+    if (price) parts.push(`ভাড়া ${price}।`);
+  } else if (slug === 'buy-sell') {
+    parts.push(`${place}।`);
+    if (parsed.condition) parts.push(`${parsed.condition}।`);
+    if (price) parts.push(`মূল্য ${price}।`);
+  } else {
+    const priceLabel = { venue: 'ভাড়া', teacher: 'টিউশন ফি' }[slug] || 'মূল্য';
+    parts.push(`${catName}, ${place}।`);
+    if (price) parts.push(`${priceLabel} ${price}।`);
+  }
+
+  // ইউজারের নিজের লেখা পরিষ্কার ও যথেষ্ট বড় হলেই সামান্য অংশ, নইলে সাধারণ আহ্বান
+  if (parsed.body.length >= 40) parts.push(`${parsed.body.slice(0, 60).trim()}…`);
+  else parts.push('ছবি ও ফোন নম্বরসহ বিস্তারিত দেখুন।');
+
+  return parts.join(' ').slice(0, 155);
+}
+
 export async function generateMetadata({ params }) {
   const { data: listing } = await supabase
     .from('listings')
-    .select('title, area, price_or_salary, description, photos, categories(slug)')
+    .select('title, area, upazila, price_or_salary, description, photos, rent_type, owner_name, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'active')
     .gt('expiry_date', new Date().toISOString())
@@ -27,23 +120,24 @@ export async function generateMetadata({ params }) {
     return { title: 'পোস্ট পাওয়া যায়নি | খুঁজি শেরপুর', robots: { index: false } };
   }
 
-  const price = formatPrice(listing.price_or_salary, 'bn');
-  const title = `${listing.title}${price ? ` - ${price}` : ''} | খুঁজি শেরপুর`;
-  const catName = categoryLabels[listing.categories?.slug]?.bn?.name || '';
-  const cleanDesc = (listing.description || '').replace(/\s+/g, ' ').trim();
-  const description = cleanDesc
-    ? cleanDesc.slice(0, 150)
-    : `শেরপুরের ${listing.area} এলাকায় ${catName}। এখনই দেখুন খুঁজি শেরপুরে।`;
+  const slug = listing.categories?.slug;
+  const parsed = parseDescription(listing.description);
+  const title = buildTitle(listing, slug);
+  const description = buildDescription(listing, slug, parsed);
   const image = listing.photos?.[0];
   const images = image ? [image] : [DEFAULT_OG_IMAGE];
 
   // ?fbclid= ইত্যাদি যোগ হওয়া লিংকও একই পাতা বলে গণ্য হবে
   const canonical = `/listing/${params.id}`;
 
+  // আবেদনের মেয়াদ-পেরোনো চাকরি সার্চ ফলাফলে আনার দরকার নেই
+  const expiredJob = slug === 'job' && isDeadlinePassed(parsed.deadline);
+
   return {
     title,
     description,
     alternates: { canonical },
+    ...(expiredJob ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
       title,
       description,
@@ -64,6 +158,7 @@ const text = {
     views: 'ভিউ',
     contact: 'যোগাযোগ', phone: 'মোবাইল', whatsapp: 'হোয়াটসঅ্যাপ', email: 'ইমেইল',
     noContact: 'এই পোস্টে যোগাযোগের তথ্য দেওয়া হয়নি।',
+    deadlinePassed: '⏰ আবেদনের শেষ তারিখ পেরিয়ে গেছে',
     house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য',
   },
   en: {
@@ -72,6 +167,7 @@ const text = {
     views: 'views',
     contact: 'Contact', phone: 'Phone', whatsapp: 'WhatsApp', email: 'Email',
     noContact: 'No contact information was provided for this post.',
+    deadlinePassed: '⏰ The application deadline has passed',
     house: 'House', shop: 'Shop', mess: 'Mess', other: 'Other',
   },
 };
@@ -125,6 +221,9 @@ export default async function ListingDetailPage({ params }) {
   }
 
   const isJob = listing.categories?.slug === 'job';
+  const parsed = parseDescription(listing.description);
+  const deadlinePassed = isJob && isDeadlinePassed(parsed.deadline);
+
   const label = categoryLabels[listing.categories?.slug];
   const categoryName = label ? label[lang].name : '';
   const photos = listing.photos || [];
@@ -133,6 +232,16 @@ export default async function ListingDetailPage({ params }) {
   ).join(', ');
   const price = formatPrice(listing.price_or_salary, lang);
   const views = (listing.view_count || 0) + (counted ? 1 : 0);
+
+  // পাতায় শেষ তারিখ বাংলা অঙ্ক ও মাসের নামে দেখাই
+  const shownDescription = listing.description
+    ? lang === 'bn'
+      ? listing.description.replace(
+          /(আবেদনের শেষ তারিখ:\s*)(\d{4}-\d{2}-\d{2})/,
+          (_, a, d) => `${a}${formatDateBn(d)}`
+        )
+      : listing.description
+    : '';
 
   const hasPhone = !!listing.contact_phone;
   const waUrl = waLink(listing.whatsapp);
@@ -146,16 +255,14 @@ export default async function ListingDetailPage({ params }) {
     { k: t.posted, v: timeAgo(listing.posted_at, lang) },
   ].filter((r) => r && r.v);
 
-  // স্ট্রাকচার্ড ডেটা: চাকরির জন্য JobPosting (প্রতিষ্ঠানের নাম থাকলে), বাকিদের জন্য Product
+  // স্ট্রাকচার্ড ডেটা: চাকরির জন্য JobPosting (প্রতিষ্ঠানের নাম থাকলে ও মেয়াদ না ফুরোলে), বাকিদের জন্য Product
   const numericPrice = parsePrice(listing.price_or_salary);
   let jsonLd = null;
 
   if (isJob) {
-    if (listing.owner_name) {
-      // আবেদনের শেষ তারিখ বিবরণের ভেতরে "আবেদনের শেষ তারিখ: YYYY-MM-DD" আকারে থাকে
-      const deadline = (listing.description || '').match(/আবেদনের শেষ তারিখ:\s*(\d{4}-\d{2}-\d{2})/);
-      const validThrough = deadline
-        ? `${deadline[1]}T23:59:59+06:00`
+    if (listing.owner_name && !deadlinePassed) {
+      const validThrough = parsed.deadline
+        ? `${parsed.deadline}T23:59:59+06:00`
         : new Date(listing.expiry_date).toISOString();
 
       jsonLd = {
@@ -183,7 +290,7 @@ export default async function ListingDetailPage({ params }) {
       '@context': 'https://schema.org',
       '@type': 'Product',
       name: listing.title,
-      description: (listing.description || listing.title).slice(0, 500),
+      description: (parsed.body || listing.title).slice(0, 500),
       ...(photos[0] ? { image: photos } : {}),
       ...(numericPrice
         ? {
@@ -244,6 +351,9 @@ export default async function ListingDetailPage({ params }) {
 
             <h1 className="text-xl font-semibold mt-2 leading-snug">{listing.title}</h1>
             {price && <p className="text-2xl font-semibold text-green font-numeric mt-2">{price}</p>}
+            {deadlinePassed && (
+              <p className="mt-2 text-xs bg-red-50 text-red-600 rounded-lg px-3 py-2">{t.deadlinePassed}</p>
+            )}
             <p className="text-sm text-ink/55 mt-2">
               📍 {where}
               <span className="mx-1.5">·</span>
@@ -299,7 +409,7 @@ export default async function ListingDetailPage({ params }) {
             <div className="mt-6 pt-5 border-t border-ink/10">
               <h2 className="text-sm font-medium text-ink/60 mb-2">{t.desc}</h2>
               <p className="text-ink/80 text-sm leading-relaxed whitespace-pre-line">
-                {listing.description ? <Linkify value={listing.description} /> : t.noDesc}
+                {shownDescription ? <Linkify value={shownDescription} /> : t.noDesc}
               </p>
             </div>
 
