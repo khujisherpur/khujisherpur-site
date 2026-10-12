@@ -3,7 +3,12 @@ export const dynamic = 'force-dynamic';
 import { supabase } from '../../lib/supabaseClient';
 import { getLang } from '../../lib/getLang';
 import { toBn } from '../../lib/format';
+import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../lib/site';
 import LanguageToggle from '../../components/LanguageToggle';
+
+// ৩ দিনের পুরোনো অনুরোধ আর দেখানো হবে না (ডাটাবেসও মুছে ফেলে)
+const EXPIRY_DAYS = 3;
+const sinceISO = () => new Date(Date.now() - EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
 const text = {
   bn: {
@@ -30,15 +35,42 @@ const text = {
 
 export async function generateMetadata() {
   const lang = getLang();
+
+  let n = 0;
   if (lang === 'bn') {
-    return {
-      title: 'রক্তদাতা ও রক্তের অনুরোধ — খুঁজি শেরপুর',
-      description: 'শেরপুরে জরুরি রক্তের অনুরোধ দেখুন, রক্তের জন্য অনুরোধ করুন বা রক্তদাতা হিসেবে নিবন্ধন করুন।',
-    };
+    const { count } = await supabase
+      .from('blood_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'active')
+      .gte('created_at', sinceISO());
+    n = count || 0;
   }
+
+  const title =
+    lang === 'bn'
+      ? 'শেরপুরে রক্ত দরকার? জরুরি অনুরোধ ও রক্তদাতা | খুঁজি শেরপুর'
+      : 'Need Blood in Sherpur? Urgent Requests & Donors | Khuji Sherpur';
+  const description =
+    lang === 'bn'
+      ? n > 0
+        ? `এখন ${toBn(n)}টি জরুরি রক্তের অনুরোধ সক্রিয়। রক্ত লাগলে অনুরোধ করুন, রক্তদাতা হতে চাইলে নিবন্ধন করুন — মিলে যাওয়া ডোনাররা নোটিফিকেশন পান।`
+        : 'শেরপুরে জরুরি রক্ত লাগলে অনুরোধ পোস্ট করুন, রক্তদাতা হতে নিবন্ধন করুন — মিলে যাওয়া ডোনাররা নোটিফিকেশন পান।'
+      : 'Post an urgent blood request in Sherpur or register as a donor. Matching donors get notified.';
+
   return {
-    title: 'Blood Donors & Requests — Khuji Sherpur',
-    description: 'See urgent blood requests in Sherpur, post a request, or register as a blood donor.',
+    title,
+    description,
+    alternates: { canonical: '/blood' },
+    openGraph: {
+      title,
+      description,
+      url: '/blood',
+      siteName: SITE_NAME,
+      type: 'website',
+      locale: lang === 'bn' ? 'bn_BD' : 'en_US',
+      images: [DEFAULT_OG_IMAGE],
+    },
+    twitter: { card: 'summary_large_image', title, description, images: [DEFAULT_OG_IMAGE] },
   };
 }
 
@@ -47,14 +79,11 @@ export default async function BloodPage() {
   const t = text[lang];
   const num = (n) => (lang === 'bn' ? toBn(n) : n);
 
-  // ৭ দিনের পুরোনো অনুরোধ আর দেখানো হবে না (ভুলে সক্রিয় থেকে গেলেও)
-  const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
-
   const { data: requests } = await supabase
     .from('blood_requests')
     .select('id, blood_group, bags_needed, hospital_or_area, created_at')
     .eq('status', 'active')
-    .gte('created_at', since)
+    .gte('created_at', sinceISO())
     .order('created_at', { ascending: false })
     .limit(50);
 
