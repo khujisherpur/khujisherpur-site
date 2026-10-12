@@ -513,7 +513,7 @@ export default function ReviewSection({ providerId, ownerId }) {
                   )}
 
                   {replyingTo === r.id && (
-                    <div className="mt-2 ml-3 flex gap-2">
+                    <div className="mt-2 flex items-center gap-2">
                       <input
                         type="text"
                         value={replyText}
@@ -521,11 +521,11 @@ export default function ReviewSection({ providerId, ownerId }) {
                         placeholder={t.replyPlaceholder}
                         maxLength={500}
                         autoFocus
-                        className="flex-1 border border-ink/20 rounded-full px-4 py-2 text-sm outline-none focus:border-green bg-white"
+                        className="flex-1 min-w-0 border border-ink/20 rounded-full px-4 py-2 text-sm outline-none focus:border-green bg-white"
                       />
                       <button
                         onClick={() => submitReply(r.id)}
-                        className="text-xs bg-green text-white px-4 py-2 rounded-full"
+                        className="text-xs bg-green text-white px-4 py-2 rounded-full flex-shrink-0 whitespace-nowrap"
                       >
                         {t.send}
                       </button>
