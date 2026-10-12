@@ -2,7 +2,8 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 import { supabase } from '../../lib/supabaseClient';
 import { getLang } from '../../lib/getLang';
-import { cleanPhone } from '../../lib/format';
+import { cleanPhone, toBn } from '../../lib/format';
+import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../lib/site';
 import LanguageToggle from '../../components/LanguageToggle';
 
 const groupOrder = ['national', 'fire', 'police', 'government', 'pourashava', 'health', 'family_planning'];
@@ -35,15 +36,40 @@ const text = {
 
 export async function generateMetadata() {
   const lang = getLang();
+
+  let n = 0;
   if (lang === 'bn') {
-    return {
-      title: 'জরুরি সেবা — থানা, ফায়ার সার্ভিস, হাসপাতাল | খুঁজি শেরপুর',
-      description: 'শেরপুর জেলার জরুরি ফোন নম্বর: ৯৯৯, থানা, ফায়ার সার্ভিস, স্বাস্থ্য অফিস ও সরকারি দপ্তর এক জায়গায়।',
-    };
+    const { count } = await supabase
+      .from('emergency_services')
+      .select('id', { count: 'exact', head: true });
+    n = count || 0;
   }
+
+  const title =
+    lang === 'bn'
+      ? 'শেরপুরের জরুরি ফোন নম্বর: থানা, ফায়ার সার্ভিস, হাসপাতাল | খুঁজি শেরপুর'
+      : 'Sherpur Emergency Phone Numbers: Police, Fire, Health | Khuji Sherpur';
+  const description =
+    lang === 'bn'
+      ? n >= 5
+        ? `শেরপুরের ${toBn(n)}টি জরুরি ফোন নম্বর — জাতীয় হেল্পলাইন, থানা, ফায়ার সার্ভিস, স্বাস্থ্য অফিস ও সরকারি দপ্তর। এক ট্যাপে কল করুন।`
+        : 'শেরপুরের জরুরি ফোন নম্বর — জাতীয় হেল্পলাইন, থানা, ফায়ার সার্ভিস, স্বাস্থ্য অফিস ও সরকারি দপ্তর। এক ট্যাপে কল করুন।'
+      : 'Emergency phone numbers for Sherpur district: national helplines, police stations, fire service, health offices and government offices. Call with one tap.';
+
   return {
-    title: 'Emergency Services — Police, Fire, Health | Khuji Sherpur',
-    description: 'Emergency phone numbers for Sherpur district: police stations, fire service, health offices and government offices.',
+    title,
+    description,
+    alternates: { canonical: '/emergency' },
+    openGraph: {
+      title,
+      description,
+      url: '/emergency',
+      siteName: SITE_NAME,
+      type: 'website',
+      locale: lang === 'bn' ? 'bn_BD' : 'en_US',
+      images: [DEFAULT_OG_IMAGE],
+    },
+    twitter: { card: 'summary_large_image', title, description, images: [DEFAULT_OG_IMAGE] },
   };
 }
 
