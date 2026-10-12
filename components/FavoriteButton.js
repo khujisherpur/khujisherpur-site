@@ -13,7 +13,7 @@ const text = {
   en: { save: 'Save', saved: 'Saved' },
 };
 
-export default function FavoriteButton({ targetType, targetId }) {
+export default function FavoriteButton({ targetType, targetId, asMenuItem = false }) {
   const [lang, setLang] = useState('bn');
   const [user, setUser] = useState(null);
   const [favoriteId, setFavoriteId] = useState(null);
