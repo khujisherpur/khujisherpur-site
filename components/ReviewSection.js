@@ -394,8 +394,8 @@ export default function ReviewSection({ providerId, ownerId }) {
                 <Avatar name={name} />
                 <div className="min-w-0 flex-1">
                   <div className="bg-paper rounded-2xl px-3.5 py-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold truncate">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <p className="text-sm font-semibold">
                         {name}
                         {isMine && (
                           <span className="ml-1.5 text-[10px] bg-green/10 text-green px-1.5 py-0.5 rounded-full font-medium">
