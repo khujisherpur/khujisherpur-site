@@ -1,25 +1,55 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import ProviderProfile from '../../../components/ProviderProfile';
 import { getLang } from '../../../lib/getLang';
+import { toBn } from '../../../lib/format';
+import { subcategoryIcons } from '../../../lib/services';
 import { SITE_URL, SITE_NAME, DEFAULT_OG_IMAGE } from '../../../lib/site';
-
-const subcategoryIcons = {
-  electrician: '⚡', plumber: '🚰', 'ac-technician': '❄️', 'fridge-technician': '🧊',
-  mechanic: '⚙️', carpenter: '🪚', mason: '🧱', painter: '🎨', cleaning: '🧹',
-  'mobile-repair': '📱', 'computer-repair': '💻', cctv: '📹',
-  'internet-wifi': '📶', driver: '🚗', 'transport-shifting': '🚚',
-};
 
 const BOT_UA = /bot|crawl|spider|slurp|facebookexternalhit|preview|whatsapp|telegram|headless/i;
 const SLUG_RE = /^[a-z0-9-]+$/;
 
 function safeJsonLd(obj) {
   return JSON.stringify(obj).replace(/</g, '\\u003c');
+}
+
+// generateMetadata আর পেজ দুজনেই এটা ডাকে, কিন্তু কোয়েরি চলে একবারই
+const getProfile = cache(async (slug, providerSlug) => {
+  if (!SLUG_RE.test(slug) || !SLUG_RE.test(providerSlug)) return null;
+
+  const { data: subcategory } = await supabase
+    .from('subcategories')
+    .select('id, slug, name_bn, name_en')
+    .eq('slug', slug)
+    .maybeSingle();
+  if (!subcategory) return null;
+
+  const { data: provider } = await supabase
+    .from('providers')
+    .select('id, user_id, name, name_en, slug, area, upazila, union_name, phone, whatsapp, description, is_available, photo_url, experience_years, view_count, primary_subcategory_id, is_verified')
+    .eq('slug', providerSlug)
+    .eq('primary_subcategory_id', subcategory.id)
+    .eq('status', 'approved')
+    .maybeSingle();
+  if (!provider) return null;
+
+  const { data: reviews } = await supabase
+    .from('reviews')
+    .select('rating')
+    .eq('provider_id', provider.id);
+
+  return { subcategory, provider, reviews: reviews || [] };
+});
+
+function placeOf(provider) {
+  return Array.from(
+    new Set([provider.area, provider.upazila].map((v) => (v || '').trim()).filter(Boolean))
+  ).join(', ');
 }
 
 export async function generateMetadata({ params }) {
@@ -29,33 +59,23 @@ export async function generateMetadata({ params }) {
     robots: { index: false },
   };
 
-  if (!SLUG_RE.test(params.slug) || !SLUG_RE.test(params.providerSlug)) return notFoundMeta;
+  const profile = await getProfile(params.slug, params.providerSlug);
+  if (!profile) return notFoundMeta;
+  const { subcategory, provider, reviews } = profile;
 
-  const { data: sub } = await supabase
-    .from('subcategories')
-    .select('id, name_bn, name_en')
-    .eq('slug', params.slug)
-    .maybeSingle();
-  if (!sub) return notFoundMeta;
+  const subName = lang === 'bn' ? subcategory.name_bn : subcategory.name_en || subcategory.name_bn;
+  const place = placeOf(provider);
+  const placeFull = `${place}${place.includes('শেরপুর') ? '' : ', শেরপুর'}`;
 
-  // পেজের মতোই: প্রধান সেবার slug না মিললে এটা প্রোফাইলই নয়
-  const { data: provider } = await supabase
-    .from('providers')
-    .select('name, area, description, photo_url, experience_years')
-    .eq('slug', params.providerSlug)
-    .eq('primary_subcategory_id', sub.id)
-    .eq('status', 'approved')
-    .maybeSingle();
-  if (!provider) return notFoundMeta;
+  const title = `${provider.name} — ${subName}, ${placeFull} | খুঁজি শেরপুর`;
 
-  const subName = lang === 'bn' ? sub.name_bn : sub.name_en || sub.name_bn;
-  const title = `${provider.name}${subName ? `, ${subName}` : ''} - ${provider.area}, শেরপুর | খুঁজি শেরপুর`;
-
-  const parts = [`${provider.name}, ${provider.area}-এর ${subName || 'সেবাদাতা'}।`];
-  if (provider.experience_years) parts.push(`${provider.experience_years} বছরের অভিজ্ঞতা।`);
-  const about = (provider.description || '').replace(/\s+/g, ' ').trim();
-  if (about) parts.push(about.slice(0, 70));
-  parts.push('রিভিউ দেখে সরাসরি যোগাযোগ করুন।');
+  // বর্ণনা শুধু যাচাইযোগ্য তথ্য দিয়ে: ইউজারের নিজের লেখা এখানে বসানো হয় না
+  const count = reviews.length;
+  const avg = count > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / count : 0;
+  const parts = [`${provider.name}, ${placeFull} এলাকার ${subName}।`];
+  if (provider.experience_years) parts.push(`${toBn(provider.experience_years)} বছরের অভিজ্ঞতা।`);
+  if (count > 0) parts.push(`রেটিং ${toBn(avg.toFixed(1))}/৫ (${toBn(count)} রিভিউ)।`);
+  parts.push(provider.whatsapp ? 'সরাসরি কল বা WhatsApp করুন।' : 'সরাসরি কল করুন।');
   const description = parts.join(' ').slice(0, 155);
 
   const images = provider.photo_url ? [provider.photo_url] : [DEFAULT_OG_IMAGE];
@@ -89,27 +109,9 @@ export default async function ProviderSlugPage({ params }) {
   const t = text[lang];
 
   // ক্যাটাগরির ভুল slug হলে (যেমন /wp-login.php) ডাটাবেস ছোঁয়ার আগেই ৪০৪
-  if (!SLUG_RE.test(params.slug) || !SLUG_RE.test(params.providerSlug)) {
-    notFound();
-  }
-
-  const { data: subcategory } = await supabase
-    .from('subcategories')
-    .select('id, slug, name_bn, name_en')
-    .eq('slug', params.slug)
-    .maybeSingle();
-
-  if (!subcategory) notFound();
-
-  const { data: provider } = await supabase
-    .from('providers')
-    .select('id, user_id, name, name_en, slug, area, upazila, union_name, phone, whatsapp, description, is_available, photo_url, experience_years, view_count, primary_subcategory_id, is_verified')
-    .eq('slug', params.providerSlug)
-    .eq('primary_subcategory_id', subcategory.id)
-    .eq('status', 'approved')
-    .maybeSingle();
-
-  if (!provider) notFound();
+  const profile = await getProfile(params.slug, params.providerSlug);
+  if (!profile) notFound();
+  const { subcategory, provider, reviews } = profile;
 
   // বট ও লিংক-প্রিভিউয়ের ভিউ গোনা হয় না
   const ua = headers().get('user-agent') || '';
@@ -117,13 +119,10 @@ export default async function ProviderSlugPage({ params }) {
     await supabase.rpc('increment_provider_view', { pid: provider.id });
   }
 
-  const [{ data: allSubcats }, { data: reviews }] = await Promise.all([
-    supabase
-      .from('provider_subcategories')
-      .select('subcategories(id, slug, name_bn, name_en)')
-      .eq('provider_id', provider.id),
-    supabase.from('reviews').select('rating').eq('provider_id', provider.id),
-  ]);
+  const { data: allSubcats } = await supabase
+    .from('provider_subcategories')
+    .select('subcategories(id, slug, name_bn, name_en)')
+    .eq('provider_id', provider.id);
 
   const subName = (s) => (lang === 'bn' ? s.name_bn : s.name_en || s.name_bn);
 
@@ -139,7 +138,7 @@ export default async function ProviderSlugPage({ params }) {
     }))
     .sort((a, b) => Number(b.primary) - Number(a.primary));
 
-  const count = reviews?.length || 0;
+  const count = reviews.length;
   const avg = count > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / count : 0;
 
   // স্ট্রাকচার্ড ডেটা (ফোন নম্বর ইচ্ছে করে বাদ)
