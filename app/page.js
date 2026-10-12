@@ -13,6 +13,7 @@ import AnnouncementBar from '../components/AnnouncementBar';
 import HomeJsonLd from '../components/HomeJsonLd';
 import { formatPrice, timeAgo as timeAgoFmt, toBn } from '../lib/format';
 import { getServicesFor, providerHref } from '../lib/services';
+import { SITE_NAME, DEFAULT_OG_IMAGE } from '../lib/site';
 
 const text = {
   bn: {
@@ -50,6 +51,34 @@ const text = {
     footer: '© 2026 Khuji Sherpur', credit: 'Developed by ASRAFUL',
   },
 };
+
+export async function generateMetadata() {
+  const lang = getLang();
+  const title =
+    lang === 'bn'
+      ? 'শেরপুরে বাসা ভাড়া, চাকরি, মিস্ত্রি ও জরুরি নম্বর | খুঁজি শেরপুর'
+      : 'Sherpur House Rent, Jobs, Repairmen & Emergency Numbers | Khuji Sherpur';
+  const description =
+    lang === 'bn'
+      ? 'শেরপুর জেলার বাসা-মেস ভাড়া, চাকরির খবর, ইলেকট্রিশিয়ান-প্লাম্বার, রক্তদাতা ও জরুরি ফোন নম্বর — রিভিউ দেখে সরাসরি কল করুন।'
+      : 'House and mess rent, job listings, electricians, plumbers, blood donors and emergency phone numbers in Sherpur district. Check reviews and call directly.';
+
+  return {
+    title,
+    description,
+    alternates: { canonical: '/' },
+    openGraph: {
+      title,
+      description,
+      url: '/',
+      siteName: SITE_NAME,
+      type: 'website',
+      locale: lang === 'bn' ? 'bn_BD' : 'en_US',
+      images: [DEFAULT_OG_IMAGE],
+    },
+    twitter: { card: 'summary_large_image', title, description, images: [DEFAULT_OG_IMAGE] },
+  };
+}
 
 function categoryHref(cat) {
   if (cat.type === 'external') return cat.external_url;
