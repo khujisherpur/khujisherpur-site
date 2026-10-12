@@ -122,6 +122,11 @@ export default function DashboardPage() {
   }, []);
 
   async function init() {
+    if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+      // OAuth থেকে ফেরার পর একবার পরিষ্কার ঠিকানায় রিলোড
+      window.location.replace(window.location.pathname);
+      return;
+    }
     const { data } = await supabase.auth.getUser();
     setUser(data.user);
     if (data.user) {
