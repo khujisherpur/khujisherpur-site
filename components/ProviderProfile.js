@@ -148,12 +148,8 @@ export default async function ProviderProfile({
         <div className="h-24 bg-gradient-to-r from-green-dark to-green rounded-t-2xl" />
 
         <ProfileMenu title={provider.name} lang={lang}>
-          <div className="menu-item">
-            <FavoriteButton targetType="provider" targetId={provider.id} />
-          </div>
-          <div className="menu-item">
-            <ReportButton targetType="provider" targetId={provider.id} />
-          </div>
+          <FavoriteButton targetType="provider" targetId={provider.id} asMenuItem />
+          <ReportButton targetType="provider" targetId={provider.id} asMenuItem />
         </ProfileMenu>
 
         <div className="px-5 pb-6">
