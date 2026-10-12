@@ -16,7 +16,7 @@ module.exports = {
         marigold: '#E3A72E',
       },
       fontFamily: {
-        sans: ["'Noto Serif Bengali'", 'var(--font-hind)', 'sans-serif'],
+        sans: ['var(--font-hind)', 'sans-serif'],
         numeric: ['var(--font-noto-serif-bn)', 'serif'],
       },
     },
