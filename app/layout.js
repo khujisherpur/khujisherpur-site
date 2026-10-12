@@ -7,6 +7,10 @@ const TITLE = 'খুঁজি শেরপুর | শেরপুরে যা
 const DESCRIPTION =
   'শেরপুর জেলায় বাসা ভাড়া, মেস ভাড়া, চাকরি বিজ্ঞপ্তি, ইলেকট্রিশিয়ান ও প্লাম্বার — সব এক জায়গায় খুঁজুন।';
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
 export const metadata = {
   metadataBase: new URL(SITE_URL),
   manifest: '/manifest.json',
