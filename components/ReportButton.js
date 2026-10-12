@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-export default function ReportButton({ targetType, targetId }) {
+export default function ReportButton({ targetType, targetId, asMenuItem = false }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -76,9 +76,20 @@ export default function ReportButton({ targetType, targetId }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-xs text-ink/40 hover:text-red-500 underline"
+        className={
+          asMenuItem
+            ? 'w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-paper'
+            : 'text-xs text-ink/40 hover:text-red-500 underline'
+        }
       >
-        ⚠ অনুপযুক্ত মনে হলে রিপোর্ট করুন
+        {asMenuItem ? (
+          <>
+            <span>⚠️</span>
+            <span>পোস্ট রিপোর্ট করুন</span>
+          </>
+        ) : (
+          '⚠ অনুপযুক্ত মনে হলে রিপোর্ট করুন'
+        )}
       </button>
 
       {open && (
