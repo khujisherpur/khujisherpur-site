@@ -148,10 +148,10 @@ export default async function ProviderProfile({
         <div className="h-24 bg-gradient-to-r from-green-dark to-green rounded-t-2xl" />
 
         <ProfileMenu title={provider.name} lang={lang}>
-          <div className="px-4 py-2 text-sm">
+          <div className="menu-item">
             <FavoriteButton targetType="provider" targetId={provider.id} />
           </div>
-          <div className="px-4 py-2 text-sm flex justify-start">
+          <div className="menu-item">
             <ReportButton targetType="provider" targetId={provider.id} />
           </div>
         </ProfileMenu>
