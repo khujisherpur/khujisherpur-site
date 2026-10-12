@@ -41,6 +41,31 @@ const getSubcategory = cache(async (slug) => {
   return data || null;
 });
 
+// এই সেবা যাঁরা অতিরিক্ত সেবা হিসেবে দেন তাঁদের আইডি (মেটাডেটা ও পেজ একই কোয়েরি ভাগ করে)
+const getLinkedIds = cache(async (subId) => {
+  const { data } = await supabase
+    .from('provider_subcategories')
+    .select('provider_id')
+    .eq('subcategory_id', subId);
+  return (data || []).map((l) => l.provider_id);
+});
+
+function orFilterFor(subId, linkedIds) {
+  return linkedIds.length
+    ? `id.in.(${linkedIds.join(',')}),primary_subcategory_id.eq.${subId}`
+    : `primary_subcategory_id.eq.${subId}`;
+}
+
+async function countProviders(subId) {
+  const linkedIds = await getLinkedIds(subId);
+  const { count } = await supabase
+    .from('providers')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'approved')
+    .or(orFilterFor(subId, linkedIds));
+  return count || 0;
+}
+
 function cleanUpazila(v) {
   return typeof v === 'string' && upazilaList.includes(v) ? v : '';
 }
@@ -52,13 +77,25 @@ export async function generateMetadata({ params, searchParams }) {
     return { title: lang === 'bn' ? 'পাওয়া যায়নি' : 'Not found', robots: { index: false, follow: false } };
   }
   const name = lang === 'bn' ? sub.name_bn : sub.name_en || sub.name_bn;
-  const title = lang === 'bn' ? `${name} — খুঁজি শেরপুর` : `${name} in Sherpur — Khuji Sherpur`;
-  const description =
-    lang === 'bn'
-      ? `শেরপুর জেলার ${name} সেবাদাতাদের তালিকা — এলাকা, অভিজ্ঞতা ও যোগাযোগ এক জায়গায়।`
-      : `List of ${name} service providers in Sherpur district — area, experience and contact in one place.`;
   const filtered = !!cleanUpazila(searchParams?.upazila);
   const canonical = `/${params.slug}`;
+
+  // সংখ্যা ৩-এর কম হলে বলা হয় না (কম সংখ্যা দেখালে উল্টো ক্লিক কমে); ফিল্টার করা পাতায় গোনাই হয় না
+  let n = 0;
+  if (!filtered && lang === 'bn') n = await countProviders(sub.id);
+  const fmt = n >= 3 ? toBn(n) : null;
+
+  const title =
+    lang === 'bn'
+      ? `শেরপুরের ${name} — ফোন নম্বর ও রিভিউ | খুঁজি শেরপুর`
+      : `${name} in Sherpur — phone numbers & reviews | Khuji Sherpur`;
+  const description =
+    lang === 'bn'
+      ? fmt
+        ? `শেরপুরে ${fmt} জন ${name} — এলাকা, অভিজ্ঞতা ও রিভিউসহ। সরাসরি কল করুন।`
+        : `শেরপুরের ${name} সেবাদাতা — এলাকা, অভিজ্ঞতা ও রিভিউসহ। সরাসরি কল করুন।`
+      : `${name} service providers in Sherpur district — area, experience and reviews. Call directly.`;
+
   return {
     title,
     description,
@@ -91,14 +128,8 @@ export default async function SubcategoryPage({ params, searchParams }) {
   }
 
   // এই সেবা যাঁরা দেন (প্রধান বা অতিরিক্ত, দুটোই)
-  const { data: links } = await supabase
-    .from('provider_subcategories')
-    .select('provider_id')
-    .eq('subcategory_id', subcategory.id);
-  const linkedIds = (links || []).map((l) => l.provider_id);
-  const orFilter = linkedIds.length
-    ? `id.in.(${linkedIds.join(',')}),primary_subcategory_id.eq.${subcategory.id}`
-    : `primary_subcategory_id.eq.${subcategory.id}`;
+  const linkedIds = await getLinkedIds(subcategory.id);
+  const orFilter = orFilterFor(subcategory.id, linkedIds);
 
   let query = supabase
     .from('providers')
@@ -191,7 +222,7 @@ export default async function SubcategoryPage({ params, searchParams }) {
                 className="flex gap-3 bg-white rounded-xl p-3 border-l-4 border-l-green border-t border-r border-b border-ink/10 hover:shadow-md transition-shadow"
               >
                 {p.photo_url ? (
-                  <img src={p.photo_url} alt="" className="w-16 h-16 rounded-full object-cover flex-shrink-0" />
+                  <img src={p.photo_url} alt={p.name || ''} className="w-16 h-16 rounded-full object-cover flex-shrink-0" />
                 ) : (
                   <span className="w-16 h-16 rounded-full bg-[#EEF1F8] text-green-dark text-xl font-semibold flex items-center justify-center flex-shrink-0">
                     {p.name?.charAt(0)}
