@@ -52,6 +52,10 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@500;600;700&display=swap"
         />
+            <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;500&text=০১২৩৪৫৬৭৮৯&display=swap"
+        />
       </head>
       <body className="bg-paper text-ink font-sans antialiased">
         <MaintenanceGate>{children}</MaintenanceGate>
