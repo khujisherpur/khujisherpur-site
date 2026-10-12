@@ -67,7 +67,7 @@ export default function ProfileMenu({ title, lang = 'bn', children }) {
             <span>↗️</span>
             <span>{bn ? 'শেয়ার করুন' : 'Share'}</span>
           </button>
-          {children}
+          <div className="divide-y divide-ink/5">{children}</div>
         </div>
       )}
     </div>
