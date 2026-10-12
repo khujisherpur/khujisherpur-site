@@ -36,9 +36,3 @@ html, body {
 .menu-item a:hover {
   background: rgba(0, 0, 0, 0.04) !important;
 }
-/* শুধু বাংলা অংক (০-৯) পরিষ্কার ফন্টে */
-@font-face {
-  font-family: 'BanglaDigits';
-  src: local('Noto Serif Bengali');
-  unicode-range: U+09E6-09EF;
-}
