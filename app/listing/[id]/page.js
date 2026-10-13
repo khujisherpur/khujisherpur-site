@@ -27,6 +27,7 @@ function formatDateBn(iso) {
 }
 
 // পোস্ট করার সময় সিস্টেম যেসব লাইন বিবরণের মাথায় বসায় সেগুলো আলাদা করে নিই
+// (deadline এখানে শুধু পুরোনো পোস্টের জন্য, নতুন পোস্টে আলাদা কলাম আছে)
 function parseDescription(desc) {
   const lines = String(desc || '').split(/\n+/).map((l) => l.trim()).filter(Boolean);
   let deadline = null;
@@ -110,7 +111,7 @@ function buildDescription(listing, slug, parsed) {
 export async function generateMetadata({ params }) {
   const { data: listing } = await supabase
     .from('listings')
-    .select('title, area, upazila, price_or_salary, description, photos, rent_type, owner_name, categories(slug)')
+    .select('title, area, upazila, price_or_salary, description, photos, rent_type, owner_name, deadline, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'active')
     .gt('expiry_date', new Date().toISOString())
@@ -122,6 +123,8 @@ export async function generateMetadata({ params }) {
 
   const slug = listing.categories?.slug;
   const parsed = parseDescription(listing.description);
+  // নতুন কলাম আগে, না থাকলে পুরোনো পোস্টের বিবরণ থেকে
+  parsed.deadline = listing.deadline || parsed.deadline;
   const title = buildTitle(listing, slug);
   const description = buildDescription(listing, slug, parsed);
   const image = listing.photos?.[0];
@@ -155,6 +158,7 @@ const text = {
   bn: {
     back: '← তালিকায় ফিরে যান', desc: 'বিবরণ', noDesc: 'কোনো বিবরণ দেওয়া হয়নি।',
     details: 'বিস্তারিত', category: 'ক্যাটাগরি', location: 'এলাকা', type: 'ধরন', owner: 'মালিক', employer: 'প্রতিষ্ঠান', posted: 'পোস্ট করা হয়েছে',
+    deadline: 'আবেদনের শেষ তারিখ',
     views: 'ভিউ',
     contact: 'যোগাযোগ', phone: 'মোবাইল', whatsapp: 'হোয়াটসঅ্যাপ', email: 'ইমেইল',
     noContact: 'এই পোস্টে যোগাযোগের তথ্য দেওয়া হয়নি।',
@@ -164,6 +168,7 @@ const text = {
   en: {
     back: '← Back to list', desc: 'Description', noDesc: 'No description provided.',
     details: 'Details', category: 'Category', location: 'Location', type: 'Type', owner: 'Owner', employer: 'Employer', posted: 'Posted',
+    deadline: 'Application deadline',
     views: 'views',
     contact: 'Contact', phone: 'Phone', whatsapp: 'WhatsApp', email: 'Email',
     noContact: 'No contact information was provided for this post.',
@@ -205,7 +210,7 @@ export default async function ListingDetailPage({ params }) {
 
   const { data: listing } = await supabase
     .from('listings')
-    .select('id, title, area, upazila, union_name, price_or_salary, description, photos, rent_type, owner_name, posted_at, expiry_date, view_count, contact_phone, whatsapp, contact_email, categories(slug)')
+    .select('id, title, area, upazila, union_name, price_or_salary, description, photos, rent_type, owner_name, posted_at, expiry_date, view_count, contact_phone, whatsapp, contact_email, deadline, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'active')
     .gt('expiry_date', new Date().toISOString())
@@ -222,7 +227,10 @@ export default async function ListingDetailPage({ params }) {
 
   const isJob = listing.categories?.slug === 'job';
   const parsed = parseDescription(listing.description);
-  const deadlinePassed = isJob && isDeadlinePassed(parsed.deadline);
+  // নতুন কলাম আগে, না থাকলে পুরোনো পোস্টের বিবরণ থেকে
+  const deadline = listing.deadline || parsed.deadline;
+  parsed.deadline = deadline;
+  const deadlinePassed = isJob && isDeadlinePassed(deadline);
 
   const label = categoryLabels[listing.categories?.slug];
   const categoryName = label ? label[lang].name : '';
@@ -233,14 +241,9 @@ export default async function ListingDetailPage({ params }) {
   const price = formatPrice(listing.price_or_salary, lang);
   const views = (listing.view_count || 0) + (counted ? 1 : 0);
 
-  // পাতায় শেষ তারিখ বাংলা অঙ্ক ও মাসের নামে দেখাই
+  // পুরোনো পোস্টের বিবরণে থাকা শেষ তারিখের লাইন সরাই, তারিখ নিচের "বিস্তারিত" তালিকায় আলাদা সারিতে দেখাব
   const shownDescription = listing.description
-    ? lang === 'bn'
-      ? listing.description.replace(
-          /(আবেদনের শেষ তারিখ:\s*)(\d{4}-\d{2}-\d{2})/,
-          (_, a, d) => `${a}${formatDateBn(d)}`
-        )
-      : listing.description
+    ? listing.description.replace(/আবেদনের শেষ তারিখ:\s*\d{4}-\d{2}-\d{2}\s*/, '').trim()
     : '';
 
   const hasPhone = !!listing.contact_phone;
@@ -252,6 +255,7 @@ export default async function ListingDetailPage({ params }) {
     { k: t.location, v: where },
     listing.rent_type ? { k: t.type, v: t[listing.rent_type] || listing.rent_type } : null,
     listing.owner_name ? { k: isJob ? t.employer : t.owner, v: listing.owner_name } : null,
+    isJob && deadline ? { k: t.deadline, v: lang === 'bn' ? formatDateBn(deadline) : deadline } : null,
     { k: t.posted, v: timeAgo(listing.posted_at, lang) },
   ].filter((r) => r && r.v);
 
@@ -261,8 +265,8 @@ export default async function ListingDetailPage({ params }) {
 
   if (isJob) {
     if (listing.owner_name && !deadlinePassed) {
-      const validThrough = parsed.deadline
-        ? `${parsed.deadline}T23:59:59+06:00`
+      const validThrough = deadline
+        ? `${deadline}T23:59:59+06:00`
         : new Date(listing.expiry_date).toISOString();
 
       jsonLd = {
