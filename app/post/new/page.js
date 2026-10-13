@@ -8,8 +8,8 @@ import { locations, upazilaList } from '../../../lib/locations';
 import { categoryLabels } from '../../../lib/categoryLabels';
 import { cleanPhone, isValidBdPhone } from '../../../lib/format';
 
-// ডোমেইন বসানোর সময় শুধু এই এক লাইন বদলাবেন (https:// ছাড়া)
-export const SITE_URL = 'https://khujisherpur.com';
+// প্রোফাইল লিংকের প্রিভিউতে দেখানো ঠিকানা (https:// ছাড়া)
+const SITE_HOST = 'khujisherpur.com';
 
 const rentTypeLabels = { house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য' };
 const roomOptions = ['১', '২', '৩', '৪+'];
@@ -65,6 +65,7 @@ function PageShell({ children }) {
 }
 
 function NewPostForm() {
+  const todayStr = new Date().toLocaleDateString('en-CA');
   const searchParams = useSearchParams();
   const categorySlug = searchParams.get('category');
 
@@ -264,6 +265,10 @@ function NewPostForm() {
       if (form.selectedSubcategoryIds.length === 0) { setError('অন্তত একটা সেবা বাছাই করুন'); return; }
       if (!form.primarySubcategoryId) { setError('প্রধান সেবা বাছাই করুন'); return; }
     }
+    if (category.slug === 'job' && form.deadline && form.deadline < todayStr) {
+      setError('আবেদনের শেষ তারিখ আজকের আগের হতে পারবে না');
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -322,9 +327,6 @@ function NewPostForm() {
           const conditionText = form.condition === 'new' ? 'নতুন' : 'ব্যবহৃত';
           description = `কন্ডিশন: ${conditionText}${form.negotiable ? ' (দর কষাকষি যোগ্য)' : ''}\n\n${form.description}`;
         }
-        if (isJob && form.deadline) {
-          description = `আবেদনের শেষ তারিখ: ${form.deadline}\n\n${form.description}`;
-        }
         if (isRent) {
           const parts = [];
           if (form.bedrooms) parts.push(`${form.bedrooms} বেডরুম`);
@@ -357,6 +359,8 @@ function NewPostForm() {
         if (isJob) {
           // চাকরিতে এই কলামে প্রতিষ্ঠান বা নিয়োগকর্তার নাম যায়
           payload.owner_name = form.ownerName.trim();
+          // শেষ তারিখ আলাদা কলামে (ঐচ্ছিক)
+          payload.deadline = form.deadline || null;
         }
 
         const { error } = await supabase.from('listings').insert(payload);
@@ -891,10 +895,11 @@ function NewPostForm() {
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">আবেদনের শেষ তারিখ (ঐচ্ছিক)</label>
               <input
-                type="date" value={form.deadline}
+                type="date" min={todayStr} value={form.deadline}
                 onChange={(e) => updateField('deadline', e.target.value)}
                 className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
               />
+              <p className="text-xs text-ink/50 mt-1">তারিখ পার হলে পোস্টটি নিজে থেকে "মেয়াদ শেষ" দেখাবে</p>
             </div>
           )}
 
