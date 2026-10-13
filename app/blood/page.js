@@ -12,9 +12,7 @@ const sinceISO = () => new Date(Date.now() - EXPIRY_DAYS * 24 * 60 * 60 * 1000).
 
 const text = {
   bn: {
-    title: 'শেরপুরে রক্তদাতা ও রক্তের অনুরোধ', login: 'লগইন', home: '← হোমপেজ',
-    intro:
-      'শেরপুরে জরুরি রক্ত লাগলে এখানে অনুরোধ জমা দিন। A+, A-, B+, B-, O+, O-, AB+, AB- যেকোনো গ্রুপের রক্ত লাগলে গ্রুপ মিলে যাওয়া রক্তদাতারা নোটিফিকেশন পান। আপনি রক্ত দিতে চাইলে ডোনার হিসেবে নিবন্ধন করুন।',
+    title: 'ব্লাড', login: 'লগইন', home: '← হোমপেজ',
     needBlood: '🆘 রক্তের প্রয়োজন?', needBloodDesc: 'অনুরোধ পোস্ট করুন, ম্যাচিং ডোনাররা নোটিফিকেশন পাবেন',
     requestBtn: 'অনুরোধ করুন',
     becomeDonor: '❤️ ডোনার হতে চান?', becomeDonorDesc: 'নিবন্ধন করুন, কারো প্রয়োজন হলে নোটিফিকেশন পাবেন',
@@ -25,9 +23,7 @@ const text = {
     faqTitle: 'সাধারণ প্রশ্ন',
   },
   en: {
-    title: 'Blood Donors & Requests in Sherpur', login: 'Login', home: '← Home',
-    intro:
-      'If you urgently need blood in Sherpur, post a request here. Donors with a matching blood group (A+, A-, B+, B-, O+, O-, AB+, AB-) get notified. If you want to give blood, register as a donor.',
+    title: 'Blood', login: 'Login', home: '← Home',
     needBlood: '🆘 Need Blood?', needBloodDesc: 'Post a request, matching donors get notified',
     requestBtn: 'Request Now',
     becomeDonor: '❤️ Want to be a Donor?', becomeDonorDesc: 'Register and get notified when needed',
@@ -41,6 +37,10 @@ const text = {
 
 const faqs = {
   bn: [
+    {
+      q: 'শেরপুরে রক্তদাতা ও রক্তের অনুরোধ এখানে কীভাবে কাজ করে?',
+      a: 'শেরপুরে জরুরি রক্ত লাগলে এখানে অনুরোধ জমা দিন। A+, A-, B+, B-, O+, O-, AB+, AB- যেকোনো গ্রুপের রক্ত লাগলে গ্রুপ মিলে যাওয়া রক্তদাতারা নোটিফিকেশন পান। আপনি রক্ত দিতে চাইলে ডোনার হিসেবে নিবন্ধন করুন।',
+    },
     {
       q: 'শেরপুরে জরুরি রক্ত লাগলে কী করব?',
       a: 'এই পাতার "অনুরোধ করুন" বোতাম চেপে রক্তের গ্রুপ, কত ব্যাগ লাগবে আর হাসপাতাল বা এলাকার নাম দিয়ে অনুরোধ জমা দিন। গ্রুপ মিলে যাওয়া রক্তদাতারা নোটিফিকেশন পান, আর অনুরোধটি এই পাতাতেও সবার সামনে দেখা যায়।',
@@ -63,6 +63,10 @@ const faqs = {
     },
   ],
   en: [
+    {
+      q: 'How do blood donors and requests work on Khuji Sherpur?',
+      a: 'If you urgently need blood in Sherpur, post a request here. Donors with a matching blood group (A+, A-, B+, B-, O+, O-, AB+, AB-) get notified. If you want to give blood, register as a donor.',
+    },
     {
       q: 'What should I do if I urgently need blood in Sherpur?',
       a: 'Tap "Request Now" on this page and submit the blood group, number of bags needed and the hospital or area. Donors with a matching blood group get notified, and the request is also shown publicly on this page.',
@@ -168,11 +172,10 @@ export default async function BloodPage() {
 
       <a href="/" className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
 
-      <div className="flex items-center gap-3 mt-3 mb-3">
+      <div className="flex items-center gap-3 mt-3 mb-8">
         <span className="text-3xl">🩸</span>
-        <h1 className="text-2xl md:text-3xl font-semibold leading-snug">{t.title}</h1>
+        <h1 className="text-2xl md:text-3xl font-semibold">{t.title}</h1>
       </div>
-      <p className="text-sm text-ink/70 leading-relaxed mb-8">{t.intro}</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
         <div className="bg-white border-2 border-red-200 p-5">
