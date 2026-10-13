@@ -7,7 +7,6 @@ import PhotoLightbox from '../../../components/PhotoLightbox';
 import ReportButton from '../../../components/ReportButton';
 import FavoriteButton from '../../../components/FavoriteButton';
 import ProfileMenu from '../../../components/ProfileMenu';
-import ContactBar from '../../../components/ContactBar';
 import SiteHeader from '../../../components/SiteHeader';
 import { getLang } from '../../../lib/getLang';
 import { categoryLabels } from '../../../lib/categoryLabels';
@@ -195,9 +194,10 @@ const text = {
     deadline: 'আবেদনের শেষ তারিখ',
     views: 'ভিউ',
     contact: 'যোগাযোগ', phone: 'মোবাইল', whatsapp: 'হোয়াটসঅ্যাপ', email: 'ইমেইল',
+    call: 'কল করুন', waBtn: 'WhatsApp',
     noContact: 'এই পোস্টে যোগাযোগের তথ্য দেওয়া হয়নি।',
     deadlinePassed: '⏰ আবেদনের শেষ তারিখ পেরিয়ে গেছে',
-    bedrooms: '🛏️ বেডরুম', bathrooms: '🚿 বাথরুম', size: '📐 আয়তন', sqft: 'বর্গফুট', condition: '✨ কন্ডিশন',
+    bedrooms: 'বেডরুম', bathrooms: 'বাথরুম', size: 'আয়তন', sqft: 'বর্গফুট', condition: 'কন্ডিশন',
     amenities: 'সুযোগ-সুবিধা', map: '📍 গুগল ম্যাপে দেখুন',
     related: 'আরও দেখুন', seeAll: 'সব দেখুন →',
     house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য',
@@ -208,9 +208,10 @@ const text = {
     deadline: 'Application deadline',
     views: 'views',
     contact: 'Contact', phone: 'Phone', whatsapp: 'WhatsApp', email: 'Email',
+    call: 'Call', waBtn: 'WhatsApp',
     noContact: 'No contact information was provided for this post.',
     deadlinePassed: '⏰ The application deadline has passed',
-    bedrooms: '🛏️ Bedrooms', bathrooms: '🚿 Bathrooms', size: '📐 Size', sqft: 'sq ft', condition: '✨ Condition',
+    bedrooms: 'Bedrooms', bathrooms: 'Bathrooms', size: 'Size', sqft: 'sq ft', condition: 'Condition',
     amenities: 'Amenities', map: '📍 View on Google Maps',
     related: 'More to explore', seeAll: 'See all →',
     house: 'House', shop: 'Shop', mess: 'Mess', other: 'Other',
@@ -234,6 +235,35 @@ function Linkify({ value }) {
     ) : (
       <span key={i}>{part}</span>
     )
+  );
+}
+
+// কল ও WhatsApp বোতাম (মূল কার্ড ও আরও-দেখুন কার্ডে একই)
+function ContactButtons({ phone, whatsapp, t, small = false }) {
+  const wa = waLink(whatsapp);
+  if (!phone && !wa) return null;
+  const size = small ? 'py-2 text-xs' : 'py-3 text-sm';
+  return (
+    <div className="flex gap-2">
+      {phone && (
+        <a
+          href={`tel:${cleanPhone(phone)}`}
+          className={`flex-1 text-center font-semibold rounded-xl bg-marigold text-ink ${size}`}
+        >
+          📞 {t.call}
+        </a>
+      )}
+      {wa && (
+        <a
+          href={wa}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex-1 text-center font-semibold rounded-xl bg-[#25D366] text-white ${size}`}
+        >
+          💬 {t.waBtn}
+        </a>
+      )}
+    </div>
   );
 }
 
@@ -281,19 +311,12 @@ export default async function ListingDetailPage({ params }) {
   const price = formatPrice(listing.price_or_salary, lang);
   const views = (listing.view_count || 0) + (counted ? 1 : 0);
 
-  // বিবরণে শুধু মালিকের নিজের লেখা, বাকি তথ্য নিচে আলাদা কার্ডে
+  // বিবরণে শুধু মালিকের নিজের লেখা, বাকি তথ্য "বিস্তারিত" তালিকায়
   const shownDescription = parsed.bodyLines.join('\n');
 
   const hasPhone = !!listing.contact_phone;
   const waUrl = waLink(listing.whatsapp);
   const hasContact = hasPhone || !!waUrl || !!listing.contact_email;
-
-  // তথ্য-কার্ড: ভাড়ায় রুম/আয়তন, বিক্রিতে কন্ডিশন
-  const facts = [];
-  if (parsed.roomsInfo?.beds) facts.push({ k: t.bedrooms, v: parsed.roomsInfo.beds });
-  if (parsed.roomsInfo?.baths) facts.push({ k: t.bathrooms, v: parsed.roomsInfo.baths });
-  if (parsed.roomsInfo?.sqft) facts.push({ k: t.size, v: `${parsed.roomsInfo.sqft} ${t.sqft}` });
-  if (parsed.condition) facts.push({ k: t.condition, v: parsed.condition });
 
   const amenityList = parsed.amenities
     ? parsed.amenities.split(/[,،;]+/).map((s) => s.trim()).filter(Boolean).slice(0, 12)
@@ -302,8 +325,12 @@ export default async function ListingDetailPage({ params }) {
 
   const rows = [
     { k: t.category, v: categoryName },
-    { k: t.location, v: where },
     listing.rent_type ? { k: t.type, v: t[listing.rent_type] || listing.rent_type } : null,
+    parsed.roomsInfo?.beds ? { k: t.bedrooms, v: parsed.roomsInfo.beds } : null,
+    parsed.roomsInfo?.baths ? { k: t.bathrooms, v: parsed.roomsInfo.baths } : null,
+    parsed.roomsInfo?.sqft ? { k: t.size, v: `${parsed.roomsInfo.sqft} ${t.sqft}` } : null,
+    parsed.condition ? { k: t.condition, v: parsed.condition } : null,
+    { k: t.location, v: where },
     listing.owner_name ? { k: isJob ? t.employer : t.owner, v: listing.owner_name } : null,
     isJob && deadline ? { k: t.deadline, v: lang === 'bn' ? formatDateBn(deadline) : deadline } : null,
     { k: t.posted, v: timeAgo(listing.posted_at, lang) },
@@ -312,7 +339,7 @@ export default async function ListingDetailPage({ params }) {
   // আরও দেখুন: একই ক্যাটাগরির অন্য সক্রিয় পোস্ট, একই উপজেলার আগে
   const { data: relatedRaw } = await supabase
     .from('listings')
-    .select('id, title, area, upazila, price_or_salary, photos, posted_at, deadline')
+    .select('id, title, area, upazila, price_or_salary, photos, posted_at, deadline, contact_phone, whatsapp')
     .eq('status', 'active')
     .gt('expiry_date', new Date().toISOString())
     .eq('category_id', listing.category_id)
@@ -378,7 +405,7 @@ export default async function ListingDetailPage({ params }) {
   return (
     <>
       <SiteHeader lang={lang} />
-      <main className="max-w-2xl mx-auto px-4 pt-4 pb-32">
+      <main className="max-w-2xl mx-auto px-4 pt-4 pb-12">
         <a href={`/category/${slug}`} className="text-sm text-ink/55 hover:text-ink">
           {t.back}
         </a>
@@ -438,18 +465,10 @@ export default async function ListingDetailPage({ params }) {
               <span className="mx-1.5">·</span>👁️ {num(views)} {t.views}
             </p>
 
-            {/* তথ্য-কার্ড */}
-            {facts.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-4">
-                {facts.map((f) => (
-                  <div
-                    key={f.k}
-                    className="flex-1 min-w-[96px] bg-[#EEF1F8] rounded-xl py-2.5 px-2 text-center"
-                  >
-                    <p className="text-base font-semibold font-numeric leading-tight">{f.v}</p>
-                    <p className="text-[11px] text-ink/55 mt-0.5">{f.k}</p>
-                  </div>
-                ))}
+            {/* কল ও WhatsApp */}
+            {(hasPhone || waUrl) && (
+              <div className="mt-4">
+                <ContactButtons phone={listing.contact_phone} whatsapp={listing.whatsapp} t={t} />
               </div>
             )}
 
@@ -560,24 +579,28 @@ export default async function ListingDetailPage({ params }) {
                 const rPrice = formatPrice(r.price_or_salary, lang);
                 const rPlace = uniqPlaces([r.area, r.upazila]).join(', ');
                 return (
-                  <a
+                  <div
                     key={r.id}
-                    href={`/listing/${r.id}`}
-                    className="snap-start flex-shrink-0 w-44 bg-white border border-ink/10 rounded-2xl overflow-hidden shadow-sm"
+                    className="snap-start flex-shrink-0 w-48 bg-white border border-ink/10 rounded-2xl overflow-hidden shadow-sm"
                   >
-                    {r.photos?.[0] ? (
-                      <img src={r.photos[0]} alt={r.title || ''} className="w-full h-28 object-cover" />
-                    ) : (
-                      <div className="w-full h-28 bg-[#EEF1F8] flex items-center justify-center text-3xl opacity-70">
-                        {label?.icon || '📄'}
+                    <a href={`/listing/${r.id}`} className="block">
+                      {r.photos?.[0] ? (
+                        <img src={r.photos[0]} alt={r.title || ''} className="w-full h-28 object-cover" />
+                      ) : (
+                        <div className="w-full h-28 bg-[#EEF1F8] flex items-center justify-center text-3xl opacity-70">
+                          {label?.icon || '📄'}
+                        </div>
+                      )}
+                      <div className="p-3 pb-2">
+                        <p className="text-sm font-medium leading-snug line-clamp-2">{r.title}</p>
+                        {rPrice && <p className="text-sm font-semibold text-green font-numeric mt-1">{rPrice}</p>}
+                        <p className="text-[11px] text-ink/50 mt-1 truncate">📍 {rPlace}</p>
                       </div>
-                    )}
-                    <div className="p-3">
-                      <p className="text-sm font-medium leading-snug line-clamp-2">{r.title}</p>
-                      {rPrice && <p className="text-sm font-semibold text-green font-numeric mt-1">{rPrice}</p>}
-                      <p className="text-[11px] text-ink/50 mt-1 truncate">📍 {rPlace}</p>
+                    </a>
+                    <div className="px-3 pb-3">
+                      <ContactButtons phone={r.contact_phone} whatsapp={r.whatsapp} t={t} small />
                     </div>
-                  </a>
+                  </div>
                 );
               })}
             </div>
@@ -591,13 +614,6 @@ export default async function ListingDetailPage({ params }) {
           />
         )}
       </main>
-
-      <ContactBar
-        phone={listing.contact_phone}
-        whatsapp={listing.whatsapp || ''}
-        email={listing.contact_email}
-        lang={lang}
-      />
     </>
   );
 }
