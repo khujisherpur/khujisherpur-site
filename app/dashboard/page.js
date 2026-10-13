@@ -33,6 +33,7 @@ const text = {
     statViews: 'মোট ভিউ',
     favorites: 'সংরক্ষিত',
     donor: 'ডোনার ড্যাশবোর্ড',
+    bloodRequests: 'আমার রক্তের অনুরোধ',
     adminPanel: 'অ্যাডমিন প্যানেল',
     suspendedTitle: 'আপনার অ্যাকাউন্ট সাসপেন্ড করা আছে',
     suspendedBody: 'আপাতত আপনি নতুন পোস্ট বা প্রোফাইল তৈরি করতে বা বিদ্যমান পোস্ট এডিট করতে পারবেন না।',
@@ -73,6 +74,7 @@ const text = {
     statViews: 'Total views',
     favorites: 'Saved',
     donor: 'Donor Dashboard',
+    bloodRequests: 'My Blood Requests',
     adminPanel: 'Admin Panel',
     suspendedTitle: 'Your account is suspended',
     suspendedBody: 'You cannot create new posts or profiles, or edit existing ones, for now.',
@@ -327,6 +329,14 @@ export default function DashboardPage() {
           >
             <span className="w-9 h-9 rounded-lg bg-[#EEF1F8] flex items-center justify-center">🩸</span>
             <span className="text-sm font-medium leading-tight">{t.donor}</span>
+          </a>
+          <a
+            href="/dashboard/blood-requests"
+            className="col-span-2 bg-white border border-ink/10 rounded-xl p-3 flex items-center gap-2.5 active:bg-paper"
+          >
+            <span className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center">📋</span>
+            <span className="text-sm font-medium leading-tight">{t.bloodRequests}</span>
+            <span className="ml-auto text-ink/30">›</span>
           </a>
           {isStaff && (
             <a
