@@ -6,7 +6,7 @@ import LanguageToggle from '../../components/LanguageToggle';
 const content = {
   bn: {
     title: 'শর্তাবলি',
-    updated: 'সর্বশেষ হালনাগাদ: সেপ্টেম্বর ২০২৬',
+    updated: 'সর্বশেষ হালনাগাদ: অক্টোবর ২০২৬',
     back: '← হোমপেজে ফিরে যান',
     sections: [
       {
@@ -18,8 +18,8 @@ const content = {
         p: 'অ্যাকাউন্ট তৈরি করার সময় আপনাকে সঠিক তথ্য দিতে হবে। আপনার অ্যাকাউন্ট থেকে হওয়া সব কার্যক্রমের জন্য আপনি দায়ী থাকবেন। মিথ্যা তথ্য, প্রতারণামূলক পোস্ট, বা অন্যকে ক্ষতিগ্রস্ত করার উদ্দেশ্যে কিছু পোস্ট করা নিষিদ্ধ।',
       },
       {
-        h: '৩. পোস্ট ও প্রোফাইল অনুমোদন',
-        p: 'সব পোস্ট ও প্রোফাইল প্রকাশের আগে পর্যালোচনার (Pending) মধ্য দিয়ে যায়। খুঁজি শেরপুর কর্তৃপক্ষের এমন অধিকার আছে যে কোনো পোস্ট/প্রোফাইল, শর্তাবলি ভঙ্গ করলে বা অনুপযুক্ত মনে হলে, তা প্রত্যাখ্যান বা সরিয়ে ফেলার।',
+        h: '৩. পোস্ট ও প্রোফাইল পর্যালোচনা',
+        p: 'পোস্ট ও প্রোফাইল প্রকাশের আগে বা পরে খুঁজি শেরপুর কর্তৃপক্ষ সেগুলো পর্যালোচনা করতে পারে। এই পর্যালোচনা তথ্যের সত্যতার কোনো নিশ্চয়তা নয়। শর্তাবলি ভঙ্গ করলে বা অনুপযুক্ত মনে হলে কর্তৃপক্ষ যেকোনো সময় যে কোনো পোস্ট/প্রোফাইল প্রত্যাখ্যান বা সরিয়ে ফেলার অধিকার রাখে।',
       },
       {
         h: '৪. দায়বদ্ধতার সীমাবদ্ধতা',
@@ -33,7 +33,7 @@ const content = {
   },
   en: {
     title: 'Terms of Service',
-    updated: 'Last updated: September 2026',
+    updated: 'Last updated: October 2026',
     back: '← Back to Home',
     sections: [
       {
@@ -45,8 +45,8 @@ const content = {
         p: 'You must provide accurate information when creating an account. You are responsible for all activity under your account. Posting false information, fraudulent listings, or content intended to harm others is prohibited.',
       },
       {
-        h: '3. Post & Profile Approval',
-        p: 'All posts and profiles go through a review (Pending) stage before publishing. Khuji Sherpur reserves the right to reject or remove any post/profile that violates these terms or is deemed inappropriate.',
+        h: '3. Post & Profile Review',
+        p: 'Khuji Sherpur may review posts and profiles before or after they are published. Such a review is not a guarantee that the information is accurate. We reserve the right to reject or remove any post/profile at any time if it violates these terms or is deemed inappropriate.',
       },
       {
         h: '4. Limitation of Liability',
@@ -66,8 +66,8 @@ export async function generateMetadata() {
     title: lang === 'bn' ? 'শর্তাবলি — খুঁজি শেরপুর' : 'Terms of Service — Khuji Sherpur',
     description:
       lang === 'bn'
-        ? 'খুঁজি শেরপুর ব্যবহারের শর্তাবলি: অ্যাকাউন্ট, পোস্ট অনুমোদন ও দায়বদ্ধতার সীমাবদ্ধতা।'
-        : 'Terms of using Khuji Sherpur: accounts, post approval and limitation of liability.',
+        ? 'খুঁজি শেরপুর ব্যবহারের শর্তাবলি: অ্যাকাউন্ট, পোস্ট পর্যালোচনা ও দায়বদ্ধতার সীমাবদ্ধতা।'
+        : 'Terms of using Khuji Sherpur: accounts, post review and limitation of liability.',
   };
 }
 
