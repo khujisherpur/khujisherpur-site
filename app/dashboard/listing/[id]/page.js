@@ -42,10 +42,14 @@ function PageShell({ children }) {
 }
 
 export default function EditListingPage({ params }) {
+  const todayStr = new Date().toLocaleDateString('en-CA');
+
   const [form, setForm] = useState({
     title: '', area: '', price_or_salary: '', description: '',
     owner_name: '', contact_phone: '', whatsapp: '', contact_email: '',
+    deadline: '',
   });
+  const [originalDeadline, setOriginalDeadline] = useState('');
   const [categoryName, setCategoryName] = useState('');
   const [categorySlug, setCategorySlug] = useState('');
   const [originalStatus, setOriginalStatus] = useState('');
@@ -76,7 +80,7 @@ export default function EditListingPage({ params }) {
 
     const { data, error } = await supabase
       .from('listings')
-      .select('title, area, price_or_salary, description, photos, owner_name, status, contact_phone, whatsapp, contact_email, categories(name, slug)')
+      .select('title, area, price_or_salary, description, photos, owner_name, status, contact_phone, whatsapp, contact_email, deadline, categories(name, slug)')
       .eq('id', params.id)
       .single();
 
@@ -94,7 +98,9 @@ export default function EditListingPage({ params }) {
       contact_phone: data.contact_phone || '',
       whatsapp: data.whatsapp || '',
       contact_email: data.contact_email || '',
+      deadline: data.deadline || '',
     });
+    setOriginalDeadline(data.deadline || '');
     setCategoryName(data.categories?.name || '');
     setCategorySlug(data.categories?.slug || '');
     setOriginalStatus(data.status || '');
@@ -151,6 +157,7 @@ export default function EditListingPage({ params }) {
 
   // চাকরিতে প্রতিষ্ঠান/নিয়োগকর্তা, ভাড়ায় মালিকের নাম
   const needsOwner = categorySlug === 'job' || categorySlug === 'rent';
+  const isJob = categorySlug === 'job';
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -161,6 +168,11 @@ export default function EditListingPage({ params }) {
     }
     if (form.whatsapp && !isValidBdPhone(form.whatsapp)) {
       setError('হোয়াটসঅ্যাপ নম্বরটি সঠিক নয় (যেমন: 01XXXXXXXXX)');
+      return;
+    }
+    // পুরোনো তারিখ না বদলালে আটকাবে না, নতুন করে আজকের আগের তারিখ দিলে আটকাবে
+    if (isJob && form.deadline && form.deadline !== originalDeadline && form.deadline < todayStr) {
+      setError('আবেদনের শেষ তারিখ আজকের আগের হতে পারবে না');
       return;
     }
     setSaving(true);
@@ -190,6 +202,7 @@ export default function EditListingPage({ params }) {
         contact_email: form.contact_email.trim() || null,
       };
       if (needsOwner) payload.owner_name = form.owner_name.trim();
+      if (isJob) payload.deadline = form.deadline || null;
       // অনুমোদিত পোস্টে নাম, বিবরণ, দাম, ছবি বা যোগাযোগ বদলালে ডাটাবেস নিজেই আবার pending করে।
       // শুধু প্রত্যাখ্যাত পোস্ট ঠিক করে আবার পাঠালে এখান থেকে pending করতে হয়।
       if (originalStatus === 'rejected') payload.status = 'pending';
@@ -357,13 +370,13 @@ export default function EditListingPage({ params }) {
           {needsOwner && (
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">
-                {categorySlug === 'job' ? 'প্রতিষ্ঠান বা নিয়োগকর্তার নাম' : 'বাড়ি/দোকান মালিকের নাম'}
+                {isJob ? 'প্রতিষ্ঠান বা নিয়োগকর্তার নাম' : 'বাড়ি/দোকান মালিকের নাম'}
               </label>
               <input
                 type="text" required maxLength={80} value={form.owner_name}
                 onChange={(e) => updateField('owner_name', e.target.value)}
                 className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
-                placeholder={categorySlug === 'job' ? 'প্রতিষ্ঠান না থাকলে আপনার নাম' : 'মালিকের নাম'}
+                placeholder={isJob ? 'প্রতিষ্ঠান না থাকলে আপনার নাম' : 'মালিকের নাম'}
               />
             </div>
           )}
@@ -387,6 +400,19 @@ export default function EditListingPage({ params }) {
               />
             </div>
           </div>
+
+          {isJob && (
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">আবেদনের শেষ তারিখ (ঐচ্ছিক)</label>
+              <input
+                type="date" value={form.deadline}
+                onChange={(e) => updateField('deadline', e.target.value)}
+                className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
+              />
+              <p className="text-xs text-ink/50 mt-1">তারিখ পার হলে পোস্টটি "মেয়াদ শেষ" দেখাবে। তারিখ না দিলে ফাঁকা রাখুন।</p>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">বিবরণ</label>
             <textarea
