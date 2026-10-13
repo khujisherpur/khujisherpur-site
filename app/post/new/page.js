@@ -9,7 +9,7 @@ import { categoryLabels } from '../../../lib/categoryLabels';
 import { cleanPhone, isValidBdPhone } from '../../../lib/format';
 
 // ডোমেইন বসানোর সময় শুধু এই এক লাইন বদলাবেন (https:// ছাড়া)
-const SITE_HOST = 'khujisherpur-site.pages.dev';
+export const SITE_URL = 'https://khujisherpur.com';
 
 const rentTypeLabels = { house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য' };
 const roomOptions = ['১', '২', '৩', '৪+'];
