@@ -15,6 +15,9 @@ const staticPages = [
 
 export default async function sitemap() {
   const now = new Date();
+  // বাংলাদেশ সময়ে আজকের তারিখ (YYYY-MM-DD), আবেদনের মেয়াদ মেলাতে
+  const todayBd = new Date(now.getTime() + 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
   const entries = staticPages.map((p) => ({
     url: `${SITE_URL}${p.path}`,
     lastModified: now,
@@ -42,6 +45,7 @@ export default async function sitemap() {
         .select('id, updated_at, posted_at')
         .eq('status', 'active')
         .gt('expiry_date', now.toISOString())
+        .or(`deadline.is.null,deadline.gte.${todayBd}`)
         .order('posted_at', { ascending: false })
         .limit(1000),
     ]);
@@ -88,7 +92,7 @@ export default async function sitemap() {
       });
     });
 
-    // সক্রিয় ও মেয়াদ-না-ফুরানো পোস্ট
+    // সক্রিয়, মেয়াদ-না-ফুরানো ও আবেদনের তারিখ না-পেরোনো পোস্ট
     (listings || []).forEach((l) => {
       entries.push({
         url: `${SITE_URL}/listing/${l.id}`,
