@@ -10,18 +10,6 @@ import LanguageToggle from '../../components/LanguageToggle';
 const EXPIRY_DAYS = 3;
 const sinceISO = () => new Date(Date.now() - EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
-import { supabase } from '../../lib/supabaseClient';
-import { getLang } from '../../lib/getLang';
-import { toBn } from '../../lib/format';
-import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../lib/site';
-import LanguageToggle from '../../components/LanguageToggle';
-
-// ৩ দিনের পুরোনো অনুরোধ আর দেখানো হবে না (ডাটাবেসও মুছে ফেলে)
-const EXPIRY_DAYS = 3;
-const sinceISO = () => new Date(Date.now() - EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
-
 const text = {
   bn: {
     title: 'শেরপুরে রক্তদাতা ও রক্তের অনুরোধ', login: 'লগইন', home: '← হোমপেজ',
