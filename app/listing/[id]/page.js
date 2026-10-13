@@ -6,7 +6,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import PhotoLightbox from '../../../components/PhotoLightbox';
 import ReportButton from '../../../components/ReportButton';
 import FavoriteButton from '../../../components/FavoriteButton';
-import ShareButton from '../../../components/ShareButton';
+import ProfileMenu from '../../../components/ProfileMenu';
 import ContactBar from '../../../components/ContactBar';
 import SiteHeader from '../../../components/SiteHeader';
 import { getLang } from '../../../lib/getLang';
@@ -26,6 +26,23 @@ function formatDateBn(iso) {
   return `${toBn(parseInt(m[3], 10))} ${MONTHS_BN[parseInt(m[2], 10) - 1]} ${toBn(m[1])}`;
 }
 
+// একই জায়গার নাম দুইবার না দেখাতে: বাংলা "য়"-এর দুই রকম লেখা ও অদৃশ্য চিহ্ন এক ধরে মেলানো
+function uniqPlaces(list) {
+  const seen = new Set();
+  const out = [];
+  for (const v of list) {
+    const k = String(v || '')
+      .normalize('NFC')
+      .replace(/[\u200c\u200d]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(k);
+  }
+  return out;
+}
+
 // পোস্ট করার সময় সিস্টেম যেসব লাইন বিবরণের মাথায় বসায় সেগুলো আলাদা করে নিই
 // (deadline এখানে শুধু পুরোনো পোস্টের জন্য, নতুন পোস্টে আলাদা কলাম আছে)
 function parseDescription(desc) {
@@ -33,19 +50,38 @@ function parseDescription(desc) {
   let deadline = null;
   let condition = null;
   let rooms = null;
-  const body = [];
+  let amenities = null;
+  let mapLink = null;
+  const bodyLines = [];
   for (const line of lines) {
     const dm = line.match(/^আবেদনের শেষ তারিখ:\s*(\d{4}-\d{2}-\d{2})/);
     if (dm) { deadline = dm[1]; continue; }
     if (/^কন্ডিশন:/.test(line)) { condition = line.replace(/^কন্ডিশন:\s*/, ''); continue; }
-    if (/^(সুযোগ-সুবিধা|গুগল ম্যাপ):/.test(line)) continue;
-    if (!rooms && body.length === 0 && /(বেডরুম|বাথরুম|বর্গফুট)/.test(line) && line.length < 60) {
+    if (/^সুযোগ-সুবিধা:/.test(line)) { amenities = line.replace(/^সুযোগ-সুবিধা:\s*/, ''); continue; }
+    if (/^গুগল ম্যাপ:/.test(line)) { mapLink = line.replace(/^গুগল ম্যাপ:\s*/, ''); continue; }
+    if (!rooms && bodyLines.length === 0 && /(বেডরুম|বাথরুম|বর্গফুট)/.test(line) && line.length < 60) {
       rooms = line;
       continue;
     }
-    body.push(line);
+    bodyLines.push(line);
   }
-  return { deadline, condition, rooms, body: body.join(' ').replace(/\s+/g, ' ').trim() };
+  const roomsInfo = rooms
+    ? {
+        beds: (rooms.match(/(\S+)\s*বেডরুম/) || [])[1] || null,
+        baths: (rooms.match(/(\S+)\s*বাথরুম/) || [])[1] || null,
+        sqft: (rooms.match(/(\S+)\s*বর্গফুট/) || [])[1] || null,
+      }
+    : null;
+  return {
+    deadline,
+    condition,
+    rooms,
+    roomsInfo,
+    amenities,
+    mapLink,
+    bodyLines,
+    body: bodyLines.join(' ').replace(/\s+/g, ' ').trim(),
+  };
 }
 
 // আবেদনের শেষ তারিখ (বাংলাদেশ সময়ে দিনের শেষ) পেরিয়ে গেছে কিনা
@@ -55,9 +91,7 @@ function isDeadlinePassed(deadline) {
 }
 
 function placeOf(listing) {
-  return Array.from(
-    new Set([listing.area, listing.upazila].map((v) => (v || '').trim()).filter(Boolean))
-  ).join(', ');
+  return uniqPlaces([listing.area, listing.upazila]).join(', ');
 }
 
 function buildTitle(listing, slug) {
@@ -163,6 +197,9 @@ const text = {
     contact: 'যোগাযোগ', phone: 'মোবাইল', whatsapp: 'হোয়াটসঅ্যাপ', email: 'ইমেইল',
     noContact: 'এই পোস্টে যোগাযোগের তথ্য দেওয়া হয়নি।',
     deadlinePassed: '⏰ আবেদনের শেষ তারিখ পেরিয়ে গেছে',
+    bedrooms: '🛏️ বেডরুম', bathrooms: '🚿 বাথরুম', size: '📐 আয়তন', sqft: 'বর্গফুট', condition: '✨ কন্ডিশন',
+    amenities: 'সুযোগ-সুবিধা', map: '📍 গুগল ম্যাপে দেখুন',
+    related: 'আরও দেখুন', seeAll: 'সব দেখুন →',
     house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য',
   },
   en: {
@@ -173,6 +210,9 @@ const text = {
     contact: 'Contact', phone: 'Phone', whatsapp: 'WhatsApp', email: 'Email',
     noContact: 'No contact information was provided for this post.',
     deadlinePassed: '⏰ The application deadline has passed',
+    bedrooms: '🛏️ Bedrooms', bathrooms: '🚿 Bathrooms', size: '📐 Size', sqft: 'sq ft', condition: '✨ Condition',
+    amenities: 'Amenities', map: '📍 View on Google Maps',
+    related: 'More to explore', seeAll: 'See all →',
     house: 'House', shop: 'Shop', mess: 'Mess', other: 'Other',
   },
 };
@@ -207,10 +247,11 @@ const BOT_UA = /bot|crawl|spider|slurp|facebookexternalhit|preview|whatsapp|tele
 export default async function ListingDetailPage({ params }) {
   const lang = getLang();
   const t = text[lang];
+  const num = (n) => (lang === 'bn' ? toBn(n) : n);
 
   const { data: listing } = await supabase
     .from('listings')
-    .select('id, title, area, upazila, union_name, price_or_salary, description, photos, rent_type, owner_name, posted_at, expiry_date, view_count, contact_phone, whatsapp, contact_email, deadline, categories(slug)')
+    .select('id, category_id, title, area, upazila, union_name, price_or_salary, description, photos, rent_type, owner_name, posted_at, expiry_date, view_count, contact_phone, whatsapp, contact_email, deadline, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'active')
     .gt('expiry_date', new Date().toISOString())
@@ -225,30 +266,39 @@ export default async function ListingDetailPage({ params }) {
     await supabase.rpc('increment_listing_view', { lid: listing.id });
   }
 
-  const isJob = listing.categories?.slug === 'job';
+  const slug = listing.categories?.slug;
+  const isJob = slug === 'job';
   const parsed = parseDescription(listing.description);
   // নতুন কলাম আগে, না থাকলে পুরোনো পোস্টের বিবরণ থেকে
   const deadline = listing.deadline || parsed.deadline;
   parsed.deadline = deadline;
   const deadlinePassed = isJob && isDeadlinePassed(deadline);
 
-  const label = categoryLabels[listing.categories?.slug];
+  const label = categoryLabels[slug];
   const categoryName = label ? label[lang].name : '';
   const photos = listing.photos || [];
-  const where = Array.from(
-    new Set([listing.area, listing.union_name, listing.upazila].map((v) => (v || '').trim()).filter(Boolean))
-  ).join(', ');
+  const where = uniqPlaces([listing.area, listing.union_name, listing.upazila]).join(', ');
   const price = formatPrice(listing.price_or_salary, lang);
   const views = (listing.view_count || 0) + (counted ? 1 : 0);
 
-  // পুরোনো পোস্টের বিবরণে থাকা শেষ তারিখের লাইন সরাই, তারিখ নিচের "বিস্তারিত" তালিকায় আলাদা সারিতে দেখাব
-  const shownDescription = listing.description
-    ? listing.description.replace(/আবেদনের শেষ তারিখ:\s*\d{4}-\d{2}-\d{2}\s*/, '').trim()
-    : '';
+  // বিবরণে শুধু মালিকের নিজের লেখা, বাকি তথ্য নিচে আলাদা কার্ডে
+  const shownDescription = parsed.bodyLines.join('\n');
 
   const hasPhone = !!listing.contact_phone;
   const waUrl = waLink(listing.whatsapp);
   const hasContact = hasPhone || !!waUrl || !!listing.contact_email;
+
+  // তথ্য-কার্ড: ভাড়ায় রুম/আয়তন, বিক্রিতে কন্ডিশন
+  const facts = [];
+  if (parsed.roomsInfo?.beds) facts.push({ k: t.bedrooms, v: parsed.roomsInfo.beds });
+  if (parsed.roomsInfo?.baths) facts.push({ k: t.bathrooms, v: parsed.roomsInfo.baths });
+  if (parsed.roomsInfo?.sqft) facts.push({ k: t.size, v: `${parsed.roomsInfo.sqft} ${t.sqft}` });
+  if (parsed.condition) facts.push({ k: t.condition, v: parsed.condition });
+
+  const amenityList = parsed.amenities
+    ? parsed.amenities.split(/[,،;]+/).map((s) => s.trim()).filter(Boolean).slice(0, 12)
+    : [];
+  const mapLink = parsed.mapLink && /^https?:\/\//.test(parsed.mapLink) ? parsed.mapLink : null;
 
   const rows = [
     { k: t.category, v: categoryName },
@@ -258,6 +308,22 @@ export default async function ListingDetailPage({ params }) {
     isJob && deadline ? { k: t.deadline, v: lang === 'bn' ? formatDateBn(deadline) : deadline } : null,
     { k: t.posted, v: timeAgo(listing.posted_at, lang) },
   ].filter((r) => r && r.v);
+
+  // আরও দেখুন: একই ক্যাটাগরির অন্য সক্রিয় পোস্ট, একই উপজেলার আগে
+  const { data: relatedRaw } = await supabase
+    .from('listings')
+    .select('id, title, area, upazila, price_or_salary, photos, posted_at, deadline')
+    .eq('status', 'active')
+    .gt('expiry_date', new Date().toISOString())
+    .eq('category_id', listing.category_id)
+    .neq('id', listing.id)
+    .order('posted_at', { ascending: false })
+    .limit(30);
+
+  const related = (relatedRaw || [])
+    .filter((r) => !(isJob && isDeadlinePassed(r.deadline)))
+    .sort((a, b) => Number(b.upazila === listing.upazila) - Number(a.upazila === listing.upazila))
+    .slice(0, 8);
 
   // স্ট্রাকচার্ড ডেটা: চাকরির জন্য JobPosting (প্রতিষ্ঠানের নাম থাকলে ও মেয়াদ না ফুরোলে), বাকিদের জন্য Product
   const numericPrice = parsePrice(listing.price_or_salary);
@@ -313,33 +379,40 @@ export default async function ListingDetailPage({ params }) {
     <>
       <SiteHeader lang={lang} />
       <main className="max-w-2xl mx-auto px-4 pt-4 pb-32">
-        <a href={`/category/${listing.categories?.slug}`} className="text-sm text-ink/55 hover:text-ink">
+        <a href={`/category/${slug}`} className="text-sm text-ink/55 hover:text-ink">
           {t.back}
         </a>
 
-        <div className="bg-white border border-ink/10 rounded-2xl mt-3 overflow-hidden shadow-sm">
-          {photos.length > 0 ? (
-            <div>
-              <PhotoLightbox src={photos[0]} alt={`${listing.title} - 1`} size="w-full h-64" rounded={false} />
-              {photos.length > 1 && (
-                <div className="grid grid-cols-2 gap-1 mt-1">
-                  {photos.slice(1).map((url, i) => (
-                    <PhotoLightbox
-                      key={url}
-                      src={url}
-                      alt={`${listing.title} - ${i + 2}`}
-                      size="w-full h-28"
-                      rounded={false}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="h-32 bg-[#EEF1F8] flex items-center justify-center text-5xl opacity-70">
-              {label?.icon || '📄'}
-            </div>
-          )}
+        <div className="relative bg-white border border-ink/10 rounded-2xl mt-3 shadow-sm">
+          <div className="overflow-hidden rounded-t-2xl">
+            {photos.length > 0 ? (
+              <div>
+                <PhotoLightbox src={photos[0]} alt={`${listing.title} - 1`} size="w-full h-64" rounded={false} />
+                {photos.length > 1 && (
+                  <div className="grid grid-cols-2 gap-1 mt-1">
+                    {photos.slice(1).map((url, i) => (
+                      <PhotoLightbox
+                        key={url}
+                        src={url}
+                        alt={`${listing.title} - ${i + 2}`}
+                        size="w-full h-28"
+                        rounded={false}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="h-32 bg-[#EEF1F8] flex items-center justify-center text-5xl opacity-70">
+                {label?.icon || '📄'}
+              </div>
+            )}
+          </div>
+
+          <ProfileMenu title={listing.title} lang={lang}>
+            <FavoriteButton targetType="listing" targetId={listing.id} asMenuItem />
+            <ReportButton targetType="listing" targetId={listing.id} asMenuItem />
+          </ProfileMenu>
 
           <div className="p-5">
             <div className="flex items-center gap-2 flex-wrap">
@@ -362,13 +435,23 @@ export default async function ListingDetailPage({ params }) {
               📍 {where}
               <span className="mx-1.5">·</span>
               {timeAgo(listing.posted_at, lang)}
-              <span className="mx-1.5">·</span>👁️ {lang === 'bn' ? toBn(views) : views} {t.views}
+              <span className="mx-1.5">·</span>👁️ {num(views)} {t.views}
             </p>
 
-            <div className="mt-4 flex items-center gap-2 flex-wrap">
-              <FavoriteButton targetType="listing" targetId={listing.id} />
-              <ShareButton title={listing.title} lang={lang} />
-            </div>
+            {/* তথ্য-কার্ড */}
+            {facts.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-4">
+                {facts.map((f) => (
+                  <div
+                    key={f.k}
+                    className="flex-1 min-w-[96px] bg-[#EEF1F8] rounded-xl py-2.5 px-2 text-center"
+                  >
+                    <p className="text-base font-semibold font-numeric leading-tight">{f.v}</p>
+                    <p className="text-[11px] text-ink/55 mt-0.5">{f.k}</p>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* যোগাযোগ */}
             <div className="mt-6 pt-5 border-t border-ink/10">
@@ -410,6 +493,7 @@ export default async function ListingDetailPage({ params }) {
               )}
             </div>
 
+            {/* বিবরণ */}
             <div className="mt-6 pt-5 border-t border-ink/10">
               <h2 className="text-sm font-medium text-ink/60 mb-2">{t.desc}</h2>
               <p className="text-ink/80 text-sm leading-relaxed whitespace-pre-line">
@@ -417,6 +501,33 @@ export default async function ListingDetailPage({ params }) {
               </p>
             </div>
 
+            {/* সুযোগ-সুবিধা */}
+            {amenityList.length > 0 && (
+              <div className="mt-6 pt-5 border-t border-ink/10">
+                <h2 className="text-sm font-medium text-ink/60 mb-2">{t.amenities}</h2>
+                <div className="flex flex-wrap gap-1.5">
+                  {amenityList.map((a) => (
+                    <span key={a} className="text-xs bg-[#EEF1F8] text-ink/75 px-3 py-1.5 rounded-full">
+                      ✓ {a}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* গুগল ম্যাপ */}
+            {mapLink && (
+              <a
+                href={mapLink}
+                target="_blank"
+                rel="noopener noreferrer nofollow ugc"
+                className="mt-5 block text-center text-sm font-medium border border-green text-green rounded-xl py-2.5"
+              >
+                {t.map}
+              </a>
+            )}
+
+            {/* বিস্তারিত */}
             <div className="mt-6 pt-5 border-t border-ink/10">
               <h2 className="text-sm font-medium text-ink/60 mb-2">{t.details}</h2>
               <div className="bg-paper rounded-xl divide-y divide-ink/5">
@@ -428,12 +539,50 @@ export default async function ListingDetailPage({ params }) {
                 ))}
               </div>
             </div>
-
-            <div className="mt-6 pt-4 border-t border-ink/10 flex justify-center text-xs">
-              <ReportButton targetType="listing" targetId={listing.id} />
-            </div>
           </div>
         </div>
+
+        {/* আরও দেখুন */}
+        {related.length > 0 && (
+          <section className="mt-8">
+            <div className="flex items-center justify-between mb-3 px-1">
+              <h2 className="font-semibold">
+                {t.related}
+                {categoryName ? ` · ${categoryName}` : ''}
+              </h2>
+              <a href={`/category/${slug}`} className="text-sm text-green">
+                {t.seeAll}
+              </a>
+            </div>
+
+            <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4 scrollbar-hide">
+              {related.map((r) => {
+                const rPrice = formatPrice(r.price_or_salary, lang);
+                const rPlace = uniqPlaces([r.area, r.upazila]).join(', ');
+                return (
+                  <a
+                    key={r.id}
+                    href={`/listing/${r.id}`}
+                    className="snap-start flex-shrink-0 w-44 bg-white border border-ink/10 rounded-2xl overflow-hidden shadow-sm"
+                  >
+                    {r.photos?.[0] ? (
+                      <img src={r.photos[0]} alt={r.title || ''} className="w-full h-28 object-cover" />
+                    ) : (
+                      <div className="w-full h-28 bg-[#EEF1F8] flex items-center justify-center text-3xl opacity-70">
+                        {label?.icon || '📄'}
+                      </div>
+                    )}
+                    <div className="p-3">
+                      <p className="text-sm font-medium leading-snug line-clamp-2">{r.title}</p>
+                      {rPrice && <p className="text-sm font-semibold text-green font-numeric mt-1">{rPrice}</p>}
+                      <p className="text-[11px] text-ink/50 mt-1 truncate">📍 {rPlace}</p>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {jsonLd && (
           <script
