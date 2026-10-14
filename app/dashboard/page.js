@@ -5,6 +5,7 @@ import NotificationBell from '../../components/NotificationBell';
 import BottomNav from '../../components/BottomNav';
 import SiteHeader from '../../components/SiteHeader';
 import PushToggle from '../../components/PushToggle';
+import PageSkeleton from '../../components/PageSkeleton';
 
 const text = {
   bn: {
@@ -32,6 +33,7 @@ const text = {
     statPosts: 'পোস্ট',
     statViews: 'মোট ভিউ',
     favorites: 'সংরক্ষিত',
+    myProfile: 'আমার প্রোফাইল',
     donor: 'ডোনার ড্যাশবোর্ড',
     bloodRequests: 'আমার রক্তের অনুরোধ',
     adminPanel: 'অ্যাডমিন প্যানেল',
@@ -73,6 +75,7 @@ const text = {
     statPosts: 'Posts',
     statViews: 'Total views',
     favorites: 'Saved',
+    myProfile: 'My Profile',
     donor: 'Donor Dashboard',
     bloodRequests: 'My Blood Requests',
     adminPanel: 'Admin Panel',
@@ -124,13 +127,17 @@ export default function DashboardPage() {
   }, []);
 
   async function init() {
-    const { data } = await supabase.auth.getUser();
-    setUser(data.user);
-    if (data.user) {
-      await loadMyPosts(data.user.id);
-      const [{ data: b }, { data: prof }] = await Promise.all([
-        supabase.from('banned_users').select('reason').eq('user_id', data.user.id).maybeSingle(),
-        supabase.from('users').select('name, role').eq('id', data.user.id).maybeSingle(),
+    // getSession ব্রাউজারের সেভ করা লগইন পড়ে, ইন্টারনেটে যায় না, তাই দ্রুত।
+    // ডাটাবেসের অনুমতি-নিয়ম সার্ভারেই যাচাই হয়।
+    const { data } = await supabase.auth.getSession();
+    const currentUser = data.session?.user || null;
+    setUser(currentUser);
+    if (currentUser) {
+      const uid = currentUser.id;
+      const [, { data: b }, { data: prof }] = await Promise.all([
+        loadMyPosts(uid),
+        supabase.from('banned_users').select('reason').eq('user_id', uid).maybeSingle(),
+        supabase.from('users').select('name, role').eq('id', uid).maybeSingle(),
       ]);
       setBan(b || null);
       setProfile(prof || null);
@@ -139,27 +146,33 @@ export default function DashboardPage() {
   }
 
   async function loadMyPosts(userId) {
-    const { data: p } = await supabase
-      .from('providers')
-      .select('id, name, area, status, is_available, photo_url, view_count, categories(name)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    const [{ data: p }, { data: l }] = await Promise.all([
+      supabase
+        .from('providers')
+        .select('id, name, area, status, is_available, photo_url, view_count, primary_subcategory_id, categories(name)')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('listings')
+        .select('id, title, area, status, photos, view_count, price_or_salary, categories(name)')
+        .eq('user_id', userId)
+        .order('posted_at', { ascending: false }),
+    ]);
+
     const mine = p || [];
     const ids = mine.map((x) => x.id);
     let enriched = mine;
     if (ids.length) {
-      const [{ data: links }, { data: prim }, { data: subs }] = await Promise.all([
+      const [{ data: links }, { data: subs }] = await Promise.all([
         supabase.from('provider_subcategories').select('provider_id, subcategory_id').in('provider_id', ids),
-        supabase.from('providers').select('id, primary_subcategory_id').in('id', ids),
         supabase.from('subcategories').select('id, name_bn, name_en'),
       ]);
       const nameBn = Object.fromEntries((subs || []).map((s) => [s.id, s.name_bn]));
       const nameEn = Object.fromEntries((subs || []).map((s) => [s.id, s.name_en || s.name_bn]));
-      const primary = Object.fromEntries((prim || []).map((x) => [x.id, x.primary_subcategory_id]));
       enriched = mine.map((x) => {
         const subIds = [
-          primary[x.id],
-          ...(links || []).filter((l) => l.provider_id === x.id).map((l) => l.subcategory_id),
+          x.primary_subcategory_id,
+          ...(links || []).filter((lk) => lk.provider_id === x.id).map((lk) => lk.subcategory_id),
         ];
         const uniq = [...new Set(subIds.filter(Boolean))];
         return {
@@ -172,11 +185,6 @@ export default function DashboardPage() {
       });
     }
     setProviders(enriched);
-    const { data: l } = await supabase
-      .from('listings')
-      .select('id, title, area, status, photos, view_count, price_or_salary, categories(name)')
-      .eq('user_id', userId)
-      .order('posted_at', { ascending: false });
     setListings(l || []);
   }
 
@@ -223,7 +231,7 @@ export default function DashboardPage() {
     return (
       <>
         <SiteHeader lang={lang} simple />
-        <p className="text-center py-20 text-ink/60">{t.loading}</p>
+        <PageSkeleton />
       </>
     );
   }
@@ -314,29 +322,36 @@ export default function DashboardPage() {
         )}
 
         <PushToggle lang={lang} />
+
         {/* Quick links */}
         <div className="grid grid-cols-2 gap-2 mt-4">
           <a
             href="/dashboard/favorites"
             className="bg-white border border-ink/10 rounded-xl p-3 flex items-center gap-2.5 active:bg-paper"
           >
-            <span className="w-9 h-9 rounded-lg bg-[#EEF1F8] flex items-center justify-center">❤️</span>
-            <span className="text-sm font-medium">{t.favorites}</span>
+            <span className="w-9 h-9 rounded-lg bg-[#EEF1F8] flex items-center justify-center flex-shrink-0">❤️</span>
+            <span className="text-sm font-medium leading-tight">{t.favorites}</span>
+          </a>
+          <a
+            href="/dashboard/profile"
+            className="bg-white border border-ink/10 rounded-xl p-3 flex items-center gap-2.5 active:bg-paper"
+          >
+            <span className="w-9 h-9 rounded-lg bg-[#EEF1F8] flex items-center justify-center flex-shrink-0">👤</span>
+            <span className="text-sm font-medium leading-tight">{t.myProfile}</span>
           </a>
           <a
             href="/dashboard/donor"
             className="bg-white border border-ink/10 rounded-xl p-3 flex items-center gap-2.5 active:bg-paper"
           >
-            <span className="w-9 h-9 rounded-lg bg-[#EEF1F8] flex items-center justify-center">🩸</span>
+            <span className="w-9 h-9 rounded-lg bg-[#EEF1F8] flex items-center justify-center flex-shrink-0">🩸</span>
             <span className="text-sm font-medium leading-tight">{t.donor}</span>
           </a>
           <a
             href="/dashboard/blood-requests"
-            className="col-span-2 bg-white border border-ink/10 rounded-xl p-3 flex items-center gap-2.5 active:bg-paper"
+            className="bg-white border border-ink/10 rounded-xl p-3 flex items-center gap-2.5 active:bg-paper"
           >
-            <span className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center">📋</span>
+            <span className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">📋</span>
             <span className="text-sm font-medium leading-tight">{t.bloodRequests}</span>
-            <span className="ml-auto text-ink/30">›</span>
           </a>
           {isStaff && (
             <a
