@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import BottomNav from '../../../components/BottomNav';
+import PageSkeleton from '../../../components/PageSkeleton';
 
 const fmtNum = (n) => Number(n).toLocaleString('bn-BD');
 
@@ -137,7 +138,7 @@ export default function DonorDashboardPage() {
   if (loading) {
     return (
       <PageShell>
-        <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>
+        <PageSkeleton />
       </PageShell>
     );
   }
@@ -189,7 +190,9 @@ export default function DonorDashboardPage() {
             </span>
             <div className="min-w-0">
               <p className="text-[11px] text-white/70">ডোনার ড্যাশবোর্ড</p>
-              <p className="font-semibold text-lg leading-tight">🩸 রক্তদাতা</p>
+              <p className="font-semibold text-lg leading-tight truncate">
+                🩸 {donorProfile.name || 'রক্তদাতা'}
+              </p>
               <p className="text-xs text-white/70 truncate">{user.email}</p>
             </div>
           </div>
