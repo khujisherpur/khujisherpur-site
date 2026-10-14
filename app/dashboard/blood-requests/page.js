@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import BottomNav from '../../../components/BottomNav';
+import PageSkeleton from '../../../components/PageSkeleton';
 
 const fmtNum = (n) => Number(n).toLocaleString('bn-BD');
 
@@ -44,9 +45,11 @@ export default function MyBloodRequestsPage() {
   }, []);
 
   async function init() {
-    const { data } = await supabase.auth.getUser();
-    setUser(data.user);
-    if (data.user) await loadRequests(data.user.id);
+    // getSession ব্রাউজারের সেভ করা লগইন পড়ে, তাই দ্রুত; ডাটাবেসের অনুমতি সার্ভারেই যাচাই হয়
+    const { data } = await supabase.auth.getSession();
+    const currentUser = data.session?.user || null;
+    setUser(currentUser);
+    if (currentUser) await loadRequests(currentUser.id);
     setLoading(false);
   }
 
@@ -79,7 +82,7 @@ export default function MyBloodRequestsPage() {
   if (loading) {
     return (
       <PageShell>
-        <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>
+        <PageSkeleton />
       </PageShell>
     );
   }
