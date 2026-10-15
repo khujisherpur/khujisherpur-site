@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { cleanPhone, isValidBdPhone } from '../../../lib/format';
+import SiteHeader from '../../../components/SiteHeader';
 
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -25,7 +26,7 @@ function friendlyError(err) {
   return 'কিছু একটা সমস্যা হয়েছে, একটু পরে আবার চেষ্টা করুন';
 }
 
-export default function BloodRequestPage() {
+function BloodRequestForm() {
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [form, setForm] = useState({
@@ -116,11 +117,7 @@ export default function BloodRequestPage() {
   }
 
   return (
-    <main className="max-w-xl mx-auto px-4 py-10">
-      <header className="mb-8">
-        <a href="/"><img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-9 w-auto" /></a>
-      </header>
-
+    <main className="max-w-xl mx-auto px-4 py-6">
       <div className="flex items-center gap-2 mb-6">
         <span className="text-2xl">🩸</span>
         <h1 className="text-xl font-semibold">রক্তের অনুরোধ করুন</h1>
@@ -226,5 +223,14 @@ export default function BloodRequestPage() {
         </button>
       </form>
     </main>
+  );
+}
+
+export default function BloodRequestPage() {
+  return (
+    <>
+      <SiteHeader lang="bn" simple />
+      <BloodRequestForm />
+    </>
   );
 }
