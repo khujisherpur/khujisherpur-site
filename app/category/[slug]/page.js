@@ -15,7 +15,7 @@ const FILTER_KEYS = ['type', 'upazila', 'sort', 'sub'];
 
 // গুগল ও ফেসবুকে দেখানো শিরোনাম: মানুষ যা টাইপ করে সেই শব্দ আগে
 const SEO_TITLES = {
-  rent: 'শেরপুরে বাসা, দোকান ও মেস ভাড়া',
+  rent: 'শেরপুরে বাসা ভাড়া, দোকান ও মেস ভাড়ার বিজ্ঞাপন',
   job: 'শেরপুরে চাকরির খবর ও নতুন জব বিজ্ঞপ্তি',
   'buy-sell': 'শেরপুরে কেনাবেচা — নতুন ও পুরোনো পণ্য',
   'agri-product': 'শেরপুরে কৃষিপণ্য কেনাবেচা',
@@ -29,8 +29,8 @@ const SEO_TITLES = {
 const SEO_DESCS = {
   rent: (n) =>
     n
-      ? `শেরপুরে এখন ${n}টি ভাড়ার বিজ্ঞাপন — বাসা, দোকান ও মেস। ছবি, ভাড়া ও ফোন নম্বরসহ।`
-      : 'শেরপুরের বাসা, দোকান ও মেস ভাড়ার বিজ্ঞাপন — ছবি, ভাড়া ও ফোন নম্বরসহ।',
+      ? `শেরপুরে এখন ${n}টি ভাড়ার বিজ্ঞাপন — বাসা, দোকান ও মেস। উপজেলা অনুযায়ী খুঁজুন, মালিকের সঙ্গে সরাসরি যোগাযোগ করুন। বিনামূল্যে ভাড়ার বিজ্ঞাপন দিন।`
+      : 'শেরপুরে বাসা ভাড়া, দোকান ভাড়া বা মেস খুঁজছেন? উপজেলা অনুযায়ী ভাড়ার বিজ্ঞাপন দেখুন, মালিকের সঙ্গে সরাসরি যোগাযোগ করুন। বিনামূল্যে ভাড়ার বিজ্ঞাপন দিন।',
   job: (n) =>
     n
       ? `শেরপুরে এখন ${n}টি চাকরির বিজ্ঞপ্তি — বেতন, প্রতিষ্ঠান ও আবেদনের শেষ তারিখসহ।`
@@ -117,7 +117,10 @@ export async function generateMetadata({ params, searchParams }) {
     }
     ({ title, description } = seoFor(params.slug, name, n, type, label.bn.desc));
   } else {
-    title = `${name} in Sherpur | Khuji Sherpur`;
+    title =
+      params.slug === 'rent'
+        ? 'House, Shop & Mess for Rent in Sherpur | Khuji Sherpur'
+        : `${name} in Sherpur | Khuji Sherpur`;
     description = label.en.desc || title;
   }
 
@@ -335,6 +338,13 @@ export default async function CategoryPage({ params, searchParams }) {
   const clearHref = base;
   const postHref = `/post/new?category=${category.slug}`;
 
+  // ভাড়া পেজে শুধু "ভাড়া" না লিখে গুগল-বান্ধব পুরো শিরোনাম
+  const pageHeading = isRent
+    ? lang === 'bn'
+      ? 'শেরপুরে বাসা, দোকান ও মেস ভাড়া'
+      : 'House, Shop & Mess for Rent in Sherpur'
+    : name;
+
   return (
     <>
       <SiteHeader lang={lang} />
@@ -347,7 +357,7 @@ export default async function CategoryPage({ params, searchParams }) {
               {label.icon}
             </span>
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl md:text-2xl font-semibold leading-tight truncate">{name}</h1>
+              <h1 className={`text-xl md:text-2xl font-semibold leading-snug ${isRent ? '' : 'truncate'}`}>{pageHeading}</h1>
               <p className="text-xs text-ink/50 mt-0.5">
                 {num(items.length)}
                 {isService ? t.profilesWord : t.postsWord}
