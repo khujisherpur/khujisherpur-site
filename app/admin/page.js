@@ -8,7 +8,7 @@ import ReviewsTab from '../../components/admin/ReviewsTab';
 import ModerationTab from '../../components/admin/ModerationTab';
 import ReportsTab from '../../components/admin/ReportsTab';
 import PendingBadge from '../../components/admin/PendingBadge';
-
+import PageSkeleton from '../../components/PageSkeleton';
 const navIcon = (emoji, short, badge) => (
   <span className="relative flex flex-col items-center md:block leading-tight">
     <span>{emoji}</span>
@@ -56,17 +56,19 @@ export default function AdminPage() {
   }, []);
 
   async function init() {
-    const { data: authData } = await supabase.auth.getUser();
-    if (!authData.user) {
+        // getSession ব্রাউজারের সেভ করা লগইন পড়ে, তাই দ্রুত; অনুমতি ডাটাবেস সার্ভারেই যাচাই হয়
+    const { data: sessionData } = await supabase.auth.getSession();
+    const authUser = sessionData.session?.user || null;
+    if (!authUser) {
       setLoading(false);
       return;
     }
-    setUser(authData.user);
+    setUser(authUser);
 
     const { data: profile } = await supabase
       .from('users')
       .select('role')
-      .eq('id', authData.user.id)
+      .eq('id', authUser.id)
       .single();
 
     setRole(profile?.role || 'user');
@@ -248,8 +250,7 @@ export default function AdminPage() {
     filled: { text: 'পূরণ হয়েছে', color: 'text-ink/50 bg-ink/5' },
   };
 
-  if (loading) return <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>;
-
+    if (loading) return <PageSkeleton />;
   if (!user) {
     return (
       <main className="max-w-md mx-auto px-4 py-20 text-center">
