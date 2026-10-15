@@ -1,5 +1,8 @@
-'use client';
-import { useState } from 'react';
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+import { getLang } from '../../lib/getLang';
+import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../lib/site';
+import LanguageToggle from '../../components/LanguageToggle';
 
 const content = {
   bn: {
@@ -21,6 +24,7 @@ const content = {
       'সন্দেহজনক কিছু মনে হলে সাথে সাথে রিপোর্ট করুন',
     ],
     outro: 'কোনো ব্যবহারকারীর মধ্যে হওয়া লেনদেন, চুক্তি, বা বিরোধে খুঁজি শেরপুর কোনো পক্ষ নয় এবং এ সংক্রান্ত কোনো ক্ষতির জন্য দায়ী থাকবে না।',
+    back: '← হোমপেজে ফিরে যান',
   },
   en: {
     title: 'Disclaimer',
@@ -41,31 +45,48 @@ const content = {
       'Report immediately if something seems suspicious',
     ],
     outro: 'Khuji Sherpur is not a party to any transaction, agreement, or dispute between users, and is not liable for any resulting damages.',
+    back: '← Back to Home',
   },
 };
 
+export async function generateMetadata() {
+  const lang = getLang();
+
+  const title =
+    lang === 'bn'
+      ? 'দায়বদ্ধতা সংক্রান্ত ঘোষণা | খুঁজি শেরপুর'
+      : 'Disclaimer | Khuji Sherpur';
+  const description =
+    lang === 'bn'
+      ? 'খুঁজি শেরপুর একটি তথ্য-মাধ্যম। পোস্ট করা তথ্যের সত্যতা আমরা নিশ্চিত করি না, বাসা ভাড়া, চাকরি বা সেবাদাতা নেওয়ার আগে নিজে যাচাই করুন।'
+      : 'Khuji Sherpur is an information platform. We do not guarantee the accuracy of user posts, so verify rentals, jobs and service providers yourself.';
+
+  return {
+    title,
+    description,
+    alternates: { canonical: '/disclaimer' },
+    openGraph: {
+      title,
+      description,
+      url: '/disclaimer',
+      siteName: SITE_NAME,
+      type: 'website',
+      locale: lang === 'bn' ? 'bn_BD' : 'en_US',
+      images: [DEFAULT_OG_IMAGE],
+    },
+    twitter: { card: 'summary_large_image', title, description, images: [DEFAULT_OG_IMAGE] },
+  };
+}
+
 export default function DisclaimerPage() {
-  const [lang, setLang] = useState('bn');
+  const lang = getLang();
   const t = content[lang];
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-10">
       <header className="flex items-center justify-between mb-8">
         <a href="/"><img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-9 w-auto" /></a>
-        <div className="flex border border-ink/20 rounded-full overflow-hidden text-sm">
-          <button
-            onClick={() => setLang('bn')}
-            className={`px-3 py-1 ${lang === 'bn' ? 'bg-green text-white' : 'text-ink/60'}`}
-          >
-            বাংলা
-          </button>
-          <button
-            onClick={() => setLang('en')}
-            className={`px-3 py-1 ${lang === 'en' ? 'bg-green text-white' : 'text-ink/60'}`}
-          >
-            English
-          </button>
-        </div>
+        <LanguageToggle lang={lang} />
       </header>
 
       <h1 className="text-2xl font-semibold mb-2">{t.title}</h1>
@@ -92,7 +113,7 @@ export default function DisclaimerPage() {
       </div>
 
       <a href="/" className="inline-block mt-10 text-green underline text-sm">
-        {lang === 'bn' ? '← হোমপেজে ফিরে যান' : '← Back to Home'}
+        {t.back}
       </a>
     </main>
   );
