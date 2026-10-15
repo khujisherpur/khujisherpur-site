@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { getLang } from '../../lib/getLang';
 import { toBn } from '../../lib/format';
 import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../lib/site';
-import LanguageToggle from '../../components/LanguageToggle';
+import SiteHeader from '../../components/SiteHeader';
 
 // ৩ দিনের পুরোনো অনুরোধ আর দেখানো হবে না (ডাটাবেসও মুছে ফেলে)
 const EXPIRY_DAYS = 3;
@@ -12,7 +12,7 @@ const sinceISO = () => new Date(Date.now() - EXPIRY_DAYS * 24 * 60 * 60 * 1000).
 
 const text = {
   bn: {
-    title: 'ব্লাড', login: 'লগইন', home: '← হোমপেজ',
+    title: 'শেরপুরে রক্তদাতা ও জরুরি রক্তের অনুরোধ', login: 'লগইন', home: '← হোমপেজ',
     needBlood: '🆘 রক্তের প্রয়োজন?', needBloodDesc: 'অনুরোধ পোস্ট করুন, ম্যাচিং ডোনাররা নোটিফিকেশন পাবেন',
     requestBtn: 'অনুরোধ করুন',
     becomeDonor: '❤️ ডোনার হতে চান?', becomeDonorDesc: 'নিবন্ধন করুন, কারো প্রয়োজন হলে নোটিফিকেশন পাবেন',
@@ -23,7 +23,7 @@ const text = {
     faqTitle: 'সাধারণ প্রশ্ন',
   },
   en: {
-    title: 'Blood', login: 'Login', home: '← Home',
+    title: 'Blood Donors & Urgent Blood Requests in Sherpur', login: 'Login', home: '← Home',
     needBlood: '🆘 Need Blood?', needBloodDesc: 'Post a request, matching donors get notified',
     requestBtn: 'Request Now',
     becomeDonor: '❤️ Want to be a Donor?', becomeDonorDesc: 'Register and get notified when needed',
@@ -161,20 +161,14 @@ export default async function BloodPage() {
   };
 
   return (
+    <>
+    <SiteHeader lang={lang} />
     <main className="max-w-2xl mx-auto px-4">
-      <header className="flex items-center justify-between py-6 flex-wrap gap-3">
-        <a href="/"><img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-10 w-auto" /></a>
-        <div className="flex items-center gap-2">
-          <LanguageToggle lang={lang} />
-          <a href="/login" className="text-sm border border-ink/20 rounded-full px-4 py-1.5 hover:bg-white">{t.login}</a>
-        </div>
-      </header>
-
-      <a href="/" className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
+      <a href="/" className="inline-block mt-5 text-sm text-ink/50 hover:text-ink">{t.home}</a>
 
       <div className="flex items-center gap-3 mt-3 mb-8">
         <span className="text-3xl">🩸</span>
-        <h1 className="text-2xl md:text-3xl font-semibold">{t.title}</h1>
+        <h1 className="text-xl md:text-3xl font-semibold leading-snug">{t.title}</h1>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
@@ -242,5 +236,6 @@ export default async function BloodPage() {
         dangerouslySetInnerHTML={{ __html: safeJsonLd(faqJsonLd) }}
       />
     </main>
+    </>
   );
 }
