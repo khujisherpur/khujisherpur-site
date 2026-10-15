@@ -452,7 +452,7 @@ export default function EditProviderPage({ params }) {
               </select>
             </div>
             <div>
-              <label className="block text-sm mb-1.5 text-ink/70">ইউনিয়ন</label>
+              <label className="block text-sm mb-1.5 text-ink/70">ইউনিয়ন / পৌরসভা</label>
               <select
                 required value={form.unionName} disabled={!form.upazila}
                 onChange={(e) => updateField('unionName', e.target.value)}
