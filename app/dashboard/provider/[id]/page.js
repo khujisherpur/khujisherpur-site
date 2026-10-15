@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../../lib/supabaseClient';
 import ImageCropper from '../../../../components/ImageCropper';
 import SiteHeader from '../../../../components/SiteHeader';
+import PageSkeleton from '../../../../components/PageSkeleton';
 import { locations, upazilaList } from '../../../../lib/locations';
 import { cleanPhone, isValidBdPhone } from '../../../../lib/format';
 
@@ -79,23 +80,30 @@ export default function EditProviderPage({ params }) {
   }, []);
 
   async function load() {
-    const { data: authData } = await supabase.auth.getUser();
-    setUser(authData.user);
-    if (!authData.user) {
+    // getSession ব্রাউজারের সেভ করা লগইন পড়ে, ইন্টারনেটে যায় না, তাই দ্রুত।
+    // ডাটাবেসের অনুমতি-নিয়ম সার্ভারেই যাচাই হয়।
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData.session?.user || null;
+    setUser(currentUser);
+    if (!currentUser) {
       setNeedLogin(true);
       setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase
-      .from('providers')
-      .select(`
-        name, area, phone, whatsapp, description, photo_url, experience_years, vehicle_type,
-        name_en, slug, upazila, union_name, primary_subcategory_id, category_id, status,
-        categories(slug)
-      `)
-      .eq('id', params.id)
-      .single();
+    // প্রোফাইল আর তার সেবার লিংক একসাথে আনি
+    const [{ data, error }, { data: mySubs }] = await Promise.all([
+      supabase
+        .from('providers')
+        .select(`
+          name, area, phone, whatsapp, description, photo_url, experience_years, vehicle_type,
+          name_en, slug, upazila, union_name, primary_subcategory_id, category_id, status,
+          categories(slug)
+        `)
+        .eq('id', params.id)
+        .single(),
+      supabase.from('provider_subcategories').select('subcategory_id').eq('provider_id', params.id),
+    ]);
 
     if (error || !data) {
       setLoadFailed(true);
@@ -117,10 +125,12 @@ export default function EditProviderPage({ params }) {
     setOriginalStatus(data.status || '');
 
     if (data.categories?.slug === 'service-provider') {
-      const [{ data: allSubs }, { data: mySubs }] = await Promise.all([
-        supabase.from('subcategories').select('id, name_bn').eq('category_id', data.category_id).eq('is_active', true).order('sort_order'),
-        supabase.from('provider_subcategories').select('subcategory_id').eq('provider_id', params.id),
-      ]);
+      const { data: allSubs } = await supabase
+        .from('subcategories')
+        .select('id, name_bn')
+        .eq('category_id', data.category_id)
+        .eq('is_active', true)
+        .order('sort_order');
       const linkIds = (mySubs || []).map((r) => r.subcategory_id);
       setSubcategories(allSubs || []);
       setSelectedSubcategoryIds(linkIds);
@@ -291,7 +301,7 @@ export default function EditProviderPage({ params }) {
   if (loading) {
     return (
       <PageShell>
-        <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>
+        <PageSkeleton />
       </PageShell>
     );
   }
