@@ -4,6 +4,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import BottomNav from '../../../components/BottomNav';
 import PageSkeleton from '../../../components/PageSkeleton';
+import { cleanPhone, isValidBdPhone } from '../../../lib/format';
 
 function PageShell({ children }) {
   return (
@@ -14,10 +15,15 @@ function PageShell({ children }) {
   );
 }
 
+const normName = (s) => s.trim().replace(/\s+/g, ' ');
+const normPhone = (s) => (s.trim() ? cleanPhone(s) : '');
+
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
   const [name, setName] = useState('');
   const [savedName, setSavedName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [savedPhone, setSavedPhone] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -33,12 +39,15 @@ export default function ProfilePage() {
     if (data.user) {
       const { data: prof } = await supabase
         .from('users')
-        .select('name')
+        .select('name, phone')
         .eq('id', data.user.id)
         .maybeSingle();
       const n = prof?.name || '';
+      const p = prof?.phone || '';
       setName(n);
       setSavedName(n);
+      setPhone(p);
+      setSavedPhone(p);
     }
     setLoading(false);
   }
@@ -46,17 +55,22 @@ export default function ProfilePage() {
   async function handleSave(e) {
     e.preventDefault();
     if (!user || saving) return;
-    const clean = name.trim().replace(/\s+/g, ' ');
-    if (clean.length < 2) {
+    const cleanName = normName(name);
+    if (cleanName.length < 2) {
       setError('নাম অন্তত ২ অক্ষরের হতে হবে');
       return;
     }
+    if (phone.trim() && !isValidBdPhone(phone)) {
+      setError('সঠিক মোবাইল নম্বর দিন (যেমন: 01XXXXXXXXX)');
+      return;
+    }
+    const cleanedPhone = normPhone(phone);
     setSaving(true);
     setError(null);
     setSaved(false);
     const { data: updated, error: err } = await supabase
       .from('users')
-      .update({ name: clean })
+      .update({ name: cleanName, phone: cleanedPhone || null })
       .eq('id', user.id)
       .select('id');
     setSaving(false);
@@ -64,8 +78,10 @@ export default function ProfilePage() {
       setError('সেভ করা যায়নি, একটু পরে আবার চেষ্টা করুন');
       return;
     }
-    setName(clean);
-    setSavedName(clean);
+    setName(cleanName);
+    setSavedName(cleanName);
+    setPhone(cleanedPhone);
+    setSavedPhone(cleanedPhone);
     setSaved(true);
   }
 
@@ -93,7 +109,7 @@ export default function ProfilePage() {
     );
   }
 
-  const changed = name.trim().replace(/\s+/g, ' ') !== savedName;
+  const changed = normName(name) !== savedName || normPhone(phone) !== savedPhone;
 
   return (
     <PageShell>
@@ -132,6 +148,25 @@ export default function ProfilePage() {
           </div>
 
           <div>
+            <label className="block text-sm mb-1.5 text-ink/70">মোবাইল নম্বর</label>
+            <input
+              type="tel"
+              inputMode="tel"
+              maxLength={20}
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                setSaved(false);
+              }}
+              className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
+              placeholder="01XXXXXXXXX"
+            />
+            <p className="text-[11px] text-ink/45 mt-1.5">
+              পোস্ট বা প্রোভাইডার প্রোফাইলে দেওয়া ফোন আলাদা, সেটা সেই পোস্ট বা প্রোফাইল এডিট করে বদলাতে হয়।
+            </p>
+          </div>
+
+          <div>
             <label className="block text-sm mb-1.5 text-ink/70">ইমেইল</label>
             <input
               type="text"
@@ -146,7 +181,7 @@ export default function ProfilePage() {
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
           )}
           {saved && !changed && (
-            <p className="text-sm text-green bg-green/10 rounded-lg px-3 py-2">✓ নাম সেভ হয়েছে</p>
+            <p className="text-sm text-green bg-green/10 rounded-lg px-3 py-2">✓ সেভ হয়েছে</p>
           )}
 
           <button
