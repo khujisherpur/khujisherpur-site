@@ -137,11 +137,11 @@ export default async function HomePage() {
       .limit(6),
     supabase
       .from('listings')
-      .select('id, title, area, price_or_salary, photos, posted_at, categories(slug)')
+      .select('id, title, area, upazila, owner_name, price_or_salary, photos, posted_at, categories(slug)')
       .eq('status', 'active')
       .gt('expiry_date', new Date().toISOString())
       .order('posted_at', { ascending: false })
-      .limit(8),
+      .limit(40),
   ]);
 
   // সেবাদাতার আসল সেবার নাম (ইলেকট্রিশিয়ান, প্লাম্বার...)
@@ -151,20 +151,15 @@ export default async function HomePage() {
     return s ? `${s.icon} ${s.label}` : categoryLabels[p.categories?.slug]?.[lang].name || '';
   };
 
-  const recentItems = [
-    ...(recentProviders || []).map((p) => ({
-      id: p.id, type: 'provider', title: p.name, area: p.area,
-      image: p.photo_url, date: p.created_at, slug: p.categories?.slug,
-      badge: providerBadge(p), href: providerHref(p, svc[p.id]),
-    })),
-    ...(recentListings || []).map((l) => ({
-      id: l.id, type: 'listing', title: l.title, area: l.area, price: l.price_or_salary,
-      image: l.photos?.[0] || null, date: l.posted_at, slug: l.categories?.slug,
-      badge: categoryLabels[l.categories?.slug]?.[lang].name || '', href: `/listing/${l.id}`,
-    })),
-  ]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 8);
+  // সাম্প্রতিক পোস্ট: শুধু পোস্ট (সেবাদাতারা নিজেদের আলাদা অংশে আছে), সর্বোচ্চ ৪০টা
+  const recentItems = (recentListings || []).map((l) => ({
+    id: l.id, type: 'listing', title: l.title, area: l.area, upazila: l.upazila,
+    price: l.price_or_salary, image: l.photos?.[0] || null, date: l.posted_at,
+    slug: l.categories?.slug,
+    // চাকরির পোস্টে প্রতিষ্ঠানের নাম দেখানো হয়, ছবি না থাকলেও কার্ড ভরা দেখায়
+    owner: l.categories?.slug === 'job' ? l.owner_name : null,
+    badge: categoryLabels[l.categories?.slug]?.[lang].name || '', href: `/listing/${l.id}`,
+  }));
 
   const providersWithRating = await Promise.all(
     (recentProviders || []).slice(0, 6).map(async (p) => {
@@ -324,79 +319,6 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* Recent Posts */}
-        {recentItems.length > 0 && (
-          <section className="pb-10">
-            <div className="flex items-center justify-between px-4 mb-3">
-              <h2 className="text-lg font-semibold">🔥 {t.recentTitle}</h2>
-              <a href="/search" className="text-sm text-green font-medium">{t.seeAll}</a>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-2 px-4 snap-x snap-mandatory scrollbar-hide">
-              {recentItems.map((item) => {
-                const label = categoryLabels[item.slug];
-                return (
-                  <a
-                    key={`${item.type}-${item.id}`}
-                    href={item.href}
-                    className="flex-shrink-0 w-36 snap-start bg-white rounded-xl border border-ink/10 overflow-hidden hover:shadow-md transition-shadow"
-                  >
-                    <div className="relative h-24 bg-paper flex items-center justify-center overflow-hidden">
-                      {item.image ? (
-                        <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-3xl opacity-30">{label?.icon || '📍'}</span>
-                      )}
-                      {item.badge && (
-                        <span className="absolute top-1.5 left-1.5 text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-white/90 text-ink/70">
-                          {item.badge}
-                        </span>
-                      )}
-                    </div>
-                    <div className="p-2.5">
-                      <p className="text-xs font-medium line-clamp-1">{item.title}</p>
-                      <p className="text-[10px] text-ink/50 mt-1">📍 {item.area}</p>
-                      {item.price && (
-                        <p className="text-xs text-green font-numeric font-semibold mt-1">
-                          {formatPrice(item.price, lang)}
-                        </p>
-                      )}
-                      <p className="text-[9px] text-ink/30 mt-1">{timeAgoFmt(item.date, lang)}</p>
-                    </div>
-                  </a>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* How It Works */}
-        <section className="px-4 pb-10">
-          <div className="bg-green/5 border border-green/10 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">{t.howTitle}</h2>
-            </div>
-            <div className="flex items-start justify-between gap-1">
-              {steps.map((step, i) => (
-                <div key={i} className="flex items-center flex-1 last:flex-none">
-                  <div className="flex flex-col items-center text-center flex-1">
-                    <div className="relative">
-                      <span className="w-12 h-12 rounded-full bg-green text-white flex items-center justify-center text-lg">
-                        {step.icon}
-                      </span>
-                      <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-marigold text-ink text-[10px] font-bold flex items-center justify-center font-numeric">
-                        {num(i + 1)}
-                      </span>
-                    </div>
-                    <p className="font-medium text-xs mt-2">{step.title}</p>
-                    <p className="text-[10px] text-ink/60 mt-1 leading-snug px-1">{step.desc}</p>
-                  </div>
-                  {i < steps.length - 1 && <span className="text-ink/20 text-lg px-0.5">›</span>}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* Recent Service Providers */}
         {providersWithRating.length > 0 && (
           <section className="pb-10">
@@ -436,6 +358,95 @@ export default async function HomePage() {
           </section>
         )}
 
+        {/* How It Works */}
+        <section className="px-4 pb-10">
+          <div className="bg-green/5 border border-green/10 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">{t.howTitle}</h2>
+            </div>
+            <div className="flex items-start justify-between gap-1">
+              {steps.map((step, i) => (
+                <div key={i} className="flex items-center flex-1 last:flex-none">
+                  <div className="flex flex-col items-center text-center flex-1">
+                    <div className="relative">
+                      <span className="w-12 h-12 rounded-full bg-green text-white flex items-center justify-center text-lg">
+                        {step.icon}
+                      </span>
+                      <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-marigold text-ink text-[10px] font-bold flex items-center justify-center font-numeric">
+                        {num(i + 1)}
+                      </span>
+                    </div>
+                    <p className="font-medium text-xs mt-2">{step.title}</p>
+                    <p className="text-[10px] text-ink/60 mt-1 leading-snug px-1">{step.desc}</p>
+                  </div>
+                  {i < steps.length - 1 && <span className="text-ink/20 text-lg px-0.5">›</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Recent Posts */}
+        {recentItems.length > 0 && (
+          <section className="px-4 pb-10">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold">🔥 {t.recentTitle}</h2>
+              <a href="/search" className="text-sm text-green font-medium">{t.seeAll}</a>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {recentItems.map((item) => {
+                const label = categoryLabels[item.slug];
+                const place = [item.upazila, item.area].filter(Boolean).join(', ');
+                return (
+                  <a
+                    key={`${item.type}-${item.id}`}
+                    href={item.href}
+                    className="block bg-white rounded-xl border border-ink/10 overflow-hidden hover:shadow-md transition-shadow"
+                  >
+                    <div className="relative aspect-[4/3] bg-paper flex items-center justify-center overflow-hidden">
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.title}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-4xl opacity-30">{label?.icon || '📍'}</span>
+                      )}
+                      {item.badge && (
+                        <span className="absolute top-2 left-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/90 text-ink/70">
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      {item.price && (
+                        <p className="text-base text-green font-numeric font-bold leading-tight">
+                          {formatPrice(item.price, lang)}
+                        </p>
+                      )}
+                      <p className="text-sm font-medium leading-snug line-clamp-2 mt-1">{item.title}</p>
+                      {item.owner && (
+                        <p className="text-[11px] text-ink/60 mt-1 line-clamp-1">🏢 {item.owner}</p>
+                      )}
+                      {place && <p className="text-[11px] text-ink/50 mt-1.5 line-clamp-1">📍 {place}</p>}
+                      <p className="text-[10px] text-ink/30 mt-1">{timeAgoFmt(item.date, lang)}</p>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+            <a
+              href="/search"
+              className="mt-4 block text-center border border-green/30 text-green font-medium text-sm py-2.5 rounded-xl hover:bg-green/5"
+            >
+              {t.seeAll}
+            </a>
+          </section>
+        )}
+
         <footer className="border-t border-ink/10 py-6 px-4 text-sm text-ink/60 flex flex-col items-center gap-2 mb-16 md:mb-0">
           <div className="flex gap-4 flex-wrap justify-center">
             <a href="/terms" className="hover:text-ink">{t.terms}</a>
@@ -472,4 +483,4 @@ export default async function HomePage() {
       <BottomNav activeTab="home" />
     </div>
   );
-}
+      }
