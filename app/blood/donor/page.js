@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { cleanPhone, isValidBdPhone } from '../../../lib/format';
+import SiteHeader from '../../../components/SiteHeader';
 
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -25,7 +26,7 @@ function friendlyError(err) {
   return 'কিছু একটা সমস্যা হয়েছে, একটু পরে আবার চেষ্টা করুন';
 }
 
-export default function BloodDonorPage() {
+function BloodDonorForm() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [existingDonor, setExistingDonor] = useState(null);
@@ -139,11 +140,7 @@ export default function BloodDonorPage() {
   }
 
   return (
-    <main className="max-w-xl mx-auto px-4 py-10">
-      <header className="mb-8">
-        <a href="/"><img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-9 w-auto" /></a>
-      </header>
-
+    <main className="max-w-xl mx-auto px-4 py-6">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-2xl">❤️</span>
         <h1 className="text-xl font-semibold">
@@ -218,5 +215,14 @@ export default function BloodDonorPage() {
         </button>
       </form>
     </main>
+  );
+}
+
+export default function BloodDonorPage() {
+  return (
+    <>
+      <SiteHeader lang="bn" simple />
+      <BloodDonorForm />
+    </>
   );
 }
