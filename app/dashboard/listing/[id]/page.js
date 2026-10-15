@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../../lib/supabaseClient';
 import ImageCropper from '../../../../components/ImageCropper';
 import SiteHeader from '../../../../components/SiteHeader';
+import PageSkeleton from '../../../../components/PageSkeleton';
 import { cleanPhone, isValidBdPhone } from '../../../../lib/format';
 
 const MAX_PHOTOS = 3;
@@ -70,9 +71,12 @@ export default function EditListingPage({ params }) {
   }, []);
 
   async function load() {
-    const { data: authData } = await supabase.auth.getUser();
-    setUser(authData.user);
-    if (!authData.user) {
+    // getSession ব্রাউজারের সেভ করা লগইন পড়ে, ইন্টারনেটে যায় না, তাই দ্রুত।
+    // ডাটাবেসের অনুমতি-নিয়ম সার্ভারেই যাচাই হয়।
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData.session?.user || null;
+    setUser(currentUser);
+    if (!currentUser) {
       setNeedLogin(true);
       setLoading(false);
       return;
@@ -235,7 +239,7 @@ export default function EditListingPage({ params }) {
   if (loading) {
     return (
       <PageShell>
-        <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>
+        <PageSkeleton />
       </PageShell>
     );
   }
