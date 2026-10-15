@@ -400,7 +400,7 @@ export default function ModerationTab({ kind }) {
                     </>
                   )}
                   <Row label="উপজেলা" value={s.upazila} />
-                  <Row label="ইউনিয়ন" value={s.union_name} />
+                  <Row label="ইউনিয়ন / পৌরসভা" value={s.union_name} />
                   <Row label="এলাকা/ঠিকানা" value={s.area} />
                   <Row label="মোবাইল" value={s[phoneKey]} />
                   <Row label="হোয়াটসঅ্যাপ" value={s.whatsapp} />
