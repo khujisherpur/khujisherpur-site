@@ -14,6 +14,16 @@ const SITE_HOST = 'khujisherpur.com';
 const rentTypeLabels = { house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য' };
 const roomOptions = ['১', '২', '৩', '৪+'];
 
+// চাকরি নিয়োগ বিজ্ঞপ্তির অপশন
+const jobTypeLabels = {
+  'ফুল-টাইম': 'ফুল-টাইম',
+  'পার্ট-টাইম': 'পার্ট-টাইম',
+  'চুক্তিভিত্তিক': 'চুক্তিভিত্তিক',
+  'ইন্টার্ন': 'ইন্টার্ন',
+};
+const jobGenderOptions = ['নারী ও পুরুষ উভয়', 'শুধু পুরুষ', 'শুধু নারী'];
+const applyMethodOptions = ['ফোনে যোগাযোগ', 'হোয়াটসঅ্যাপ', 'ই-মেইল', 'সরাসরি এসে', 'ডাকযোগে'];
+
 const categoryFieldText = {
   rent: { titlePh: 'যেমন: ২ বেডরুম বাসা, শেরপুর সদর', priceLabel: 'ভাড়া', pricePh: '৮,০০০' },
   'buy-sell': { titlePh: 'যেমন: স্যামসাং স্মার্টফোন', priceLabel: 'মূল্য', pricePh: '১৫,০০০' },
@@ -86,6 +96,10 @@ function NewPostForm() {
     sqft: '', amenities: '', mapLink: '',
     contact_phone: '', whatsapp: '', contact_email: '',
     nameEn: '', slug: '', selectedSubcategoryIds: [], primarySubcategoryId: '',
+    // চাকরি নিয়োগ বিজ্ঞপ্তির বাড়তি তথ্য
+    jobType: 'ফুল-টাইম', positionCount: '', jobGender: jobGenderOptions[0],
+    education: '', jobExperience: '', ageLimit: '', applyMethods: [],
+    documents: '', benefits: '',
   });
   const [waSame, setWaSame] = useState(false);
   const [existingProvider, setExistingProvider] = useState(null);
@@ -208,6 +222,15 @@ function NewPostForm() {
       if (!selected.includes(primary)) primary = selected[0] || '';
       return { ...f, selectedSubcategoryIds: selected, primarySubcategoryId: primary };
     });
+  }
+
+  function toggleApplyMethod(method) {
+    setForm((f) => ({
+      ...f,
+      applyMethods: f.applyMethods.includes(method)
+        ? f.applyMethods.filter((m) => m !== method)
+        : [...f.applyMethods, method],
+    }));
   }
 
   function handleFileSelect(e) {
@@ -336,6 +359,22 @@ function NewPostForm() {
           if (form.amenities) rentBlock += `সুযোগ-সুবিধা: ${form.amenities}\n\n`;
           description = `${rentBlock}${form.description}`;
           if (form.mapLink) description += `\n\nগুগল ম্যাপ: ${form.mapLink}`;
+        }
+
+        if (isJob) {
+          // নিয়োগ বিজ্ঞপ্তির তথ্য "লেবেল: মান" লাইন হিসেবে বিবরণের মাথায় বসে,
+          // বিস্তারিত পেজে প্রতিটি লাইন আলাদা দেখায়
+          const jobLines = [];
+          if (form.positionCount.trim()) jobLines.push(`পদসংখ্যা: ${form.positionCount.trim()} জন`);
+          jobLines.push(`চাকরির ধরন: ${form.jobType}`);
+          jobLines.push(`আবেদনের জন্য: ${form.jobGender}`);
+          if (form.education.trim()) jobLines.push(`শিক্ষাগত যোগ্যতা: ${form.education.trim()}`);
+          if (form.jobExperience.trim()) jobLines.push(`অভিজ্ঞতা: ${form.jobExperience.trim()}`);
+          if (form.ageLimit.trim()) jobLines.push(`বয়সসীমা: ${form.ageLimit.trim()}`);
+          if (form.applyMethods.length > 0) jobLines.push(`আবেদন পদ্ধতি: ${form.applyMethods.join(', ')}`);
+          if (form.documents.trim()) jobLines.push(`প্রয়োজনীয় কাগজপত্র: ${form.documents.trim()}`);
+          if (form.benefits.trim()) jobLines.push(`অতিরিক্ত সুবিধা: ${form.benefits.trim()}`);
+          description = `${jobLines.join('\n')}\n\n${form.description}`;
         }
 
         const payload = {
@@ -888,6 +927,125 @@ function NewPostForm() {
                   inputMode="numeric"
                 />
               </div>
+            </div>
+          )}
+
+          {isJob && (
+            <div className="rounded-xl border border-ink/10 bg-paper p-4 space-y-3">
+              <p className="text-sm font-medium">💼 নিয়োগের বিবরণ</p>
+
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">চাকরির ধরন</label>
+                <div className="flex gap-2 flex-wrap">
+                  {Object.entries(jobTypeLabels).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => updateField('jobType', key)}
+                      className={`text-sm px-4 py-1.5 rounded-full border ${
+                        form.jobType === key ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60 bg-white'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm mb-1.5 text-ink/70">পদসংখ্যা (ঐচ্ছিক)</label>
+                  <input
+                    type="text" inputMode="numeric" maxLength={5} value={form.positionCount}
+                    onChange={(e) => updateField('positionCount', e.target.value)}
+                    className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                    placeholder="যেমন: ২"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1.5 text-ink/70">কারা আবেদন করতে পারবেন</label>
+                  <select
+                    value={form.jobGender}
+                    onChange={(e) => updateField('jobGender', e.target.value)}
+                    className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                  >
+                    {jobGenderOptions.map((g) => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">শিক্ষাগত যোগ্যতা (ঐচ্ছিক)</label>
+                <input
+                  type="text" maxLength={100} value={form.education}
+                  onChange={(e) => updateField('education', e.target.value)}
+                  className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                  placeholder="যেমন: এসএসসি পাস বা সমমান"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm mb-1.5 text-ink/70">অভিজ্ঞতা (ঐচ্ছিক)</label>
+                  <input
+                    type="text" maxLength={60} value={form.jobExperience}
+                    onChange={(e) => updateField('jobExperience', e.target.value)}
+                    className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                    placeholder="যেমন: ১ বছর / লাগবে না"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1.5 text-ink/70">বয়সসীমা (ঐচ্ছিক)</label>
+                  <input
+                    type="text" maxLength={40} value={form.ageLimit}
+                    onChange={(e) => updateField('ageLimit', e.target.value)}
+                    className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                    placeholder="যেমন: ১৮-৩৫ বছর"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">আবেদন পদ্ধতি</label>
+                <div className="flex gap-2 flex-wrap">
+                  {applyMethodOptions.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => toggleApplyMethod(m)}
+                      className={`text-sm px-3 py-1.5 rounded-full border ${
+                        form.applyMethods.includes(m) ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60 bg-white'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">প্রয়োজনীয় কাগজপত্র (ঐচ্ছিক)</label>
+                <input
+                  type="text" maxLength={200} value={form.documents}
+                  onChange={(e) => updateField('documents', e.target.value)}
+                  className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                  placeholder="যেমন: সিভি, ছবি, এনআইডি কপি, সনদের ফটোকপি"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">অতিরিক্ত সুবিধা (ঐচ্ছিক)</label>
+                <input
+                  type="text" maxLength={200} value={form.benefits}
+                  onChange={(e) => updateField('benefits', e.target.value)}
+                  className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                  placeholder="যেমন: দুপুরের খাবার, ঈদ বোনাস"
+                />
+              </div>
+
+              <p className="text-[11px] text-red-500">
+                ⚠️ চাকরির জন্য আবেদনকারীর কাছ থেকে কোনো টাকা চাওয়া যাবে না। এমন পোস্ট পেলে সরিয়ে দেওয়া হবে।
+              </p>
             </div>
           )}
 
