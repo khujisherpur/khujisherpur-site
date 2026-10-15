@@ -57,7 +57,7 @@ export default async function SearchPage({ searchParams }) {
     .eq('status', 'approved');
   let listingsQuery = supabase
     .from('listings')
-    .select('id, title, area, upazila, union_name, price_or_salary, photos, posted_at, categories(slug)')
+    .select('id, title, area, upazila, union_name, owner_name, price_or_salary, photos, posted_at, categories(slug)')
     .eq('status', 'active')
     .gt('expiry_date', new Date().toISOString());
 
@@ -126,6 +126,7 @@ export default async function SearchPage({ searchParams }) {
     ...(l || []).map((x) => ({
       type: 'listing', id: x.id, title: x.title, area: x.area, upazila: x.upazila,
       price: x.price_or_salary, image: x.photos?.[0] || null, date: x.posted_at, slug: x.categories?.slug,
+      owner: x.categories?.slug === 'job' ? x.owner_name : null,
       badge: categoryLabels[x.categories?.slug]?.[lang].name || '', href: `/listing/${x.id}`,
     })),
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -172,7 +173,7 @@ export default async function SearchPage({ searchParams }) {
           )}
         </div>
 
-        <section className="pb-16 space-y-3">
+        <section className="pb-16">
           {items.length === 0 && (
             <div className="text-center py-12">
               <p className="text-4xl mb-2">{hasSearch ? '🔎' : '📭'}</p>
@@ -180,52 +181,60 @@ export default async function SearchPage({ searchParams }) {
             </div>
           )}
 
-          {items.map((item) => {
-            const label = categoryLabels[item.slug];
-            const isProvider = item.type === 'provider';
-            return (
-              <a
-                key={`${item.type}-${item.id}`}
-                href={item.href}
-                className={`flex gap-3 bg-white rounded-xl p-3 border-l-4 ${
-                  isProvider ? 'border-l-green' : 'border-l-marigold'
-                } border-t border-r border-b border-ink/10 hover:shadow-md transition-shadow`}
-              >
-                {item.image ? (
-                  <img
-                    src={item.image}
-                    alt={item.title || ''}
-                    loading="lazy"
-                    className={`w-20 h-20 object-cover flex-shrink-0 ${isProvider ? 'rounded-full' : 'rounded-lg'}`}
-                  />
-                ) : (
-                  <span
-                    className={`w-20 h-20 bg-[#EEF1F8] flex items-center justify-center text-2xl flex-shrink-0 ${
-                      isProvider ? 'rounded-full text-green-dark font-semibold' : 'rounded-lg opacity-70'
-                    }`}
-                  >
-                    {isProvider ? item.title?.charAt(0) : label?.icon || '📄'}
-                  </span>
-                )}
-                <div className="min-w-0 flex-1 flex flex-col">
-                  <p className={`text-[11px] font-medium ${isProvider ? 'text-green' : 'text-marigold'}`}>
-                    {item.badge}
-                  </p>
-                  <p className="font-medium leading-snug line-clamp-2 mt-0.5">{item.title}</p>
-                  <p className="text-xs text-ink/55 mt-1 truncate">
-                    📍 {item.area}
-                    {item.upazila && item.upazila !== item.area ? `, ${item.upazila}` : ''}
-                  </p>
-                  <div className="flex items-end justify-between mt-auto pt-1">
-                    <p className="text-green font-semibold font-numeric">
-                      {item.price ? formatPrice(item.price, lang) : ''}
-                    </p>
-                    <p className="text-[10px] text-ink/40">{timeAgo(item.date, lang)}</p>
+          <div className="grid grid-cols-2 gap-3">
+            {items.map((item) => {
+              const label = categoryLabels[item.slug];
+              const isProvider = item.type === 'provider';
+              const place = [item.area, item.upazila && item.upazila !== item.area ? item.upazila : '']
+                .filter(Boolean)
+                .join(', ');
+              return (
+                <a
+                  key={`${item.type}-${item.id}`}
+                  href={item.href}
+                  className="block bg-white rounded-xl border border-ink/10 overflow-hidden hover:shadow-md transition-shadow"
+                >
+                  <div className="relative aspect-[4/3] bg-paper flex items-center justify-center overflow-hidden">
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt={item.title || ''}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-4xl opacity-30">
+                        {isProvider ? item.title?.charAt(0) : label?.icon || '📄'}
+                      </span>
+                    )}
+                    {item.badge && (
+                      <span
+                        className={`absolute top-2 left-2 text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                          isProvider ? 'bg-green text-white' : 'bg-white/90 text-ink/70'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
                   </div>
-                </div>
-              </a>
-            );
-          })}
+                  <div className="p-3">
+                    {item.price && (
+                      <p className="text-base text-green font-numeric font-bold leading-tight">
+                        {formatPrice(item.price, lang)}
+                      </p>
+                    )}
+                    <p className="text-sm font-medium leading-snug line-clamp-2 mt-1">{item.title}</p>
+                    {item.owner && (
+                      <p className="text-[11px] text-ink/60 mt-1 line-clamp-1">🏢 {item.owner}</p>
+                    )}
+                    {place && <p className="text-[11px] text-ink/50 mt-1.5 line-clamp-1">📍 {place}</p>}
+                    <p className="text-[10px] text-ink/30 mt-1">{timeAgo(item.date, lang)}</p>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
         </section>
 
         <BottomNav activeTab="search" />
