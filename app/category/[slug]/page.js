@@ -49,6 +49,30 @@ const SEO_DESCS = {
       : 'শেরপুরে কমিউনিটি সেন্টার, হল ও ভেন্যু ভাড়ার বিজ্ঞাপন।',
 };
 
+// পেজের ভেতরের মূল শিরোনাম (h1) আর ইংরেজি মেটা টাইটেল: মানুষ যা খোঁজে সেই শব্দসহ
+const PAGE_HEADINGS = {
+  bn: {
+    rent: 'শেরপুরে বাসা, দোকান ও মেস ভাড়া',
+    job: 'শেরপুরে চাকরির খবর ও জব বিজ্ঞপ্তি',
+    'buy-sell': 'শেরপুরে নতুন ও পুরোনো পণ্য কেনাবেচা',
+    'agri-product': 'শেরপুরে কৃষিপণ্য কেনাবেচা',
+    teacher: 'শেরপুরে প্রাইভেট টিউটর ও টিউশন',
+    venue: 'শেরপুরে কমিউনিটি সেন্টার ও ভেন্যু ভাড়া',
+    ambulance: 'শেরপুরে অ্যাম্বুলেন্স সেবা',
+    'service-provider': 'শেরপুরে ইলেকট্রিশিয়ান, প্লাম্বারসহ সব সেবা',
+  },
+  en: {
+    rent: 'House, Shop & Mess for Rent in Sherpur',
+    job: 'Jobs & Job Circulars in Sherpur',
+    'buy-sell': 'Buy & Sell New and Used Items in Sherpur',
+    'agri-product': 'Agri Products in Sherpur',
+    teacher: 'Private Tutors & Tuition in Sherpur',
+    venue: 'Community Centers & Venues in Sherpur',
+    ambulance: 'Ambulance Service in Sherpur',
+    'service-provider': 'Electricians, Plumbers & More in Sherpur',
+  },
+};
+
 function seoFor(slug, name, n, type, fallbackDesc) {
   const title = SEO_TITLES[slug] || `শেরপুরে ${name}`;
   const fmt = n >= 3 ? toBn(n) : null;
@@ -117,10 +141,7 @@ export async function generateMetadata({ params, searchParams }) {
     }
     ({ title, description } = seoFor(params.slug, name, n, type, label.bn.desc));
   } else {
-    title =
-      params.slug === 'rent'
-        ? 'House, Shop & Mess for Rent in Sherpur | Khuji Sherpur'
-        : `${name} in Sherpur | Khuji Sherpur`;
+    title = `${PAGE_HEADINGS.en[params.slug] || `${name} in Sherpur`} | Khuji Sherpur`;
     description = label.en.desc || title;
   }
 
@@ -223,6 +244,8 @@ export default async function CategoryPage({ params, searchParams }) {
   const isRent = category.slug === 'rent';
   const isServiceProvider = category.slug === 'service-provider';
   const name = label[lang].name;
+  // পেজের মূল শিরোনাম (h1): তালিকায় থাকলে গুগল-বান্ধব পুরো শিরোনাম, না থাকলে ক্যাটাগরির নাম
+  const pageHeading = PAGE_HEADINGS[lang]?.[category.slug] || name;
 
   // পুরোনো লিংক (?sub=electrician) নতুন তালিকায় নিয়ে যাই (শুধু নিরাপদ slug হলে)
   if (isServiceProvider && activeSub) {
@@ -265,7 +288,7 @@ export default async function CategoryPage({ params, searchParams }) {
             <a href="/" className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
             <div className="flex items-center gap-3 mt-3">
               <span className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-[#EEF1F8]">{label.icon}</span>
-              <h1 className="text-2xl md:text-3xl font-semibold">{name}</h1>
+              <h1 className="text-xl md:text-3xl font-semibold leading-snug">{pageHeading}</h1>
             </div>
             <p className="text-ink/60 text-sm mt-2">{t.whichService}</p>
           </div>
@@ -338,13 +361,6 @@ export default async function CategoryPage({ params, searchParams }) {
   const clearHref = base;
   const postHref = `/post/new?category=${category.slug}`;
 
-  // ভাড়া পেজে শুধু "ভাড়া" না লিখে গুগল-বান্ধব পুরো শিরোনাম
-  const pageHeading = isRent
-    ? lang === 'bn'
-      ? 'শেরপুরে বাসা, দোকান ও মেস ভাড়া'
-      : 'House, Shop & Mess for Rent in Sherpur'
-    : name;
-
   return (
     <>
       <SiteHeader lang={lang} />
@@ -357,7 +373,7 @@ export default async function CategoryPage({ params, searchParams }) {
               {label.icon}
             </span>
             <div className="min-w-0 flex-1">
-              <h1 className={`text-xl md:text-2xl font-semibold leading-snug ${isRent ? '' : 'truncate'}`}>{pageHeading}</h1>
+              <h1 className="text-xl md:text-2xl font-semibold leading-snug">{pageHeading}</h1>
               <p className="text-xs text-ink/50 mt-0.5">
                 {num(items.length)}
                 {isService ? t.profilesWord : t.postsWord}
