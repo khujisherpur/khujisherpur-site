@@ -4,6 +4,7 @@ import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import { cleanPhone } from '../../../lib/format';
+import SiteHeader from '../../../components/SiteHeader';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
@@ -38,10 +39,13 @@ export default async function BloodRequestDetailPage({ params }) {
 
   if (!request) {
     return (
-      <main className="max-w-md mx-auto px-4 py-20 text-center">
-        <p className="text-ink/70">এই অনুরোধটি খুঁজে পাওয়া যায়নি।</p>
-        <a href="/blood" className="text-green underline mt-2 inline-block">ব্লাড পেজে ফিরে যান</a>
-      </main>
+      <>
+        <SiteHeader lang="bn" simple />
+        <main className="max-w-md mx-auto px-4 py-20 text-center">
+          <p className="text-ink/70">এই অনুরোধটি খুঁজে পাওয়া যায়নি।</p>
+          <a href="/blood" className="text-green underline mt-2 inline-block">ব্লাড পেজে ফিরে যান</a>
+        </main>
+      </>
     );
   }
 
@@ -51,12 +55,10 @@ export default async function BloodRequestDetailPage({ params }) {
   const statusLabel = request.status === 'fulfilled' ? 'পূরণ হয়েছে' : 'মেয়াদ শেষ';
 
   return (
+    <>
+    <SiteHeader lang="bn" simple />
     <main className="max-w-2xl mx-auto px-4">
-      <header className="flex items-center justify-between py-6">
-        <a href="/"><img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-10 w-auto" /></a>
-      </header>
-
-      <a href="/blood" className="text-sm text-ink/50 hover:text-ink">← ব্লাড পেজে ফিরে যান</a>
+      <a href="/blood" className="inline-block mt-5 text-sm text-ink/50 hover:text-ink">← ব্লাড পেজে ফিরে যান</a>
 
       <div className="bg-white border-2 border-red-200 mt-4 p-6">
         <div className="flex items-center gap-4">
@@ -123,5 +125,6 @@ export default async function BloodRequestDetailPage({ params }) {
         )}
       </div>
     </main>
+    </>
   );
 }
