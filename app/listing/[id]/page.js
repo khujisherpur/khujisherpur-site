@@ -10,13 +10,29 @@ import ProfileMenu from '../../../components/ProfileMenu';
 import SiteHeader from '../../../components/SiteHeader';
 import { getLang } from '../../../lib/getLang';
 import { categoryLabels } from '../../../lib/categoryLabels';
-import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../../lib/site';
+import { SITE_URL, SITE_NAME, DEFAULT_OG_IMAGE } from '../../../lib/site';
 import { formatPrice, parsePrice, timeAgo, toBn, cleanPhone, waLink } from '../../../lib/format';
 
 const MONTHS_BN = [
   'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
   'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর',
 ];
+
+// "২ জন" / "5" -> 2 / 5 (বাংলা অঙ্কেও চলে), সংখ্যা না পেলে null
+function leadingNumber(raw) {
+  const en = String(raw || '').replace(/[০-৯]/g, (d) => '০১২৩৪৫৬৭৮৯'.indexOf(d));
+  const m = en.match(/\d+/);
+  const n = m ? parseInt(m[0], 10) : null;
+  return n && n > 0 && n < 10000 ? n : null;
+}
+
+// ফর্মের "চাকরির ধরন" -> Google for Jobs-এর নির্ধারিত শব্দ
+const EMPLOYMENT_TYPES = {
+  'ফুল-টাইম': 'FULL_TIME',
+  'পার্ট-টাইম': 'PART_TIME',
+  'চুক্তিভিত্তিক': 'CONTRACTOR',
+  'ইন্টার্ন': 'INTERN',
+};
 
 // "2026-10-02" -> "২ অক্টোবর ২০২৬"
 function formatDateBn(iso) {
@@ -44,17 +60,38 @@ function uniqPlaces(list) {
 
 // পোস্ট করার সময় সিস্টেম যেসব লাইন বিবরণের মাথায় বসায় সেগুলো আলাদা করে নিই
 // (deadline এখানে শুধু পুরোনো পোস্টের জন্য, নতুন পোস্টে আলাদা কলাম আছে)
-function parseDescription(desc) {
+// চাকরির ফর্ম বিবরণের মাথায় "লেবেল: মান" লাইন বসায়, সেগুলো আলাদা করে তথ্য-তালিকায় দেখাই
+const JOB_FIELD_KEYS = {
+  'পদসংখ্যা': 'positions',
+  'চাকরির ধরন': 'jobType',
+  'আবেদনের জন্য': 'gender',
+  'শিক্ষাগত যোগ্যতা': 'education',
+  'অভিজ্ঞতা': 'experience',
+  'বয়সসীমা': 'ageLimit',
+  'আবেদন পদ্ধতি': 'applyMethod',
+  'প্রয়োজনীয় কাগজপত্র': 'documents',
+  'অতিরিক্ত সুবিধা': 'benefits',
+};
+const JOB_FIELD_RE = new RegExp(`^(${Object.keys(JOB_FIELD_KEYS).join('|')}):\\s*(.+)$`);
+
+// isJob সত্য হলে তবেই চাকরির লাইনগুলো আলাদা হয়, নইলে অন্য ক্যাটাগরির লেখা অক্ষত থাকে
+function parseDescription(desc, isJob = false) {
   const lines = String(desc || '').split(/\n+/).map((l) => l.trim()).filter(Boolean);
   let deadline = null;
   let condition = null;
   let rooms = null;
   let amenities = null;
   let mapLink = null;
+  const job = {};
   const bodyLines = [];
   for (const line of lines) {
     const dm = line.match(/^আবেদনের শেষ তারিখ:\s*(\d{4}-\d{2}-\d{2})/);
     if (dm) { deadline = dm[1]; continue; }
+    // শুধু বিবরণের শুরুর অংশে (মালিকের নিজের লেখার আগে) থাকা চাকরির লাইন
+    if (isJob && bodyLines.length === 0) {
+      const jm = line.match(JOB_FIELD_RE);
+      if (jm) { job[JOB_FIELD_KEYS[jm[1]]] = jm[2].trim(); continue; }
+    }
     if (/^কন্ডিশন:/.test(line)) { condition = line.replace(/^কন্ডিশন:\s*/, ''); continue; }
     if (/^সুযোগ-সুবিধা:/.test(line)) { amenities = line.replace(/^সুযোগ-সুবিধা:\s*/, ''); continue; }
     if (/^গুগল ম্যাপ:/.test(line)) { mapLink = line.replace(/^গুগল ম্যাপ:\s*/, ''); continue; }
@@ -78,6 +115,7 @@ function parseDescription(desc) {
     roomsInfo,
     amenities,
     mapLink,
+    job,
     bodyLines,
     body: bodyLines.join(' ').replace(/\s+/g, ' ').trim(),
   };
@@ -106,7 +144,8 @@ function buildTitle(listing, slug) {
   } else if (price) {
     mid = `${base} — ${price}`;
   }
-  return `${mid} | খুঁজি শেরপুর`;
+  // চাকরির টাইটেলে "শেরপুরে চাকরি" থাকলে মানুষ যা খোঁজে তার সঙ্গে মেলে
+  return slug === 'job' ? `${mid} | শেরপুরে চাকরি | খুঁজি শেরপুর` : `${mid} | খুঁজি শেরপুর`;
 }
 
 function buildDescription(listing, slug, parsed) {
@@ -117,6 +156,8 @@ function buildDescription(listing, slug, parsed) {
 
   if (slug === 'job') {
     parts.push(`${listing.owner_name ? `${listing.owner_name}, ` : ''}${place}।`);
+    if (parsed.job?.positions) parts.push(`পদসংখ্যা ${parsed.job.positions}।`);
+    if (parsed.job?.education) parts.push(`যোগ্যতা: ${parsed.job.education}।`);
     if (price) parts.push(`বেতন ${price}।`);
     if (parsed.deadline) parts.push(`আবেদনের শেষ তারিখ ${formatDateBn(parsed.deadline)}।`);
   } else if (slug === 'rent') {
@@ -155,7 +196,7 @@ export async function generateMetadata({ params }) {
   }
 
   const slug = listing.categories?.slug;
-  const parsed = parseDescription(listing.description);
+  const parsed = parseDescription(listing.description, slug === 'job');
   // নতুন কলাম আগে, না থাকলে পুরোনো পোস্টের বিবরণ থেকে
   parsed.deadline = listing.deadline || parsed.deadline;
   const title = buildTitle(listing, slug);
@@ -192,6 +233,9 @@ const text = {
     back: '← তালিকায় ফিরে যান', desc: 'বিবরণ', noDesc: 'কোনো বিবরণ দেওয়া হয়নি।',
     details: 'বিস্তারিত', category: 'ক্যাটাগরি', location: 'এলাকা', type: 'ধরন', owner: 'মালিক', employer: 'প্রতিষ্ঠান', posted: 'পোস্ট করা হয়েছে',
     deadline: 'আবেদনের শেষ তারিখ',
+    positions: 'পদসংখ্যা', jobType: 'চাকরির ধরন', gender: 'আবেদনের জন্য',
+    education: 'শিক্ষাগত যোগ্যতা', experience: 'অভিজ্ঞতা', ageLimit: 'বয়সসীমা',
+    applyMethod: 'আবেদন পদ্ধতি', documents: 'প্রয়োজনীয় কাগজপত্র', benefits: 'অতিরিক্ত সুবিধা',
     views: 'ভিউ',
     contact: 'যোগাযোগ', phone: 'মোবাইল', whatsapp: 'হোয়াটসঅ্যাপ', email: 'ইমেইল',
     call: 'কল করুন', waBtn: 'WhatsApp',
@@ -206,6 +250,9 @@ const text = {
     back: '← Back to list', desc: 'Description', noDesc: 'No description provided.',
     details: 'Details', category: 'Category', location: 'Location', type: 'Type', owner: 'Owner', employer: 'Employer', posted: 'Posted',
     deadline: 'Application deadline',
+    positions: 'Vacancies', jobType: 'Job type', gender: 'Open to',
+    education: 'Education', experience: 'Experience', ageLimit: 'Age limit',
+    applyMethod: 'How to apply', documents: 'Documents needed', benefits: 'Benefits',
     views: 'views',
     contact: 'Contact', phone: 'Phone', whatsapp: 'WhatsApp', email: 'Email',
     call: 'Call', waBtn: 'WhatsApp',
@@ -298,7 +345,7 @@ export default async function ListingDetailPage({ params }) {
 
   const slug = listing.categories?.slug;
   const isJob = slug === 'job';
-  const parsed = parseDescription(listing.description);
+  const parsed = parseDescription(listing.description, isJob);
   // নতুন কলাম আগে, না থাকলে পুরোনো পোস্টের বিবরণ থেকে
   const deadline = listing.deadline || parsed.deadline;
   parsed.deadline = deadline;
@@ -323,6 +370,21 @@ export default async function ListingDetailPage({ params }) {
     : [];
   const mapLink = parsed.mapLink && /^https?:\/\//.test(parsed.mapLink) ? parsed.mapLink : null;
 
+  // চাকরির তথ্য-সারি: বিবরণ থেকে আলাদা করা লাইনগুলো এখানে সুন্দর তালিকায়
+  const jobRows = isJob
+    ? [
+        { k: t.jobType, v: parsed.job.jobType },
+        { k: t.positions, v: parsed.job.positions },
+        { k: t.gender, v: parsed.job.gender },
+        { k: t.education, v: parsed.job.education },
+        { k: t.experience, v: parsed.job.experience },
+        { k: t.ageLimit, v: parsed.job.ageLimit },
+        { k: t.applyMethod, v: parsed.job.applyMethod },
+        { k: t.documents, v: parsed.job.documents },
+        { k: t.benefits, v: parsed.job.benefits },
+      ]
+    : [];
+
   const rows = [
     { k: t.category, v: categoryName },
     listing.rent_type ? { k: t.type, v: t[listing.rent_type] || listing.rent_type } : null,
@@ -332,6 +394,7 @@ export default async function ListingDetailPage({ params }) {
     parsed.condition ? { k: t.condition, v: parsed.condition } : null,
     { k: t.location, v: where },
     listing.owner_name ? { k: isJob ? t.employer : t.owner, v: listing.owner_name } : null,
+    ...jobRows,
     isJob && deadline ? { k: t.deadline, v: lang === 'bn' ? formatDateBn(deadline) : deadline } : null,
     { k: t.posted, v: timeAgo(listing.posted_at, lang) },
   ].filter((r) => r && r.v);
@@ -380,6 +443,20 @@ export default async function ListingDetailPage({ params }) {
           },
         },
         ...(photos[0] ? { image: photos[0] } : {}),
+        // ফর্ম থেকে পাওয়া বাড়তি তথ্য: থাকলেই যোগ হয়, না থাকলে বাদ
+        ...(EMPLOYMENT_TYPES[parsed.job.jobType] ? { employmentType: EMPLOYMENT_TYPES[parsed.job.jobType] } : {}),
+        ...(leadingNumber(parsed.job.positions) ? { totalJobOpenings: leadingNumber(parsed.job.positions) } : {}),
+        ...(parsed.job.education ? { educationRequirements: parsed.job.education } : {}),
+        ...(parsed.job.experience ? { experienceRequirements: parsed.job.experience } : {}),
+        ...(numericPrice
+          ? {
+              baseSalary: {
+                '@type': 'MonetaryAmount',
+                currency: 'BDT',
+                value: { '@type': 'QuantitativeValue', value: numericPrice, unitText: 'MONTH' },
+              },
+            }
+          : {}),
       };
     }
   } else {
@@ -401,6 +478,24 @@ export default async function ListingDetailPage({ params }) {
         : {}),
     };
   }
+
+  // গুগল ফলাফলে লিংকের নিচে দেখানো পথ: হোম › ক্যাটাগরি › পোস্ট
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: SITE_NAME, item: `${SITE_URL}/` },
+      ...(categoryName
+        ? [{ '@type': 'ListItem', position: 2, name: categoryName, item: `${SITE_URL}/category/${slug}` }]
+        : []),
+      {
+        '@type': 'ListItem',
+        position: categoryName ? 3 : 2,
+        name: listing.title,
+        item: `${SITE_URL}/listing/${listing.id}`,
+      },
+    ],
+  };
 
   return (
     <>
@@ -613,6 +708,10 @@ export default async function ListingDetailPage({ params }) {
             dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
           />
         )}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbLd) }}
+        />
       </main>
     </>
   );
