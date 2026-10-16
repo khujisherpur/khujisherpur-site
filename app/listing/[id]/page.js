@@ -34,6 +34,15 @@ const EMPLOYMENT_TYPES = {
   'ইন্টার্ন': 'INTERN',
 };
 
+// ফর্মের "বেতনের ধরন" -> Google for Jobs-এর unitText; "আলোচনা সাপেক্ষে" বা অজানা হলে এখানে নেই
+const SALARY_UNITS = {
+  'মাসিক': 'MONTH',
+  'দৈনিক': 'DAY',
+  'সাপ্তাহিক': 'WEEK',
+  'ঘণ্টায়': 'HOUR',
+};
+const SALARY_NEGOTIABLE = 'আলোচনা সাপেক্ষে';
+
 // "2026-10-02" -> "২ অক্টোবর ২০২৬"
 function formatDateBn(iso) {
   const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -68,6 +77,7 @@ const JOB_FIELD_KEYS = {
   'শিক্ষাগত যোগ্যতা': 'education',
   'অভিজ্ঞতা': 'experience',
   'বয়সসীমা': 'ageLimit',
+  'বেতনের ধরন': 'salaryUnit',
   'আবেদন পদ্ধতি': 'applyMethod',
   'প্রয়োজনীয় কাগজপত্র': 'documents',
   'অতিরিক্ত সুবিধা': 'benefits',
@@ -158,7 +168,9 @@ function buildDescription(listing, slug, parsed) {
     parts.push(`${listing.owner_name ? `${listing.owner_name}, ` : ''}${place}।`);
     if (parsed.job?.positions) parts.push(`পদসংখ্যা ${parsed.job.positions}।`);
     if (parsed.job?.education) parts.push(`যোগ্যতা: ${parsed.job.education}।`);
-    if (price) parts.push(`বেতন ${price}।`);
+    const unit = parsed.job?.salaryUnit;
+    if (unit === SALARY_NEGOTIABLE) parts.push('বেতন আলোচনা সাপেক্ষে।');
+    else if (price) parts.push(`বেতন ${price}${unit ? ` (${unit})` : ''}।`);
     if (parsed.deadline) parts.push(`আবেদনের শেষ তারিখ ${formatDateBn(parsed.deadline)}।`);
   } else if (slug === 'rent') {
     const lbl = { house: 'বাসা', shop: 'দোকান', mess: 'মেস' }[listing.rent_type];
@@ -233,6 +245,8 @@ const text = {
     back: '← তালিকায় ফিরে যান', desc: 'বিবরণ', noDesc: 'কোনো বিবরণ দেওয়া হয়নি।',
     details: 'বিস্তারিত', category: 'ক্যাটাগরি', location: 'এলাকা', type: 'ধরন', owner: 'মালিক', employer: 'প্রতিষ্ঠান', posted: 'পোস্ট করা হয়েছে',
     deadline: 'আবেদনের শেষ তারিখ',
+    salaryNegotiable: 'বেতন আলোচনা সাপেক্ষে',
+    salaryPer: { 'মাসিক': 'মাসে', 'দৈনিক': 'দিনে', 'সাপ্তাহিক': 'সপ্তাহে', 'ঘণ্টায়': 'ঘণ্টায়' },
     positions: 'পদসংখ্যা', jobType: 'চাকরির ধরন', gender: 'আবেদনের জন্য',
     education: 'শিক্ষাগত যোগ্যতা', experience: 'অভিজ্ঞতা', ageLimit: 'বয়সসীমা',
     applyMethod: 'আবেদন পদ্ধতি', documents: 'প্রয়োজনীয় কাগজপত্র', benefits: 'অতিরিক্ত সুবিধা',
@@ -250,6 +264,8 @@ const text = {
     back: '← Back to list', desc: 'Description', noDesc: 'No description provided.',
     details: 'Details', category: 'Category', location: 'Location', type: 'Type', owner: 'Owner', employer: 'Employer', posted: 'Posted',
     deadline: 'Application deadline',
+    salaryNegotiable: 'Salary negotiable',
+    salaryPer: { 'মাসিক': 'month', 'দৈনিক': 'day', 'সাপ্তাহিক': 'week', 'ঘণ্টায়': 'hour' },
     positions: 'Vacancies', jobType: 'Job type', gender: 'Open to',
     education: 'Education', experience: 'Experience', ageLimit: 'Age limit',
     applyMethod: 'How to apply', documents: 'Documents needed', benefits: 'Benefits',
@@ -356,6 +372,11 @@ export default async function ListingDetailPage({ params }) {
   const photos = listing.photos || [];
   const where = uniqPlaces([listing.area, listing.union_name, listing.upazila]).join(', ');
   const price = formatPrice(listing.price_or_salary, lang);
+  // চাকরিতে বেতন কত সময়ের জন্য: "৳ ১৫,০০০ / মাসে" বা "বেতন আলোচনা সাপেক্ষে"
+  const salaryUnit = isJob ? parsed.job.salaryUnit : null;
+  const salaryNegotiable = salaryUnit === SALARY_NEGOTIABLE;
+  const per = salaryUnit ? t.salaryPer[salaryUnit] : null;
+  const priceShown = salaryNegotiable ? t.salaryNegotiable : price && per ? `${price} / ${per}` : price;
   const views = (listing.view_count || 0) + (counted ? 1 : 0);
 
   // বিবরণে শুধু মালিকের নিজের লেখা, বাকি তথ্য "বিস্তারিত" তালিকায়
@@ -448,12 +469,13 @@ export default async function ListingDetailPage({ params }) {
         ...(leadingNumber(parsed.job.positions) ? { totalJobOpenings: leadingNumber(parsed.job.positions) } : {}),
         ...(parsed.job.education ? { educationRequirements: parsed.job.education } : {}),
         ...(parsed.job.experience ? { experienceRequirements: parsed.job.experience } : {}),
-        ...(numericPrice
+        // বেতনের ধরন জানা থাকলেই বেতন যায়; পুরোনো পোস্টে (ধরন অজানা) ভুল তথ্য না দিতে বাদ
+        ...(numericPrice && SALARY_UNITS[salaryUnit]
           ? {
               baseSalary: {
                 '@type': 'MonetaryAmount',
                 currency: 'BDT',
-                value: { '@type': 'QuantitativeValue', value: numericPrice, unitText: 'MONTH' },
+                value: { '@type': 'QuantitativeValue', value: numericPrice, unitText: SALARY_UNITS[salaryUnit] },
               },
             }
           : {}),
@@ -549,7 +571,11 @@ export default async function ListingDetailPage({ params }) {
             </div>
 
             <h1 className="text-xl font-semibold mt-2 leading-snug">{listing.title}</h1>
-            {price && <p className="text-2xl font-semibold text-green font-numeric mt-2">{price}</p>}
+            {priceShown && (
+              <p className={`${salaryNegotiable ? 'text-lg' : 'text-2xl'} font-semibold text-green font-numeric mt-2`}>
+                {priceShown}
+              </p>
+            )}
             {deadlinePassed && (
               <p className="mt-2 text-xs bg-red-50 text-red-600 rounded-lg px-3 py-2">{t.deadlinePassed}</p>
             )}
