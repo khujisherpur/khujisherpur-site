@@ -23,6 +23,9 @@ const jobTypeLabels = {
 };
 const jobGenderOptions = ['নারী ও পুরুষ উভয়', 'শুধু পুরুষ', 'শুধু নারী'];
 const applyMethodOptions = ['ফোনে যোগাযোগ', 'হোয়াটসঅ্যাপ', 'ই-মেইল', 'সরাসরি এসে', 'ডাকযোগে'];
+// বেতন কত সময়ের জন্য (Google-এর ডাটার জন্যও জরুরি)
+const SALARY_NEGOTIABLE = 'আলোচনা সাপেক্ষে';
+const salaryUnitOptions = ['মাসিক', 'দৈনিক', 'সাপ্তাহিক', 'ঘণ্টায়', SALARY_NEGOTIABLE];
 
 const categoryFieldText = {
   rent: { titlePh: 'যেমন: ২ বেডরুম বাসা, শেরপুর সদর', priceLabel: 'ভাড়া', pricePh: '৮,০০০' },
@@ -99,7 +102,7 @@ function NewPostForm() {
     // চাকরি নিয়োগ বিজ্ঞপ্তির বাড়তি তথ্য
     jobType: 'ফুল-টাইম', positionCount: '', jobGender: jobGenderOptions[0],
     education: '', jobExperience: '', ageLimit: '', applyMethods: [],
-    documents: '', benefits: '',
+    documents: '', benefits: '', salaryUnit: 'মাসিক',
   });
   const [waSame, setWaSame] = useState(false);
   const [existingProvider, setExistingProvider] = useState(null);
@@ -367,6 +370,7 @@ function NewPostForm() {
           const jobLines = [];
           if (form.positionCount.trim()) jobLines.push(`পদসংখ্যা: ${form.positionCount.trim()} জন`);
           jobLines.push(`চাকরির ধরন: ${form.jobType}`);
+          jobLines.push(`বেতনের ধরন: ${form.salaryUnit}`);
           jobLines.push(`আবেদনের জন্য: ${form.jobGender}`);
           if (form.education.trim()) jobLines.push(`শিক্ষাগত যোগ্যতা: ${form.education.trim()}`);
           if (form.jobExperience.trim()) jobLines.push(`অভিজ্ঞতা: ${form.jobExperience.trim()}`);
@@ -384,7 +388,8 @@ function NewPostForm() {
           area: form.area,
           upazila: form.upazila,
           union_name: form.unionName,
-          price_or_salary: form.priceOrSalary,
+          // "আলোচনা সাপেক্ষে" বাছলে টাকার অঙ্ক রাখা হয় না
+          price_or_salary: isJob && form.salaryUnit === SALARY_NEGOTIABLE ? '' : form.priceOrSalary,
           description,
           photos: photoUrls,
           contact_phone: cleanPhone(form.contact_phone),
@@ -917,16 +922,38 @@ function NewPostForm() {
               <label className="block text-sm mb-1.5 text-ink/70">
                 {categoryFieldText[category.slug]?.priceLabel || 'মূল্য'}
               </label>
-              <div className="flex items-center border border-ink/20 focus-within:border-green">
-                <span className="pl-3 pr-1 text-ink/50 text-lg font-numeric select-none">৳</span>
-                <input
-                  type="text" required maxLength={20} value={form.priceOrSalary}
-                  onChange={(e) => updateField('priceOrSalary', e.target.value)}
-                  className="flex-1 py-2.5 pr-3 outline-none text-lg font-numeric tracking-wide"
-                  placeholder={categoryFieldText[category.slug]?.pricePh || '০'}
-                  inputMode="numeric"
-                />
-              </div>
+              {isJob && (
+                <div className="flex gap-2 flex-wrap mb-2">
+                  {salaryUnitOptions.map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => updateField('salaryUnit', u)}
+                      className={`text-sm px-3 py-1.5 rounded-full border ${
+                        form.salaryUnit === u ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60 bg-white'
+                      }`}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {isJob && form.salaryUnit === SALARY_NEGOTIABLE ? (
+                <p className="text-xs text-ink/50 bg-paper rounded-md px-3 py-2.5">
+                  পোস্টে "বেতন আলোচনা সাপেক্ষে" লেখা দেখানো হবে
+                </p>
+              ) : (
+                <div className="flex items-center border border-ink/20 focus-within:border-green">
+                  <span className="pl-3 pr-1 text-ink/50 text-lg font-numeric select-none">৳</span>
+                  <input
+                    type="text" required maxLength={20} value={form.priceOrSalary}
+                    onChange={(e) => updateField('priceOrSalary', e.target.value)}
+                    className="flex-1 py-2.5 pr-3 outline-none text-lg font-numeric tracking-wide"
+                    placeholder={categoryFieldText[category.slug]?.pricePh || '০'}
+                    inputMode="numeric"
+                  />
+                </div>
+              )}
             </div>
           )}
 
