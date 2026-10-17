@@ -1,6 +1,7 @@
 import './globals.css';
 import MaintenanceGate from '../components/MaintenanceGate';
 import AutoPushPrompt from '../components/AutoPushPrompt';
+import Tracker from '../components/Tracker';
 import { SITE_URL, SITE_NAME, DEFAULT_OG_IMAGE } from '../lib/site';
 
 const TITLE = 'খুঁজি শেরপুর | শেরপুরে যা খুঁজছেন, এক জায়গায় খুঁজে নিন';
@@ -64,6 +65,7 @@ export default function RootLayout({ children }) {
       <body className="bg-paper text-ink font-sans antialiased">
         <MaintenanceGate>{children}</MaintenanceGate>
         <AutoPushPrompt />
+        <Tracker />
       </body>
     </html>
   );
