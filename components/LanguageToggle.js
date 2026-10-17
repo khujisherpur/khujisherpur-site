@@ -19,7 +19,7 @@ export default function LanguageToggle({ lang, variant = 'default' }) {
         }`}
       >
         <span>🌐</span>
-        <span>EN</span>
+        <span>{lang === 'bn' ? 'বাং' : 'EN'}</span>
       </button>
 
       {open && (
