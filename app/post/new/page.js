@@ -26,10 +26,6 @@ const applyMethodOptions = ['ফোনে যোগাযোগ', 'হোয়�
 // বেতন কত সময়ের জন্য (Google-এর ডাটার জন্যও জরুরি)
 const SALARY_NEGOTIABLE = 'আলোচনা সাপেক্ষে';
 const salaryUnitOptions = ['মাসিক', 'দৈনিক', 'সাপ্তাহিক', 'ঘণ্টায়', SALARY_NEGOTIABLE];
-// চাকরির ফর্ম ধাপে ধাপে (অন্য ক্যাটাগরির ফর্ম আগের মতো এক পাতায়)
-const JOB_STEPS = ['প্রতিষ্ঠান ও জায়গা', 'পদের বিবরণ', 'আবেদন ও যোগাযোগ', 'দেখে নিন'];
-const JOB_LAST_STEP = JOB_STEPS.length;
-const BN_STEP = ['১', '২', '৩', '৪'];
 
 const categoryFieldText = {
   rent: { titlePh: 'যেমন: ২ বেডরুম বাসা, শেরপুর সদর', priceLabel: 'ভাড়া', pricePh: '৮,০০০' },
@@ -81,6 +77,18 @@ function PageShell({ children }) {
   );
 }
 
+function FormSection({ n, title, children }) {
+  return (
+    <section className="rounded-xl border border-ink/10 bg-paper p-4 space-y-4">
+      <div className="flex items-center gap-2">
+        <span className="w-6 h-6 rounded-full bg-green text-white text-xs font-semibold flex items-center justify-center flex-shrink-0">{n}</span>
+        <h2 className="text-sm font-semibold">{title}</h2>
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function NewPostForm() {
   const todayStr = new Date().toLocaleDateString('en-CA');
   const searchParams = useSearchParams();
@@ -120,7 +128,6 @@ function NewPostForm() {
   const [listingPhotos, setListingPhotos] = useState([]);
 
   const [submitting, setSubmitting] = useState(false);
-  const [jobStep, setJobStep] = useState(1);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
@@ -273,34 +280,9 @@ function NewPostForm() {
     return data.publicUrl;
   }
 
-  // প্রতিটি ধাপ শেষে যে যাচাই লাগে (ঘর ফাঁকা কি না তা ব্রাউজার নিজেই দেখে)
-  function validateJobStep(step) {
-    if (step === 1 && (!form.upazila || !form.unionName)) return 'উপজেলা ও ইউনিয়ন বাছাই করুন';
-    if (step === 3) {
-      if (!isValidBdPhone(form.contact_phone)) return 'সঠিক মোবাইল নম্বর দিন (যেমন: 01XXXXXXXXX)';
-      const wa = waSame ? form.contact_phone : form.whatsapp;
-      if (wa && !isValidBdPhone(wa)) return 'হোয়াটসঅ্যাপ নম্বরটি সঠিক নয় (যেমন: 01XXXXXXXXX)';
-      if (form.deadline && form.deadline < todayStr) return 'আবেদনের শেষ তারিখ আজকের আগের হতে পারবে না';
-    }
-    return null;
-  }
-
-  function goToStep(n) {
-    setError(null);
-    setJobStep(n);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
   async function handleSubmit(e) {
     e.preventDefault();
     if (!user || !category || submitting) return;
-    // চাকরির ফর্মে শেষ ধাপের আগে "জমা" মানে পরের ধাপে যাওয়া (Enter চাপলেও একই)
-    if (category.slug === 'job' && jobStep < JOB_LAST_STEP) {
-      const stepError = validateJobStep(jobStep);
-      if (stepError) { setError(stepError); return; }
-      goToStep(jobStep + 1);
-      return;
-    }
     if (!form.upazila || !form.unionName) {
       setError('উপজেলা ও ইউনিয়ন বাছাই করুন');
       return;
@@ -628,56 +610,6 @@ function NewPostForm() {
     </div>
   );
 
-  // চাকরি না হলে সব ঘর সব সময় দেখায়; চাকরিতে শুধু বর্তমান ধাপের ঘর
-  const at = (n) => !isJob || jobStep === n;
-
-  const salaryReview =
-    form.salaryUnit === SALARY_NEGOTIABLE
-      ? 'আলোচনা সাপেক্ষে'
-      : form.priceOrSalary
-        ? `৳ ${form.priceOrSalary} (${form.salaryUnit})`
-        : '';
-  const reviewGroups = isJob
-    ? [
-        {
-          step: 1,
-          title: JOB_STEPS[0],
-          rows: [
-            ['প্রতিষ্ঠান', form.ownerName],
-            ['এলাকা', [form.area, form.unionName, form.upazila].filter(Boolean).join(', ')],
-          ],
-        },
-        {
-          step: 2,
-          title: JOB_STEPS[1],
-          rows: [
-            ['পদের নাম', form.title],
-            ['চাকরির ধরন', form.jobType],
-            ['পদসংখ্যা', form.positionCount && `${form.positionCount} জন`],
-            ['আবেদনের জন্য', form.jobGender],
-            ['শিক্ষাগত যোগ্যতা', form.education],
-            ['অভিজ্ঞতা', form.jobExperience],
-            ['বয়সসীমা', form.ageLimit],
-            ['বেতন', salaryReview],
-            ['বিবরণ', form.description],
-          ],
-        },
-        {
-          step: 3,
-          title: JOB_STEPS[2],
-          rows: [
-            ['আবেদন পদ্ধতি', form.applyMethods.join(', ')],
-            ['কাগজপত্র', form.documents],
-            ['অতিরিক্ত সুবিধা', form.benefits],
-            ['শেষ তারিখ', form.deadline],
-            ['মোবাইল', form.contact_phone],
-            ['হোয়াটসঅ্যাপ', waSame ? 'ফোন নম্বরই' : form.whatsapp],
-            ['ইমেইল', form.contact_email],
-          ],
-        },
-      ].map((g) => ({ ...g, rows: g.rows.filter(([, v]) => v) }))
-    : [];
-
   return (
     <PageShell>
       <main className="max-w-xl mx-auto px-4 py-6">
@@ -700,19 +632,8 @@ function NewPostForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white border border-ink/10 border-t-4 border-t-green p-6 space-y-4">
-          {isJob && (
-            <div>
-              <div className="flex gap-1.5">
-                {JOB_STEPS.map((name, i) => (
-                  <span key={name} className={`h-1.5 flex-1 rounded-full ${i < jobStep ? 'bg-green' : 'bg-ink/10'}`} />
-                ))}
-              </div>
-              <p className="text-xs text-ink/55 mt-2">
-                ধাপ {BN_STEP[jobStep - 1]}/{BN_STEP[JOB_LAST_STEP - 1]} · <span className="font-medium text-ink">{JOB_STEPS[jobStep - 1]}</span>
-              </p>
-            </div>
-          )}
-
+          {!isJob && (
+          <>
           {isRent && (
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">কীসের জন্য ভাড়া?</label>
@@ -743,7 +664,7 @@ function NewPostForm() {
                 placeholder="যেমন: রহিম উদ্দিন"
               />
             </div>
-          ) : !at(2) ? null : (
+          ) : (
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">{isJob ? 'পদের নাম (শিরোনাম)' : 'শিরোনাম'}</label>
               <input
@@ -829,7 +750,7 @@ function NewPostForm() {
             </>
           )}
 
-          {(isRent || isJob) && at(1) && (
+          {isRent && (
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">
                 {isJob ? 'প্রতিষ্ঠান বা নিয়োগকর্তার নাম' : 'বাড়ি/দোকান মালিকের নাম'}
@@ -843,7 +764,7 @@ function NewPostForm() {
             </div>
           )}
 
-          {at(1) && (
+          {(
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">উপজেলা</label>
@@ -956,7 +877,7 @@ function NewPostForm() {
             </>
           )}
 
-          {at(1) && (
+          {(
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">সুনির্দিষ্ট এলাকা/বাজার</label>
             <input
@@ -1014,7 +935,7 @@ function NewPostForm() {
             </div>
           )}
 
-          {!isService && at(2) && (
+          {!isService && (
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">
                 {categoryFieldText[category.slug]?.priceLabel || 'মূল্য'}
@@ -1054,10 +975,171 @@ function NewPostForm() {
             </div>
           )}
 
-          {isJob && at(2) && (
-            <div className="rounded-xl border border-ink/10 bg-paper p-4 space-y-3">
-              <p className="text-sm font-medium">💼 নিয়োগের বিবরণ</p>
 
+
+
+          {(
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">বিবরণ</label>
+            <textarea
+              required rows={4} maxLength={2000} value={form.description}
+              onChange={(e) => updateField('description', e.target.value)}
+              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green resize-none"
+              placeholder="বিস্তারিত লিখুন..."
+            />
+          </div>
+          )}
+
+          {isRent && (
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">গুগল ম্যাপ লিংক (ঐচ্ছিক)</label>
+              <input
+                type="url" maxLength={300} value={form.mapLink}
+                onChange={(e) => updateField('mapLink', e.target.value)}
+                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
+                placeholder="https://maps.google.com/..."
+              />
+            </div>
+          )}
+
+          {isService ? (
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">ছবি (ঐচ্ছিক)</label>
+              {providerPhoto ? (
+                <div className="flex items-center gap-3">
+                  <img src={URL.createObjectURL(providerPhoto)} alt="প্রিভিউ" className="w-20 h-20 object-cover rounded-full" />
+                  <button type="button" onClick={() => setProviderPhoto(null)} className="text-sm text-red-600 border border-red-300 px-3 py-1.5">
+                    সরান
+                  </button>
+                </div>
+              ) : (
+                <label className="inline-block text-sm border border-ink/20 px-4 py-2 cursor-pointer hover:bg-paper">
+                  + ছবি বাছাই করুন
+                  <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                </label>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">ছবি (ঐচ্ছিক, সর্বোচ্চ ৩টা)</label>
+              <div className="flex gap-2 flex-wrap">
+                {listingPhotos.map((blob, i) => (
+                  <div key={i} className="relative">
+                    <img src={URL.createObjectURL(blob)} alt={`ছবি ${i + 1}`} className="w-20 h-20 object-cover" />
+                    <button
+                      type="button" onClick={() => removeListingPhoto(i)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white w-5 h-5 text-xs rounded-full"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {listingPhotos.length < 3 && (
+                  <label className="w-20 h-20 border border-dashed border-ink/30 flex items-center justify-center text-xs text-ink/50 cursor-pointer hover:bg-paper">
+                    + যোগ করুন
+                    <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                  </label>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!isService && (
+            <div className="rounded-xl border border-ink/10 bg-paper p-4 space-y-3">
+              <p className="text-sm font-medium">📞 যোগাযোগের তথ্য</p>
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">
+                  মোবাইল নম্বর <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel" required inputMode="tel" maxLength={20} value={form.contact_phone}
+                  onChange={(e) => updateField('contact_phone', e.target.value)}
+                  className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                  placeholder="01XXXXXXXXX"
+                />
+              </div>
+              {waField('w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white')}
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">ইমেইল (ঐচ্ছিক, চাকরির আবেদনে কাজে লাগে)</label>
+                <input
+                  type="email" maxLength={120} value={form.contact_email}
+                  onChange={(e) => updateField('contact_email', e.target.value)}
+                  className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                  placeholder="you@example.com"
+                />
+              </div>
+              <p className="text-[11px] text-ink/45">এই তথ্য পোস্টে সবার সামনে দেখা যাবে, যাতে আগ্রহীরা সরাসরি যোগাযোগ করতে পারে।</p>
+            </div>
+          )}
+
+          
+          </>
+          )}
+
+          {isJob && (
+            <>
+              <FormSection n="১" title="প্রতিষ্ঠান ও জায়গা">
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">
+                {isJob ? 'প্রতিষ্ঠান বা নিয়োগকর্তার নাম' : 'বাড়ি/দোকান মালিকের নাম'}
+              </label>
+              <input
+                type="text" required maxLength={80} value={form.ownerName}
+                onChange={(e) => updateField('ownerName', e.target.value)}
+                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                placeholder={isJob ? 'যেমন: আল-আমিন স্টোর (প্রতিষ্ঠান না থাকলে আপনার নাম)' : 'মালিকের নাম'}
+              />
+            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">উপজেলা</label>
+              <select
+                required value={form.upazila}
+                onChange={(e) => handleUpazilaChange(e.target.value)}
+                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+              >
+                <option value="">নির্বাচন করুন...</option>
+                {upazilaList.map((u) => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">ইউনিয়ন / পৌরসভা</label>
+              <select
+                required value={form.unionName} disabled={!form.upazila}
+                onChange={(e) => updateField('unionName', e.target.value)}
+                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white disabled:bg-paper disabled:text-ink/30"
+              >
+                <option value="">নির্বাচন করুন...</option>
+                {unionsForUpazila.map((u) => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">সুনির্দিষ্ট এলাকা/বাজার</label>
+            <input
+              type="text" required maxLength={100} value={form.area}
+              onChange={(e) => updateField('area', e.target.value)}
+              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+              placeholder="যেমন: নিউ মার্কেট, শেখ হাটি বাজার"
+            />
+          </div>
+              </FormSection>
+
+              <FormSection n="২" title="পদের বিবরণ">
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">{isJob ? 'পদের নাম (শিরোনাম)' : 'শিরোনাম'}</label>
+              <input
+                type="text" required maxLength={120} value={form.title}
+                onChange={(e) => updateField('title', e.target.value)}
+                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+                placeholder={categoryFieldText[category.slug]?.titlePh || 'শিরোনাম লিখুন'}
+              />
+            </div>
+<div className="space-y-3">
               <div>
                 <label className="block text-sm mb-1.5 text-ink/70">চাকরির ধরন</label>
                 <div className="flex gap-2 flex-wrap">
@@ -1128,14 +1210,78 @@ function NewPostForm() {
                   />
                 </div>
               </div>
-
+</div>
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">
+                {categoryFieldText[category.slug]?.priceLabel || 'মূল্য'}
+              </label>
+              {isJob && (
+                <div className="flex gap-2 flex-wrap mb-2">
+                  {salaryUnitOptions.map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => updateField('salaryUnit', u)}
+                      className={`text-sm px-3 py-1.5 rounded-full border ${
+                        form.salaryUnit === u ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60 bg-white'
+                      }`}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {isJob && form.salaryUnit === SALARY_NEGOTIABLE ? (
+                <p className="text-xs text-ink/50 bg-paper rounded-md px-3 py-2.5">
+                  পোস্টে "বেতন আলোচনা সাপেক্ষে" লেখা দেখানো হবে
+                </p>
+              ) : (
+                <div className="flex items-center border border-ink/20 focus-within:border-green bg-white">
+                  <span className="pl-3 pr-1 text-ink/50 text-lg font-numeric select-none">৳</span>
+                  <input
+                    type="text" required maxLength={20} value={form.priceOrSalary}
+                    onChange={(e) => updateField('priceOrSalary', e.target.value)}
+                    className="flex-1 py-2.5 pr-3 outline-none text-lg font-numeric tracking-wide"
+                    placeholder={categoryFieldText[category.slug]?.pricePh || '০'}
+                    inputMode="numeric"
+                  />
+                </div>
+              )}
             </div>
-          )}
+          <div>
+            <label className="block text-sm mb-1.5 text-ink/70">বিবরণ</label>
+            <textarea
+              required rows={4} maxLength={2000} value={form.description}
+              onChange={(e) => updateField('description', e.target.value)}
+              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green resize-none bg-white"
+              placeholder="বিস্তারিত লিখুন..."
+            />
+          </div>
+            <div>
+              <label className="block text-sm mb-1.5 text-ink/70">ছবি (ঐচ্ছিক, সর্বোচ্চ ৩টা)</label>
+              <div className="flex gap-2 flex-wrap">
+                {listingPhotos.map((blob, i) => (
+                  <div key={i} className="relative">
+                    <img src={URL.createObjectURL(blob)} alt={`ছবি ${i + 1}`} className="w-20 h-20 object-cover" />
+                    <button
+                      type="button" onClick={() => removeListingPhoto(i)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white w-5 h-5 text-xs rounded-full"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {listingPhotos.length < 3 && (
+                  <label className="w-20 h-20 border border-dashed border-ink/30 flex items-center justify-center text-xs text-ink/50 cursor-pointer hover:bg-paper">
+                    + যোগ করুন
+                    <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                  </label>
+                )}
+              </div>
+            </div>
+              </FormSection>
 
-          {isJob && at(3) && (
-            <div className="rounded-xl border border-ink/10 bg-paper p-4 space-y-3">
-              <p className="text-sm font-medium">📨 আবেদনের নিয়ম</p>
-
+              <FormSection n="৩" title="আবেদনের নিয়ম">
               <div>
                 <label className="block text-sm mb-1.5 text-ink/70">আবেদন পদ্ধতি</label>
                 <div className="flex gap-2 flex-wrap">
@@ -1177,90 +1323,18 @@ function NewPostForm() {
               <p className="text-[11px] text-red-500">
                 ⚠️ চাকরির জন্য আবেদনকারীর কাছ থেকে কোনো টাকা চাওয়া যাবে না। এমন পোস্ট পেলে সরিয়ে দেওয়া হবে।
               </p>
-            </div>
-          )}
-
-          {isJob && at(3) && (
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">আবেদনের শেষ তারিখ (ঐচ্ছিক)</label>
               <input
                 type="date" min={todayStr} value={form.deadline}
                 onChange={(e) => updateField('deadline', e.target.value)}
-                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
+                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
               />
               <p className="text-xs text-ink/50 mt-1">তারিখ পার হলে পোস্টটি নিজে থেকে "মেয়াদ শেষ" দেখাবে</p>
             </div>
-          )}
+              </FormSection>
 
-          {at(2) && (
-          <div>
-            <label className="block text-sm mb-1.5 text-ink/70">বিবরণ</label>
-            <textarea
-              required rows={4} maxLength={2000} value={form.description}
-              onChange={(e) => updateField('description', e.target.value)}
-              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green resize-none"
-              placeholder="বিস্তারিত লিখুন..."
-            />
-          </div>
-          )}
-
-          {isRent && (
-            <div>
-              <label className="block text-sm mb-1.5 text-ink/70">গুগল ম্যাপ লিংক (ঐচ্ছিক)</label>
-              <input
-                type="url" maxLength={300} value={form.mapLink}
-                onChange={(e) => updateField('mapLink', e.target.value)}
-                className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
-                placeholder="https://maps.google.com/..."
-              />
-            </div>
-          )}
-
-          {!at(3) ? null : isService ? (
-            <div>
-              <label className="block text-sm mb-1.5 text-ink/70">ছবি (ঐচ্ছিক)</label>
-              {providerPhoto ? (
-                <div className="flex items-center gap-3">
-                  <img src={URL.createObjectURL(providerPhoto)} alt="প্রিভিউ" className="w-20 h-20 object-cover rounded-full" />
-                  <button type="button" onClick={() => setProviderPhoto(null)} className="text-sm text-red-600 border border-red-300 px-3 py-1.5">
-                    সরান
-                  </button>
-                </div>
-              ) : (
-                <label className="inline-block text-sm border border-ink/20 px-4 py-2 cursor-pointer hover:bg-paper">
-                  + ছবি বাছাই করুন
-                  <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                </label>
-              )}
-            </div>
-          ) : (
-            <div>
-              <label className="block text-sm mb-1.5 text-ink/70">ছবি (ঐচ্ছিক, সর্বোচ্চ ৩টা)</label>
-              <div className="flex gap-2 flex-wrap">
-                {listingPhotos.map((blob, i) => (
-                  <div key={i} className="relative">
-                    <img src={URL.createObjectURL(blob)} alt={`ছবি ${i + 1}`} className="w-20 h-20 object-cover" />
-                    <button
-                      type="button" onClick={() => removeListingPhoto(i)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white w-5 h-5 text-xs rounded-full"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                {listingPhotos.length < 3 && (
-                  <label className="w-20 h-20 border border-dashed border-ink/30 flex items-center justify-center text-xs text-ink/50 cursor-pointer hover:bg-paper">
-                    + যোগ করুন
-                    <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                  </label>
-                )}
-              </div>
-            </div>
-          )}
-
-          {!isService && at(3) && (
-            <div className="rounded-xl border border-ink/10 bg-paper p-4 space-y-3">
-              <p className="text-sm font-medium">📞 যোগাযোগের তথ্য</p>
+              <FormSection n="৪" title="যোগাযোগের তথ্য">
               <div>
                 <label className="block text-sm mb-1.5 text-ink/70">
                   মোবাইল নম্বর <span className="text-red-500">*</span>
@@ -1283,69 +1357,19 @@ function NewPostForm() {
                 />
               </div>
               <p className="text-[11px] text-ink/45">এই তথ্য পোস্টে সবার সামনে দেখা যাবে, যাতে আগ্রহীরা সরাসরি যোগাযোগ করতে পারে।</p>
-            </div>
+              </FormSection>
+            </>
           )}
 
-          {isJob && jobStep === JOB_LAST_STEP && (
-            <div className="space-y-3">
-              <p className="text-sm text-ink/60">
-                জমা দেওয়ার আগে তথ্যগুলো একবার দেখে নিন। কিছু বদলাতে চাইলে "বদলান" চাপুন।
-              </p>
-              {reviewGroups.map((g) => (
-                <div key={g.step} className="rounded-xl border border-ink/10 bg-paper p-4">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-medium">{g.title}</p>
-                    <button type="button" onClick={() => goToStep(g.step)} className="text-xs text-green font-medium">
-                      বদলান
-                    </button>
-                  </div>
-                  <div className="divide-y divide-ink/5">
-                    {g.rows.map(([k, v]) => (
-                      <div key={k} className="flex justify-between gap-4 py-1.5 text-sm">
-                        <span className="text-ink/55 flex-shrink-0">{k}</span>
-                        <span className="text-right min-w-0 break-words whitespace-pre-line">{v}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {g.step === 3 && listingPhotos.length > 0 && (
-                    <div className="flex gap-2 mt-2">
-                      {listingPhotos.map((blob, i) => (
-                        <img key={i} src={URL.createObjectURL(blob)} alt={`ছবি ${i + 1}`} className="w-14 h-14 object-cover rounded" />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          {isJob ? (
-            <div className="flex gap-2">
-              {jobStep > 1 && (
-                <button
-                  type="button" onClick={() => goToStep(jobStep - 1)}
-                  className="px-4 py-2.5 border border-ink/20 text-ink/70 font-medium"
-                >
-                  ← আগের ধাপ
-                </button>
-              )}
-              <button
-                type="submit" disabled={submitting}
-                className="flex-1 bg-marigold text-ink font-semibold py-2.5 hover:bg-marigold/90 transition-colors disabled:opacity-50"
-              >
-                {submitting ? 'জমা হচ্ছে...' : jobStep < JOB_LAST_STEP ? 'পরের ধাপ →' : 'পোস্ট জমা দিন'}
-              </button>
-            </div>
-          ) : (
-            <button
-              type="submit" disabled={submitting}
-              className="w-full bg-marigold text-ink font-semibold py-2.5 hover:bg-marigold/90 transition-colors disabled:opacity-50"
-            >
-              {submitting ? 'জমা হচ্ছে...' : 'পোস্ট জমা দিন'}
-            </button>
-          )}
+          <button
+            type="submit" disabled={submitting}
+            className="w-full bg-marigold text-ink font-semibold py-2.5 hover:bg-marigold/90 transition-colors disabled:opacity-50"
+          >
+            {submitting ? 'জমা হচ্ছে...' : 'পোস্ট জমা দিন'}
+          </button>
         </form>
       </main>
     </PageShell>
