@@ -3,6 +3,7 @@ import ReviewSection from './ReviewSection';
 import ReportButton from './ReportButton';
 import FavoriteButton from './FavoriteButton';
 import ProfileMenu from './ProfileMenu';
+import TrackTarget from './TrackTarget';
 import { supabase } from '../lib/supabaseClient';
 import { getServicesFor, providerHref } from '../lib/services';
 import { toBn } from '../lib/format';
@@ -62,11 +63,11 @@ function waLink(n) {
   return `https://wa.me/${d}`;
 }
 
-function ContactButtons({ phone, whatsapp, t, small = false }) {
+function ContactButtons({ phone, whatsapp, t, small = false, trackId }) {
   const wa = waLink(whatsapp);
   const size = small ? 'py-2 text-xs' : 'py-3 text-sm';
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2" {...(trackId ? { 'data-track-type': 'provider', 'data-track-id': trackId } : {})}>
       <a
         href={`tel:${phone}`}
         className={`flex-1 text-center font-semibold rounded-xl bg-marigold text-ink ${size}`}
@@ -140,6 +141,7 @@ export default async function ProviderProfile({
 
   return (
     <main className="max-w-2xl mx-auto px-4 pt-4 pb-12">
+      <TrackTarget type="provider" id={provider.id} />
       <a href={backHref} className="text-sm text-ink/55 hover:text-ink">
         {backLabel}
       </a>
@@ -321,7 +323,7 @@ export default async function ProviderProfile({
                     </p>
                   </a>
                   <div className="mt-2">
-                    <ContactButtons phone={p.phone} whatsapp={p.whatsapp} t={t} small />
+                    <ContactButtons phone={p.phone} whatsapp={p.whatsapp} t={t} small trackId={p.id} />
                   </div>
                 </div>
               );
