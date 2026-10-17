@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import PhotoLightbox from '../../../components/PhotoLightbox';
 import ReportButton from '../../../components/ReportButton';
 import FavoriteButton from '../../../components/FavoriteButton';
+import TrackTarget from '../../../components/TrackTarget';
 import ProfileMenu from '../../../components/ProfileMenu';
 import SiteHeader from '../../../components/SiteHeader';
 import { getLang } from '../../../lib/getLang';
@@ -302,12 +303,12 @@ function Linkify({ value }) {
 }
 
 // কল ও WhatsApp বোতাম (মূল কার্ড ও আরও-দেখুন কার্ডে একই)
-function ContactButtons({ phone, whatsapp, t, small = false }) {
+function ContactButtons({ phone, whatsapp, t, small = false, trackId }) {
   const wa = waLink(whatsapp);
   if (!phone && !wa) return null;
   const size = small ? 'py-2 text-xs' : 'py-3 text-sm';
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2" {...(trackId ? { 'data-track-type': 'listing', 'data-track-id': trackId } : {})}>
       {phone && (
         <a
           href={`tel:${cleanPhone(phone)}`}
@@ -522,6 +523,7 @@ export default async function ListingDetailPage({ params }) {
   return (
     <>
       <SiteHeader lang={lang} />
+      {counted && <TrackTarget type="listing" id={listing.id} />}
       <main className="max-w-2xl mx-auto px-4 pt-4 pb-12">
         <a href={`/category/${slug}`} className="text-sm text-ink/55 hover:text-ink">
           {t.back}
@@ -719,7 +721,7 @@ export default async function ListingDetailPage({ params }) {
                       </div>
                     </a>
                     <div className="px-3 pb-3">
-                      <ContactButtons phone={r.contact_phone} whatsapp={r.whatsapp} t={t} small />
+                      <ContactButtons phone={r.contact_phone} whatsapp={r.whatsapp} t={t} small trackId={r.id} />
                     </div>
                   </div>
                 );
