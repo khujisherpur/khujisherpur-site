@@ -1,4 +1,5 @@
 'use client';
+import MyAnalytics from '../../components/MyAnalytics';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import NotificationBell from '../../components/NotificationBell';
@@ -443,6 +444,8 @@ export default function DashboardPage() {
             ))}
           </div>
         </section>
+
+        {user && <MyAnalytics lang={lang} />}
 
         {/* Listings */}
         <section className="mt-8">
