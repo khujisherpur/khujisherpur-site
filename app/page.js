@@ -188,8 +188,8 @@ export default async function HomePage() {
       <header className="sticky top-0 z-40 bg-gradient-to-r from-green-dark to-green shadow-md">
         <div className="max-w-4xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
           <a href="/" className="flex items-center gap-2 min-w-0 flex-shrink">
-            <span className="flex items-center bg-white rounded-md px-2 py-1.5 flex-shrink-0">
-              <img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-9 w-auto" />
+            <span className="flex items-center bg-white rounded-md px-2 py-1 flex-shrink-0">
+              <img src="/logo-header.png" alt="খুঁজি শেরপুর" className="h-7 w-auto" />
             </span>
             <span className="min-w-0 hidden sm:block">
               <span className="block text-white text-[11px] font-medium leading-tight truncate">{t.tagline1}</span>
