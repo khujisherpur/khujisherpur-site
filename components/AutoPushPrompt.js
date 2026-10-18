@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { supabase } from '../lib/supabaseClient';
 
 const PUBLIC_KEY = 'BEfSX2r4qSUfeYUKeqUM2W6quBCiNdQc6cff0L09_TotoeQjEIOPHHk1rcpZGFDxk4CE1YNKyo7D017-ZBdFUEA';
@@ -43,6 +44,7 @@ async function subscribeAndSave(userId) {
 }
 
 export default function AutoPushPrompt() {
+  const pathname = usePathname();
   const [mode, setMode] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -131,7 +133,8 @@ export default function AutoPushPrompt() {
     setMode(null);
   }
 
-  if (!mode) return null;
+  // "আমার শেরপুর" পাতায় পপআপ দেখাবে না, যাতে কার্ড তৈরির সময় বিরক্ত না করে
+  if (!mode || (pathname && pathname.startsWith('/amar-sherpur'))) return null;
 
   const box =
     'fixed bottom-20 inset-x-3 md:max-w-md md:mx-auto z-50 bg-white border border-ink/10 rounded-2xl shadow-lg p-4';
