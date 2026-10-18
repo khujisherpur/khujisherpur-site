@@ -11,6 +11,7 @@ import HeroIntro from '../components/HeroIntro';
 import HeroSearch from '../components/HeroSearch';
 import AnnouncementBar from '../components/AnnouncementBar';
 import HomeJsonLd from '../components/HomeJsonLd';
+import AmarSherpurBanner from '../components/AmarSherpurBanner';
 import { formatPrice, timeAgo as timeAgoFmt, toBn } from '../lib/format';
 import { getServicesFor, providerHref } from '../lib/services';
 import { SITE_NAME, DEFAULT_OG_IMAGE } from '../lib/site';
@@ -277,6 +278,8 @@ export default async function HomePage() {
           `}</style>
         )}
 
+        <AmarSherpurBanner />
+        
         {/* Category Grid */}
         <section id="categories" className="px-4 pt-4 pb-10 scroll-mt-20">
           <div className="flex items-center justify-between mb-3">
