@@ -4,6 +4,7 @@ import { PLACES, UPAZILAS, mapsSearchUrl } from '../lib/sherpurPlaces';
 import { UPAZILA_SHAPES, MAP_WIDTH, MAP_HEIGHT, project } from '../lib/sherpurMap';
 import { renderCard, prepareSquarePhoto, canvasToBlob, sanitizeName } from '../lib/cardRender';
 import { toBn } from '../lib/format';
+import { SITE_URL } from '../lib/site';
 
 const STORAGE_KEY = 'amar_sherpur_v1';
 const NAME_KEY = 'amar_sherpur_name';
@@ -63,6 +64,7 @@ export default function AmarSherpur() {
   const [cardUrl, setCardUrl] = useState('');
   const [cardBlob, setCardBlob] = useState(null);
   const [canShare, setCanShare] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [inFacebook, setInFacebook] = useState(false);
   const fileRef = useRef(null);
   const urlRef = useRef('');
@@ -166,11 +168,46 @@ export default function AmarSherpur() {
     setBusy(false);
   }
 
+  // শেয়ারের সঙ্গে যাওয়া লেখা ও লিংক (?ref=card দিয়ে বোঝা যাবে কার্ড থেকে কতজন এল)
+  function captionText() {
+    return `আমি শেরপুরের ${num(total)}টির মধ্যে ${num(selCount)}টি স্থান ঘুরেছি। আপনি কতটা ঘুরেছেন?\n${SITE_URL}/amar-sherpur?ref=card`;
+  }
+
+  async function copyCaption() {
+    const text = captionText();
+    let ok = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      }
+    } catch {}
+    if (!ok) {
+      try {
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+        ok = document.execCommand('copy');
+        document.body.removeChild(area);
+      } catch {}
+    }
+    if (ok) {
+      setError('');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } else {
+      setError('কপি করা যায়নি, লেখাটি চেপে ধরে কপি করুন।');
+    }
+  }
+
   async function shareCard() {
     if (!cardBlob) return;
     try {
       const file = new File([cardBlob], 'amar-sherpur.png', { type: 'image/png' });
-      await navigator.share({ files: [file], title: 'আমার শেরপুর' });
+      await navigator.share({ files: [file], title: 'আমার শেরপুর', text: captionText() });
     } catch (err) {
       // ব্যবহারকারী নিজে বাতিল করলে কিছু বলার নেই
       if (err && err.name !== 'AbortError') setError('শেয়ার করা যায়নি, ছবি সংরক্ষণ করে শেয়ার করুন।');
@@ -284,6 +321,20 @@ export default function AmarSherpur() {
             </a>
             <button type="button" onClick={() => goTo('form')} className="text-sm text-ink/60 underline py-2">
               নাম বা ছবি বদলান
+            </button>
+          </div>
+
+          <div className="max-w-md mx-auto mt-5 bg-white rounded-xl border border-ink/10 p-3">
+            <p className="text-xs font-semibold text-ink/60 leading-relaxed">
+              ফেসবুক অ্যাপ শেয়ারের সময় ছবির সঙ্গে লেখা বা লিংক নেয় না। পোস্টের সঙ্গে লিংক দিতে এই লেখা কপি করে পেস্ট করুন।
+            </p>
+            <p className="text-sm mt-2 whitespace-pre-line break-words select-all">{captionText()}</p>
+            <button
+              type="button"
+              onClick={copyCaption}
+              className="mt-3 w-full border border-green/40 text-green text-sm font-semibold py-2.5 rounded-xl"
+            >
+              {copied ? 'কপি হয়েছে ✓' : 'লেখা ও লিংক কপি করুন'}
             </button>
           </div>
 
