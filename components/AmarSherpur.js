@@ -173,38 +173,46 @@ export default function AmarSherpur() {
     return `আমি শেরপুরের ${num(total)}টির মধ্যে ${num(selCount)}টি স্থান ঘুরেছি। আপনি কতটা ঘুরেছেন?\n${SITE_URL}/amar-sherpur?ref=card`;
   }
 
-  async function copyCaption() {
-    const text = captionText();
-    let ok = false;
+  async function copyText(text) {
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text);
-        ok = true;
+        return true;
       }
     } catch {}
-    if (!ok) {
-      try {
-        const area = document.createElement('textarea');
-        area.value = text;
-        area.style.position = 'fixed';
-        area.style.opacity = '0';
-        document.body.appendChild(area);
-        area.select();
-        ok = document.execCommand('copy');
-        document.body.removeChild(area);
-      } catch {}
+    try {
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(area);
+      return ok;
+    } catch {
+      return false;
     }
+  }
+
+  function flashCopied(ok) {
     if (ok) {
-      setError('');
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setTimeout(() => setCopied(false), 8000);
     } else {
-      setError('কপি করা যায়নি, লেখাটি চেপে ধরে কপি করুন।');
+      setError('কপি করা যায়নি, নিচের লেখাটি চেপে ধরে কপি করুন।');
     }
+  }
+
+  async function copyCaption() {
+    setError('');
+    flashCopied(await copyText(captionText()));
   }
 
   async function shareCard() {
     if (!cardBlob) return;
+    // ফেসবুক অ্যাপ ছবির সঙ্গে লেখা নেয় না, তাই শেয়ারের ট্যাপেই লিংকসহ লেখা কপি হয়ে যায়
+    const copyPromise = copyText(captionText());
     try {
       const file = new File([cardBlob], 'amar-sherpur.png', { type: 'image/png' });
       await navigator.share({ files: [file], title: 'আমার শেরপুর', text: captionText() });
@@ -212,6 +220,7 @@ export default function AmarSherpur() {
       // ব্যবহারকারী নিজে বাতিল করলে কিছু বলার নেই
       if (err && err.name !== 'AbortError') setError('শেয়ার করা যায়নি, ছবি সংরক্ষণ করে শেয়ার করুন।');
     }
+    flashCopied(await copyPromise);
   }
 
   return (
@@ -310,6 +319,13 @@ export default function AmarSherpur() {
                 শেয়ার করুন
               </button>
             )}
+            <button
+              type="button"
+              onClick={copyCaption}
+              className="w-full border border-green/40 text-green text-base font-semibold py-3.5 rounded-xl"
+            >
+              {copied ? 'লিংক কপি হয়েছে ✓' : 'লিংক কপি করুন'}
+            </button>
             <a
               href={cardUrl}
               download="amar-sherpur.png"
@@ -324,18 +340,21 @@ export default function AmarSherpur() {
             </button>
           </div>
 
-          <div className="max-w-md mx-auto mt-5 bg-white rounded-xl border border-ink/10 p-3">
+          {copied && (
+            <p
+              className="max-w-md mx-auto mt-4 rounded-xl bg-green/10 border border-green/30 px-3 py-2.5 text-sm text-green-dark font-medium leading-relaxed"
+              role="status"
+            >
+              লিংকসহ লেখা কপি হয়েছে ✓ ফেসবুকে পোস্টের ঘরে ধরে রেখে "পেস্ট" চাপুন।
+            </p>
+          )}
+
+          <div className="max-w-md mx-auto mt-4 bg-white rounded-xl border border-ink/10 p-3">
             <p className="text-xs font-semibold text-ink/60 leading-relaxed">
-              ফেসবুক অ্যাপ শেয়ারের সময় ছবির সঙ্গে লেখা বা লিংক নেয় না। পোস্টের সঙ্গে লিংক দিতে এই লেখা কপি করে পেস্ট করুন।
+              ফেসবুক অ্যাপ ছবির সঙ্গে লিংক নেয় না। তাই "শেয়ার করুন" চাপলে নিচের লেখা নিজে থেকেই কপি হয়ে যায়।
+              ফেসবুকে পোস্টের ঘরে ধরে রেখে "পেস্ট" চাপুন।
             </p>
             <p className="text-sm mt-2 whitespace-pre-line break-words select-all">{captionText()}</p>
-            <button
-              type="button"
-              onClick={copyCaption}
-              className="mt-3 w-full border border-green/40 text-green text-sm font-semibold py-2.5 rounded-xl"
-            >
-              {copied ? 'কপি হয়েছে ✓' : 'লেখা ও লিংক কপি করুন'}
-            </button>
           </div>
 
           {error && (
