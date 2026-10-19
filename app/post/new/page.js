@@ -27,11 +27,18 @@ const applyMethodOptions = ['ফোনে যোগাযোগ', 'হোয়�
 const SALARY_NEGOTIABLE = 'আলোচনা সাপেক্ষে';
 const salaryUnitOptions = ['মাসিক', 'দৈনিক', 'সাপ্তাহিক', 'ঘণ্টায়', SALARY_NEGOTIABLE];
 
+// সাব-ক্যাটাগরি (সেবা/বিষয়) বেছে নিয়ে প্রোফাইল বানানোর ক্যাটাগরি
+const SUBCAT_CATEGORIES = ['service-provider', 'teacher'];
+// শিক্ষক প্রোফাইলের বাড়তি তথ্য
+const teacherClassOptions = ['প্লে–৫ম', '৬ষ্ঠ–৮ম', '৯ম–১০ম (SSC)', '১১শ–১২শ (HSC)', 'ভর্তি প্রস্তুতি', 'কলেজ/বিশ্ববিদ্যালয়'];
+const teachModeOptions = ['শিক্ষার্থীর বাসায় গিয়ে', 'শিক্ষকের বাসায়', 'অনলাইন'];
+
 const categoryFieldText = {
   rent: { titlePh: 'যেমন: ২ বেডরুম বাসা, শেরপুর সদর', priceLabel: 'ভাড়া', pricePh: '৮,০০০' },
   'buy-sell': { titlePh: 'যেমন: স্যামসাং স্মার্টফোন', priceLabel: 'মূল্য', pricePh: '১৫,০০০' },
   job: { titlePh: 'যেমন: সেলসম্যান প্রয়োজন', priceLabel: 'বেতন', pricePh: '১৫,০০০' },
   'agri-product': { titlePh: 'যেমন: টাটকা দেশি মুরগি (প্রতি কেজি)', priceLabel: 'মূল্য', pricePh: '৩০০' },
+  'tutor-wanted': { titlePh: 'যেমন: ৮ম শ্রেণির জন্য গণিত ও ইংরেজি শিক্ষক চাই', priceLabel: 'বাজেট (মাসিক)', pricePh: '২,০০০' },
   teacher: { titlePh: 'যেমন: গণিত ও ইংরেজি প্রাইভেট টিউটর প্রয়োজন', priceLabel: 'টিউশন ফি (মাসিক)', pricePh: '৩,০০০' },
   venue: { titlePh: 'যেমন: কমিউনিটি সেন্টার ভাড়া দেওয়া হবে', priceLabel: 'ভাড়া', pricePh: '১০,০০০' },
 };
@@ -115,6 +122,8 @@ function NewPostForm() {
     jobType: 'ফুল-টাইম', positionCount: '', jobGender: jobGenderOptions[0],
     education: '', jobExperience: '', ageLimit: '', applyMethods: [],
     documents: '', benefits: '', salaryUnit: 'মাসিক',
+    // শিক্ষক প্রোফাইলের বাড়তি তথ্য
+    classLevels: [], teachModes: [], monthlyFee: '', wantedSubjects: [],
   });
   const [waSame, setWaSame] = useState(false);
   const [existingProvider, setExistingProvider] = useState(null);
@@ -174,7 +183,7 @@ function NewPostForm() {
   }, [user, category]);
 
   useEffect(() => {
-    if (category?.slug !== 'service-provider') { setSubcategories([]); return; }
+    if (!SUBCAT_CATEGORIES.includes(category?.slug)) { setSubcategories([]); return; }
     supabase
       .from('subcategories')
       .select('id, name_bn, slug')
@@ -184,14 +193,34 @@ function NewPostForm() {
       .then(({ data }) => setSubcategories(data || []));
   }, [category]);
 
+  const [wantedSubjectOptions, setWantedSubjectOptions] = useState([]);
   useEffect(() => {
-    if (category?.slug === 'service-provider' && !slugTouched) {
+    if (category?.slug !== 'tutor-wanted') { setWantedSubjectOptions([]); return; }
+    supabase
+      .from('categories')
+      .select('id')
+      .eq('slug', 'teacher')
+      .maybeSingle()
+      .then(({ data: teacherCat }) => {
+        if (!teacherCat) return;
+        supabase
+          .from('subcategories')
+          .select('id, name_bn')
+          .eq('category_id', teacherCat.id)
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true })
+          .then(({ data }) => setWantedSubjectOptions(data || []));
+      });
+  }, [category]);
+
+  useEffect(() => {
+    if (SUBCAT_CATEGORIES.includes(category?.slug) && !slugTouched) {
       setForm((f) => ({ ...f, slug: slugify(f.nameEn) }));
     }
   }, [form.nameEn]);
 
   useEffect(() => {
-    if (category?.slug !== 'service-provider' || !form.slug) {
+    if (!SUBCAT_CATEGORIES.includes(category?.slug) || !form.slug) {
       setSlugStatus(null);
       setFinalSlug('');
       return;
@@ -237,6 +266,13 @@ function NewPostForm() {
       if (!selected.includes(primary)) primary = selected[0] || '';
       return { ...f, selectedSubcategoryIds: selected, primarySubcategoryId: primary };
     });
+  }
+
+  function toggleInList(field, value) {
+    setForm((f) => ({
+      ...f,
+      [field]: f[field].includes(value) ? f[field].filter((x) => x !== value) : [...f[field], value],
+    }));
   }
 
   function toggleApplyMethod(method) {
@@ -297,11 +333,12 @@ function NewPostForm() {
       setError('হোয়াটসঅ্যাপ নম্বরটি সঠিক নয় (যেমন: 01XXXXXXXXX)');
       return;
     }
-    const isServiceProvider = category.slug === 'service-provider';
+    const isServiceProvider = SUBCAT_CATEGORIES.includes(category.slug);
+    const isTeacher = category.slug === 'teacher';
     if (isServiceProvider) {
       if (!form.nameEn.trim()) { setError('ইংরেজি নাম দিন (এটা দিয়ে আপনার প্রোফাইল লিংক তৈরি হবে)'); return; }
-      if (form.selectedSubcategoryIds.length === 0) { setError('অন্তত একটা সেবা বাছাই করুন'); return; }
-      if (!form.primarySubcategoryId) { setError('প্রধান সেবা বাছাই করুন'); return; }
+      if (form.selectedSubcategoryIds.length === 0) { setError(isTeacher ? 'অন্তত একটা বিষয় বাছাই করুন' : 'অন্তত একটা সেবা বাছাই করুন'); return; }
+      if (!form.primarySubcategoryId) { setError(isTeacher ? 'প্রধান বিষয় বাছাই করুন' : 'প্রধান সেবা বাছাই করুন'); return; }
     }
     if (category.slug === 'job' && form.deadline && form.deadline < todayStr) {
       setError('আবেদনের শেষ তারিখ আজকের আগের হতে পারবে না');
@@ -330,7 +367,13 @@ function NewPostForm() {
           union_name: form.unionName,
           phone: cleanPhone(form.phone),
           whatsapp: waValue ? cleanPhone(waValue) : null,
-          description: form.description,
+          description: isTeacher
+            ? [
+                form.classLevels.length ? `পড়ানোর ক্লাস: ${form.classLevels.join(', ')}` : '',
+                form.teachModes.length ? `পড়ানোর ধরন: ${form.teachModes.join(', ')}` : '',
+                form.monthlyFee.trim() ? `মাসিক ফি: ${form.monthlyFee.trim()}` : '',
+              ].filter(Boolean).join('\n') + (form.classLevels.length || form.teachModes.length || form.monthlyFee.trim() ? '\n\n' : '') + form.description
+            : form.description,
           photo_url: photoUrl,
           experience_years: form.experienceYears ? parseInt(form.experienceYears) : null,
         };
@@ -364,6 +407,14 @@ function NewPostForm() {
         if (isBuySell) {
           const conditionText = form.condition === 'new' ? 'নতুন' : 'ব্যবহৃত';
           description = `কন্ডিশন: ${conditionText}${form.negotiable ? ' (দর কষাকষি যোগ্য)' : ''}\n\n${form.description}`;
+        }
+        if (category.slug === 'tutor-wanted') {
+          const wantedLines = [
+            form.classLevels.length ? `ক্লাস: ${form.classLevels.join(', ')}` : '',
+            form.wantedSubjects.length ? `বিষয়: ${form.wantedSubjects.join(', ')}` : '',
+            form.teachModes.length ? `পড়ানোর ধরন: ${form.teachModes.join(', ')}` : '',
+          ].filter(Boolean);
+          description = wantedLines.length ? `${wantedLines.join('\n')}\n\n${form.description}` : form.description;
         }
         if (isRent) {
           const parts = [];
@@ -581,7 +632,8 @@ function NewPostForm() {
 
   const isService = category.type === 'service';
   const isAmbulance = category.slug === 'ambulance';
-  const isServiceProvider = category.slug === 'service-provider';
+  const isServiceProvider = SUBCAT_CATEGORIES.includes(category.slug);
+  const isTeacher = category.slug === 'teacher';
   const isRent = category.slug === 'rent';
   const isBuySell = category.slug === 'buy-sell';
   const isJob = category.slug === 'job';
@@ -627,7 +679,7 @@ function NewPostForm() {
             {category.icon}
           </span>
           <h1 className="text-xl font-semibold">
-            {isService ? `${category.name} হিসেবে প্রোফাইল তৈরি করুন` : `নতুন ${category.name} পোস্ট দিন`}
+            {isService ? (isTeacher ? 'শিক্ষক হিসেবে প্রোফাইল তৈরি করুন' : `${category.name} হিসেবে প্রোফাইল তৈরি করুন`) : `নতুন ${category.name} পোস্ট দিন`}
           </h1>
         </div>
 
@@ -715,7 +767,7 @@ function NewPostForm() {
               </div>
 
               <div>
-                <label className="block text-sm mb-1.5 text-ink/70">কোন কোন সেবা দেন? (একাধিক বাছাই করা যাবে)</label>
+                <label className="block text-sm mb-1.5 text-ink/70">{isTeacher ? 'কোন কোন বিষয় পড়ান? (একাধিক বাছাই করা যাবে)' : 'কোন কোন সেবা দেন? (একাধিক বাছাই করা যাবে)'}</label>
                 <div className="border border-ink/20 rounded-md divide-y divide-ink/10 max-h-64 overflow-y-auto">
                   {subcategories.map((s) => {
                     const checked = form.selectedSubcategoryIds.includes(s.id);
@@ -744,8 +796,126 @@ function NewPostForm() {
                   })}
                 </div>
                 {primarySubcatName && (
-                  <p className="text-xs text-ink/50 mt-1.5">প্রধান সেবা: <span className="font-medium text-ink">{primarySubcatName}</span> (এটা পরে বদলানো যাবে না)</p>
+                  <p className="text-xs text-ink/50 mt-1.5">{isTeacher ? 'প্রধান বিষয়' : 'প্রধান সেবা'}: <span className="font-medium text-ink">{primarySubcatName}</span> (এটা পরে বদলানো যাবে না)</p>
                 )}
+              </div>
+
+              {isTeacher && (
+                <>
+                  <div>
+                    <label className="block text-sm mb-1.5 text-ink/70">কোন ক্লাস পড়ান? (একাধিক বাছাই করা যাবে)</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {teacherClassOptions.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => toggleInList('classLevels', c)}
+                          aria-pressed={form.classLevels.includes(c)}
+                          className={`text-sm px-3 py-1.5 rounded-full border ${
+                            form.classLevels.includes(c) ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60 bg-white'
+                          }`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm mb-1.5 text-ink/70">কীভাবে পড়ান? (একাধিক বাছাই করা যাবে)</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {teachModeOptions.map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => toggleInList('teachModes', m)}
+                          aria-pressed={form.teachModes.includes(m)}
+                          className={`text-sm px-3 py-1.5 rounded-full border ${
+                            form.teachModes.includes(m) ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60 bg-white'
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm mb-1.5 text-ink/70">মাসিক ফি (ঐচ্ছিক)</label>
+                    <div className="flex items-center border border-ink/20 focus-within:border-green">
+                      <span className="pl-3 pr-1 text-ink/50 text-lg font-numeric select-none">৳</span>
+                      <input
+                        type="text" inputMode="numeric" maxLength={30} value={form.monthlyFee}
+                        onChange={(e) => updateField('monthlyFee', e.target.value)}
+                        className="flex-1 py-2.5 pr-3 outline-none text-lg font-numeric tracking-wide"
+                        placeholder="যেমন: ২০০০ থেকে ৩০০০"
+                      />
+                    </div>
+                    <p className="text-xs text-ink/50 mt-1">প্রতি বিষয় বা প্রতি মাসে আনুমানিক ফি লিখুন</p>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {category.slug === 'tutor-wanted' && (
+            <>
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">কোন ক্লাসের জন্য? (একাধিক বাছাই করা যাবে)</label>
+                <div className="flex gap-2 flex-wrap">
+                  {teacherClassOptions.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => toggleInList('classLevels', c)}
+                      aria-pressed={form.classLevels.includes(c)}
+                      className={`text-sm px-3 py-1.5 rounded-full border ${
+                        form.classLevels.includes(c) ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60 bg-white'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">কোন বিষয়ের শিক্ষক চাই? (একাধিক বাছাই করা যাবে)</label>
+                <div className="flex gap-2 flex-wrap">
+                  {wantedSubjectOptions.map((sub) => (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      onClick={() => toggleInList('wantedSubjects', sub.name_bn)}
+                      aria-pressed={form.wantedSubjects.includes(sub.name_bn)}
+                      className={`text-sm px-3 py-1.5 rounded-full border ${
+                        form.wantedSubjects.includes(sub.name_bn) ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60 bg-white'
+                      }`}
+                    >
+                      {sub.name_bn}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-ink/50 mt-1">বিষয় বাছলে শুধু সেই বিষয়ের শিক্ষকরা ফোনে নোটিফিকেশন পাবেন।</p>
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">কীভাবে পড়াতে চান? (একাধিক বাছাই করা যাবে)</label>
+                <div className="flex gap-2 flex-wrap">
+                  {['শিক্ষার্থীর বাসায় এসে', 'শিক্ষকের বাসায়', 'অনলাইন'].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => toggleInList('teachModes', m)}
+                      aria-pressed={form.teachModes.includes(m)}
+                      className={`text-sm px-3 py-1.5 rounded-full border ${
+                        form.teachModes.includes(m) ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60 bg-white'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
               </div>
             </>
           )}
