@@ -6,6 +6,8 @@ import ImageCropper from '../../../components/ImageCropper';
 import SiteHeader from '../../../components/SiteHeader';
 import { locations, upazilaList } from '../../../lib/locations';
 import { categoryLabels } from '../../../lib/categoryLabels';
+import DescriptionHelper from '../../../components/DescriptionHelper';
+import { checkDescription } from '../../../lib/descriptionCheck';
 import { cleanPhone, isValidBdPhone } from '../../../lib/format';
 
 // প্রোফাইল লিংকের প্রিভিউতে দেখানো ঠিকানা (https:// ছাড়া)
@@ -339,6 +341,10 @@ function NewPostForm() {
       if (!form.nameEn.trim()) { setError('ইংরেজি নাম দিন (এটা দিয়ে আপনার প্রোফাইল লিংক তৈরি হবে)'); return; }
       if (form.selectedSubcategoryIds.length === 0) { setError(isTeacher ? 'অন্তত একটা বিষয় বাছাই করুন' : 'অন্তত একটা সেবা বাছাই করুন'); return; }
       if (!form.primarySubcategoryId) { setError(isTeacher ? 'প্রধান বিষয় বাছাই করুন' : 'প্রধান সেবা বাছাই করুন'); return; }
+    }
+    if (category.type === 'service') {
+      const descProblem = checkDescription(form.description);
+      if (descProblem) { setError(descProblem); return; }
     }
     if (category.slug === 'job' && form.deadline && form.deadline < todayStr) {
       setError('আবেদনের শেষ তারিখ আজকের আগের হতে পারবে না');
@@ -1148,7 +1154,14 @@ function NewPostForm() {
 
 
 
-          {(
+          {isService ? (
+            <DescriptionHelper
+              value={form.description}
+              onChange={(v) => updateField('description', v)}
+              kind={isTeacher ? 'teacher' : isAmbulance ? 'ambulance' : 'service'}
+              context={{ name: form.name, subject: primarySubcatName, area: form.area, years: form.experienceYears }}
+            />
+          ) : (
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">বিবরণ</label>
             <textarea
