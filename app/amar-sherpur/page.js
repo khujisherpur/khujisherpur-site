@@ -10,8 +10,6 @@ export const metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: '/amar-sherpur' },
-  // ফিচার সবার জন্য খোলার আগে পর্যন্ত সার্চ ইঞ্জিনে আসবে না। ধাপ ৪-এ এই লাইনটি মুছবেন।
-  robots: { index: false, follow: false },
   openGraph: {
     title: TITLE,
     description: DESCRIPTION,
