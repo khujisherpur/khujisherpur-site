@@ -7,6 +7,7 @@ import TrackTarget from './TrackTarget';
 import { supabase } from '../lib/supabaseClient';
 import { getServicesFor, providerHref } from '../lib/services';
 import { toBn } from '../lib/format';
+import { splitProfileInfo } from '../lib/profileInfo';
 
 const text = {
   bn: {
@@ -131,6 +132,7 @@ export default async function ProviderProfile({
 }) {
   const t = text[lang];
   const num = (n) => (lang === 'bn' ? toBn(n) : n);
+  const { rows: infoRows, body: descBody } = splitProfileInfo(provider.description);
   const where = uniq([provider.union_name, provider.upazila]).join(', ');
   const fullAddress = uniq([provider.area, provider.union_name, provider.upazila]).join(', ');
   const primarySlug = services.find((s) => s.primary)?.slug;
@@ -249,7 +251,7 @@ export default async function ProviderProfile({
           <div className="mt-6 pt-5 border-t border-ink/10">
             <h2 className="text-sm font-semibold text-ink/70 mb-2">{t.about}</h2>
             <p className="text-ink/80 text-sm leading-relaxed whitespace-pre-line">
-              {provider.description || t.noDesc}
+              {descBody || t.noDesc}
             </p>
           </div>
 
@@ -267,6 +269,12 @@ export default async function ProviderProfile({
                   <span className="text-right text-ink/80">{fullAddress}</span>
                 </p>
               )}
+              {infoRows.map(([k, v]) => (
+                <p key={k} className="flex justify-between gap-3">
+                  <span className="text-ink/55 flex-shrink-0">{k}</span>
+                  <span className="text-right text-ink/80 min-w-0 break-words">{v}</span>
+                </p>
+              ))}
             </div>
           </div>
 
@@ -341,7 +349,7 @@ export default async function ProviderProfile({
             name: provider.name,
             areaServed: provider.area,
             telephone: provider.phone,
-            description: provider.description,
+            description: descBody,
             ...(rating.count > 0
               ? {
                   aggregateRating: {
