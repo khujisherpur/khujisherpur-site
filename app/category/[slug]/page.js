@@ -41,8 +41,8 @@ const SEO_DESCS = {
       : 'শেরপুরে নতুন ও ব্যবহৃত পণ্য কেনাবেচা — দাম ও ছবিসহ।',
   teacher: (n) =>
     n
-      ? `শেরপুরে ${n}টি টিউশনের বিজ্ঞাপন — বিষয়, এলাকা ও ফিসহ।`
-      : 'শেরপুরে প্রাইভেট টিউটর ও টিউশনের বিজ্ঞাপন — বিষয়, এলাকা ও ফিসহ।',
+      ? `শেরপুরে ${n} জন প্রাইভেট শিক্ষক ও টিউটর — বিষয়, ক্লাস ও এলাকা অনুযায়ী খুঁজুন, সরাসরি কল করুন।`
+      : 'শেরপুরে প্রাইভেট শিক্ষক ও টিউটর — বিষয়, ক্লাস ও এলাকা অনুযায়ী খুঁজুন, সরাসরি কল করুন।',
   venue: (n) =>
     n
       ? `শেরপুরে ${n}টি ভেন্যু ভাড়ার বিজ্ঞাপন — কমিউনিটি সেন্টার, হল ও আরও, ভাড়াসহ।`
@@ -177,6 +177,7 @@ const text = {
     all: 'সব', house: 'বাসা', shop: 'দোকান', mess: 'মেস', other: 'অন্যান্য',
     allAreas: 'সব উপজেলা',
     whichService: 'কোন সেবা খুঁজছেন?',
+    whichSubject: 'কোন বিষয়ের শিক্ষক খুঁজছেন?',
     sortNew: 'নতুন আগে', sortLow: 'কম দাম', sortHigh: 'বেশি দাম',
     profilesWord: 'টি প্রোফাইল', postsWord: 'টি পোস্ট',
     exp: 'বছর অভিজ্ঞতা',
@@ -193,6 +194,7 @@ const text = {
     all: 'All', house: 'House', shop: 'Shop', mess: 'Mess', other: 'Other',
     allAreas: 'All areas',
     whichService: 'Which service are you looking for?',
+    whichSubject: 'Which subject do you need a teacher for?',
     sortNew: 'Newest', sortLow: 'Price: low', sortHigh: 'Price: high',
     profilesWord: ' profiles', postsWord: ' posts',
     exp: 'yrs experience',
@@ -242,7 +244,8 @@ export default async function CategoryPage({ params, searchParams }) {
 
   const isService = category.type === 'service';
   const isRent = category.slug === 'rent';
-  const isServiceProvider = category.slug === 'service-provider';
+  // সেবা/বিষয় বেছে নিয়ে প্রোফাইল দেখানোর ক্যাটাগরি
+  const isServiceProvider = category.slug === 'service-provider' || category.slug === 'teacher';
   const name = label[lang].name;
   // পেজের মূল শিরোনাম (h1): তালিকায় থাকলে গুগল-বান্ধব পুরো শিরোনাম, না থাকলে ক্যাটাগরির নাম
   const pageHeading = PAGE_HEADINGS[lang]?.[category.slug] || name;
@@ -252,7 +255,7 @@ export default async function CategoryPage({ params, searchParams }) {
     if (/^[a-z0-9-]+$/.test(activeSub)) {
       redirect(`/${activeSub}`);
     }
-    redirect('/category/service-provider');
+    redirect(`/category/${category.slug}`);
   }
 
   // সেবাদাতা: সাব-ক্যাটাগরি বাছাইয়ের পেজ
@@ -290,7 +293,7 @@ export default async function CategoryPage({ params, searchParams }) {
               <span className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-[#EEF1F8]">{label.icon}</span>
               <h1 className="text-xl md:text-3xl font-semibold leading-snug">{pageHeading}</h1>
             </div>
-            <p className="text-ink/60 text-sm mt-2">{t.whichService}</p>
+            <p className="text-ink/60 text-sm mt-2">{category.slug === 'teacher' ? t.whichSubject : t.whichService}</p>
           </div>
 
           <section className="pb-16 grid grid-cols-3 sm:grid-cols-4 gap-2.5">
