@@ -1,5 +1,6 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+import { splitProfileInfo } from '../../../lib/profileInfo';
 import { redirect } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
@@ -27,8 +28,9 @@ export async function generateMetadata({ params }) {
   }
 
   const title = `${provider.name} - ${provider.categories?.name} ${provider.area} | খুঁজি শেরপুর`;
-  const description = provider.description
-    ? provider.description.slice(0, 150)
+  const bodyText = splitProfileInfo(provider.description).body;
+  const description = bodyText
+    ? bodyText.slice(0, 150)
     : `শেরপুরের ${provider.area} এলাকায় বিশ্বস্ত ${provider.categories?.name}। যোগাযোগ করুন খুঁজি শেরপুরের মাধ্যমে।`;
 
   return { title, description, openGraph: { title, description } };
