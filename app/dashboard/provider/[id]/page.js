@@ -7,6 +7,15 @@ import SiteHeader from '../../../../components/SiteHeader';
 import PageSkeleton from '../../../../components/PageSkeleton';
 import { locations, upazilaList } from '../../../../lib/locations';
 import { cleanPhone, isValidBdPhone } from '../../../../lib/format';
+import { splitProfileInfo } from '../../../../lib/profileInfo';
+import DescriptionHelper from '../../../../components/DescriptionHelper';
+import { checkDescription } from '../../../../lib/descriptionCheck';
+
+// যেসব ক্যাটাগরিতে বিষয়/সেবা বাছাই থাকে
+const SUBCAT_CATEGORIES = ['service-provider', 'teacher'];
+const teacherClassOptions = ['প্লে–৫ম', '৬ষ্ঠ–৮ম', '৯ম–১০ম (SSC)', '১১শ–১২শ (HSC)', 'ভর্তি প্রস্তুতি', 'কলেজ/বিশ্ববিদ্যালয়'];
+const teachModeOptions = ['শিক্ষার্থীর বাসায় গিয়ে', 'শিক্ষকের বাসায়', 'অনলাইন'];
+const splitList = (v) => (v ? v.split(/,\s*/).map((x) => x.trim()).filter(Boolean) : []);
 
 function extractStoragePath(publicUrl) {
   if (!publicUrl) return null;
@@ -52,6 +61,7 @@ export default function EditProviderPage({ params }) {
     name: '', area: '', phone: '', whatsapp: '', description: '',
     experienceYears: '', vehicleType: 'ac',
     nameEn: '', upazila: '', unionName: '',
+    classLevels: [], teachModes: [], monthlyFee: '',
   });
   const [waSame, setWaSame] = useState(false);
   const [categorySlug, setCategorySlug] = useState(null);
@@ -61,6 +71,7 @@ export default function EditProviderPage({ params }) {
   const [selectedSubcategoryIds, setSelectedSubcategoryIds] = useState([]);
   const [originalLinkIds, setOriginalLinkIds] = useState([]);
   const [originalStatus, setOriginalStatus] = useState('');
+  const [originalDescription, setOriginalDescription] = useState('');
   const [resultStatus, setResultStatus] = useState('');
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(null);
   const [pendingFile, setPendingFile] = useState(null);
@@ -111,9 +122,15 @@ export default function EditProviderPage({ params }) {
       return;
     }
 
+    const isTeacherCat = data.categories?.slug === 'teacher';
+    const info = isTeacherCat ? splitProfileInfo(data.description) : null;
+    const infoMap = Object.fromEntries(info ? info.rows : []);
     setForm({
       name: data.name, area: data.area, phone: data.phone, whatsapp: data.whatsapp || '',
-      description: data.description || '',
+      description: isTeacherCat ? info.body : data.description || '',
+      classLevels: splitList(infoMap['পড়ানোর ক্লাস']),
+      teachModes: splitList(infoMap['পড়ানোর ধরন']),
+      monthlyFee: infoMap['মাসিক ফি'] || '',
       experienceYears: data.experience_years || '', vehicleType: data.vehicle_type || 'ac',
       nameEn: data.name_en || '', upazila: data.upazila || '', unionName: data.union_name || '',
     });
@@ -123,8 +140,9 @@ export default function EditProviderPage({ params }) {
     setSlug(data.slug);
     setPrimarySubcategoryId(data.primary_subcategory_id);
     setOriginalStatus(data.status || '');
+    setOriginalDescription(isTeacherCat ? info.body : data.description || '');
 
-    if (data.categories?.slug === 'service-provider') {
+    if (SUBCAT_CATEGORIES.includes(data.categories?.slug)) {
       const { data: allSubs } = await supabase
         .from('subcategories')
         .select('id, name_bn')
@@ -146,6 +164,13 @@ export default function EditProviderPage({ params }) {
 
   function handleUpazilaChange(value) {
     setForm((f) => ({ ...f, upazila: value, unionName: '' }));
+  }
+
+  function toggleInList(field, value) {
+    setForm((f) => ({
+      ...f,
+      [field]: f[field].includes(value) ? f[field].filter((x) => x !== value) : [...f[field], value],
+    }));
   }
 
   function toggleSubcategory(id) {
@@ -210,6 +235,15 @@ export default function EditProviderPage({ params }) {
       return;
     }
 
+    // বিবরণ বদলালে তবেই যাচাই (পুরোনো ছোট বিবরণের কারণে অন্য তথ্য সেভ আটকাবে না)
+    if (form.description !== originalDescription) {
+      const descProblem = checkDescription(form.description);
+      if (descProblem) {
+        setError(descProblem);
+        return;
+      }
+    }
+
     setSaving(true);
     setError(null);
     let uploadedUrl = null;
@@ -223,7 +257,8 @@ export default function EditProviderPage({ params }) {
         photoUrl = null;
       }
 
-      const isServiceProvider = categorySlug === 'service-provider';
+      const isServiceProvider = SUBCAT_CATEGORIES.includes(categorySlug);
+      const isTeacher = categorySlug === 'teacher';
       const finalIds = isServiceProvider
         ? Array.from(new Set([...selectedSubcategoryIds, primarySubcategoryId].filter(Boolean)))
         : [];
@@ -235,7 +270,13 @@ export default function EditProviderPage({ params }) {
         area: form.area.trim(),
         phone: cleanPhone(form.phone),
         whatsapp: waValue ? cleanPhone(waValue) : null,
-        description: form.description,
+        description: isTeacher
+          ? [
+              form.classLevels.length ? `পড়ানোর ক্লাস: ${form.classLevels.join(', ')}` : '',
+              form.teachModes.length ? `পড়ানোর ধরন: ${form.teachModes.join(', ')}` : '',
+              form.monthlyFee.trim() ? `মাসিক ফি: ${form.monthlyFee.trim()}` : '',
+            ].filter(Boolean).join('\n') + (form.classLevels.length || form.teachModes.length || form.monthlyFee.trim() ? '\n\n' : '') + form.description
+          : form.description,
         photo_url: photoUrl,
         experience_years: form.experienceYears ? parseInt(form.experienceYears) : null,
         upazila: form.upazila,
@@ -351,7 +392,8 @@ export default function EditProviderPage({ params }) {
     );
   }
 
-  const isServiceProvider = categorySlug === 'service-provider';
+  const isServiceProvider = SUBCAT_CATEGORIES.includes(categorySlug);
+  const isTeacher = categorySlug === 'teacher';
   const unionsForUpazila = form.upazila ? locations[form.upazila] || [] : [];
   const primaryName = subcategories.find((s) => s.id === primarySubcategoryId)?.name_bn;
   const shownPhoto = newPhotoPreview || (removePhoto ? null : currentPhotoUrl);
@@ -359,7 +401,7 @@ export default function EditProviderPage({ params }) {
 
   const notice =
     originalStatus === 'approved'
-      ? `ℹ️ নাম, ছবি, ফোন, হোয়াটসঅ্যাপ, বিবরণ${isServiceProvider ? ' বা সেবার তালিকা' : ''} বদলালে প্রোফাইলটি আবার পর্যালোচনায় যাবে এবং অনুমোদনের আগ পর্যন্ত সাইটে দেখা যাবে না। শুধু এলাকা, অভিজ্ঞতা বা অনুপলব্ধ-সক্রিয় বদলালে যাবে না।`
+      ? `ℹ️ নাম, ছবি, ফোন, হোয়াটসঅ্যাপ, বিবরণ${isServiceProvider ? (isTeacher ? ', ক্লাস, ফি বা বিষয়ের তালিকা' : ' বা সেবার তালিকা') : ''} বদলালে প্রোফাইলটি আবার পর্যালোচনায় যাবে এবং অনুমোদনের আগ পর্যন্ত সাইটে দেখা যাবে না। শুধু এলাকা, অভিজ্ঞতা বা অনুপলব্ধ-সক্রিয় বদলালে যাবে না।`
       : originalStatus === 'rejected'
       ? 'ℹ️ সেভ করলে প্রোফাইলটি আবার পর্যালোচনার জন্য পাঠানো হবে।'
       : null;
@@ -386,7 +428,7 @@ export default function EditProviderPage({ params }) {
             </p>
             {primaryName && (
               <p className="text-ink/60 mt-1">
-                প্রধান সেবা: <span className="font-medium text-ink">{primaryName}</span>
+                {isTeacher ? 'প্রধান বিষয়' : 'প্রধান সেবা'}: <span className="font-medium text-ink">{primaryName}</span>
               </p>
             )}
             <p className="text-ink/40 text-xs mt-1">🔒 এই দুটো পরিবর্তন করা যায় না</p>
@@ -542,7 +584,7 @@ export default function EditProviderPage({ params }) {
 
           {isServiceProvider && (
             <div>
-              <label className="block text-sm mb-1.5 text-ink/70">কোন কোন সেবা দেন?</label>
+              <label className="block text-sm mb-1.5 text-ink/70">{isTeacher ? 'কোন কোন বিষয় পড়ান?' : 'কোন কোন সেবা দেন?'}</label>
               <div className="border border-ink/20 rounded-lg divide-y divide-ink/10 max-h-64 overflow-y-auto">
                 {subcategories.map((s) => {
                   const isPrimary = s.id === primarySubcategoryId;
@@ -562,18 +604,61 @@ export default function EditProviderPage({ params }) {
                   );
                 })}
               </div>
-              <p className="text-xs text-ink/50 mt-1.5">প্রধান সেবা বাদ দেওয়া যাবে না, শুধু নতুন সেবা যোগ/বাদ দেওয়া যাবে</p>
+              <p className="text-xs text-ink/50 mt-1.5">{isTeacher ? 'প্রধান বিষয় বাদ দেওয়া যাবে না, শুধু নতুন বিষয় যোগ/বাদ দেওয়া যাবে' : 'প্রধান সেবা বাদ দেওয়া যাবে না, শুধু নতুন সেবা যোগ/বাদ দেওয়া যাবে'}</p>
             </div>
           )}
 
-          <div>
-            <label className="block text-sm mb-1.5 text-ink/70">বিবরণ</label>
-            <textarea
-              required rows={4} maxLength={2000} value={form.description}
-              onChange={(e) => updateField('description', e.target.value)}
-              className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green resize-none"
-            />
-          </div>
+          {isTeacher && (
+            <>
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">কোন ক্লাস পড়ান? (একাধিক বাছাই করা যাবে)</label>
+                <div className="flex gap-2 flex-wrap">
+                  {Array.from(new Set([...teacherClassOptions, ...form.classLevels])).map((c) => (
+                    <button
+                      key={c} type="button" onClick={() => toggleInList('classLevels', c)}
+                      aria-pressed={form.classLevels.includes(c)}
+                      className={`text-sm px-3 py-1.5 rounded-full border ${form.classLevels.includes(c) ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60 bg-white'}`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">কীভাবে পড়ান? (একাধিক বাছাই করা যাবে)</label>
+                <div className="flex gap-2 flex-wrap">
+                  {Array.from(new Set([...teachModeOptions, ...form.teachModes])).map((m) => (
+                    <button
+                      key={m} type="button" onClick={() => toggleInList('teachModes', m)}
+                      aria-pressed={form.teachModes.includes(m)}
+                      className={`text-sm px-3 py-1.5 rounded-full border ${form.teachModes.includes(m) ? 'bg-green text-white border-green' : 'border-ink/20 text-ink/60 bg-white'}`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1.5 text-ink/70">মাসিক ফি (ঐচ্ছিক)</label>
+                <input
+                  type="text" inputMode="numeric" maxLength={30} value={form.monthlyFee}
+                  onChange={(e) => updateField('monthlyFee', e.target.value)}
+                  className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
+                  placeholder="যেমন: ২০০০ থেকে ৩০০০"
+                />
+              </div>
+            </>
+          )}
+
+          <DescriptionHelper
+            rounded
+            value={form.description}
+            onChange={(v) => updateField('description', v)}
+            kind={isTeacher ? 'teacher' : categorySlug === 'ambulance' ? 'ambulance' : 'service'}
+            context={{ name: form.name, subject: primaryName, area: form.area, years: form.experienceYears }}
+          />
 
           {notice && (
             <p className="text-xs text-marigold bg-marigold/10 rounded-lg px-3 py-2">{notice}</p>
