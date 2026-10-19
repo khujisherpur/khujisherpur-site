@@ -7,7 +7,8 @@ import { SITE_URL } from '../lib/site';
 const staticPages = [
   { path: '/', changeFrequency: 'daily', priority: 1.0 },
   { path: '/emergency', changeFrequency: 'monthly', priority: 0.6 },
-    { path: '/blood', changeFrequency: 'daily', priority: 0.8 },
+  { path: '/blood', changeFrequency: 'daily', priority: 0.8 },
+  { path: '/amar-sherpur', changeFrequency: 'weekly', priority: 0.7 },
   { path: '/terms', changeFrequency: 'yearly', priority: 0.2 },
   { path: '/privacy', changeFrequency: 'yearly', priority: 0.2 },
   { path: '/disclaimer', changeFrequency: 'yearly', priority: 0.2 },
