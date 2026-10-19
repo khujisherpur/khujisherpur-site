@@ -93,7 +93,9 @@ export async function generateMetadata({ params, searchParams }) {
     lang === 'bn'
       ? fmt
         ? `শেরপুরে ${fmt} জন ${name} — এলাকা, অভিজ্ঞতা ও রিভিউসহ। সরাসরি কল করুন।`
-        : `শেরপুরের ${name} সেবাদাতা — এলাকা, অভিজ্ঞতা ও রিভিউসহ। সরাসরি কল করুন।`
+        : /শিক্ষক|টিউটর/.test(name)
+          ? `শেরপুরের ${name} — বিষয়, এলাকা ও রিভিউসহ। সরাসরি কল করুন।`
+          : `শেরপুরের ${name} সেবাদাতা — এলাকা, অভিজ্ঞতা ও রিভিউসহ। সরাসরি কল করুন।`
       : `${name} service providers in Sherpur district — area, experience and reviews. Call directly.`;
 
   return {
@@ -145,13 +147,21 @@ export default async function SubcategoryPage({ params, searchParams }) {
   const name = lang === 'bn' ? subcategory.name_bn : subcategory.name_en || subcategory.name_bn;
   const icon = subcategoryIcons[subcategory.slug] || '🛠️';
   const base = `/${subcategory.slug}`;
+  // শিক্ষকের বিষয় হলে প্রোফাইল যোগ ও ফেরার লিংক শিক্ষকের ক্যাটাগরিতে যায়
+  const { data: ownerCat } = await supabase
+    .from('categories')
+    .select('slug')
+    .eq('id', subcategory.category_id)
+    .maybeSingle();
+  const catSlug = ownerCat?.slug === 'teacher' ? 'teacher' : 'service-provider';
+  const countWord = catSlug === 'teacher' && lang === 'bn' ? ' জন শিক্ষক' : t.countWord;
 
   return (
     <>
       <SiteHeader lang={lang} />
       <main className="max-w-4xl mx-auto px-4">
         <div className="pt-5 pb-4">
-          <a href="/category/service-provider" className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
+          <a href={`/category/${catSlug}`} className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
           <div className="flex items-center gap-3 mt-3">
             <span className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-[#EEF1F8] flex-shrink-0">
               {icon}
@@ -160,11 +170,11 @@ export default async function SubcategoryPage({ params, searchParams }) {
               <h1 className="text-xl md:text-2xl font-semibold leading-tight truncate">{name}</h1>
               <p className="text-xs text-ink/50 mt-0.5">
                 {num(items.length)}
-                {t.countWord}
+                {countWord}
               </p>
             </div>
             <a
-              href="/post/new?category=service-provider"
+              href={`/post/new?category=${catSlug}`}
               className="bg-marigold text-ink font-semibold text-sm px-4 py-2.5 rounded-full flex-shrink-0 whitespace-nowrap"
             >
               {t.addProfile}
@@ -201,7 +211,7 @@ export default async function SubcategoryPage({ params, searchParams }) {
                 <>
                   <p className="text-ink/45 text-xs mt-1">{t.beFirst}</p>
                   <a
-                    href="/post/new?category=service-provider"
+                    href={`/post/new?category=${catSlug}`}
                     className="inline-block mt-4 bg-marigold text-ink font-semibold text-sm px-6 py-2.5 rounded-full"
                   >
                     {t.addProfile}
