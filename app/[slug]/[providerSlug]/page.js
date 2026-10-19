@@ -8,6 +8,7 @@ import SiteHeader from '../../../components/SiteHeader';
 import ProviderProfile from '../../../components/ProviderProfile';
 import { getLang } from '../../../lib/getLang';
 import { toBn } from '../../../lib/format';
+import { splitProfileInfo } from '../../../lib/profileInfo';
 import { subcategoryIcons } from '../../../lib/services';
 import { SITE_URL, SITE_NAME, DEFAULT_OG_IMAGE } from '../../../lib/site';
 
@@ -147,7 +148,7 @@ export default async function ProviderSlugPage({ params }) {
     '@type': 'LocalBusiness',
     name: provider.name,
     url: `${SITE_URL}/${subcategory.slug}/${provider.slug}`,
-    description: (provider.description || `${provider.name}, ${subName(subcategory)}`).slice(0, 500),
+    description: (splitProfileInfo(provider.description).body || `${provider.name}, ${subName(subcategory)}`).slice(0, 500),
     ...(provider.photo_url ? { image: provider.photo_url } : {}),
     address: {
       '@type': 'PostalAddress',
