@@ -4,6 +4,7 @@ import { PLACES, UPAZILAS, mapsSearchUrl } from '../lib/sherpurPlaces';
 import { renderCard, prepareSquarePhoto, canvasToBlob, sanitizeName, CARD_THEMES } from '../lib/cardRender';
 import { toBn } from '../lib/format';
 import { SITE_URL } from '../lib/site';
+import { trackCard, fetchCardTotal } from '../lib/trackCard';
 
 const STORAGE_KEY = 'amar_sherpur_v1';
 const NAME_KEY = 'amar_sherpur_name';
@@ -87,11 +88,17 @@ export default function AmarSherpur() {
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
   const [inFacebook, setInFacebook] = useState(false);
+  const [takenTotal, setTakenTotal] = useState(null);
 
   const fileRef = useRef(null);
   const previewRef = useRef(null);
   const urlRef = useRef('');
   const requestRef = useRef(0);
+  // ইভেন্ট গোনার জন্য (প্রতিটি পাতা-খোলায় একবারই)
+  const fromCardRef = useRef(false);
+  const openedRef = useRef(false);
+  const pickedRef = useRef(false);
+  const generatedRef = useRef(false);
 
   // শুরুতে সংরক্ষিত তথ্য ফেরত আনা
   useEffect(() => {
@@ -101,6 +108,13 @@ export default function AmarSherpur() {
     if (savedTheme && THEME_IDS.has(savedTheme)) setTheme(savedTheme);
     if (readStore(UPAZILA_NAMES_KEY) === '0') setShowUpazilaNames(false);
     setReady(true);
+    try {
+      fromCardRef.current = new URLSearchParams(window.location.search).get('ref') === 'card';
+    } catch {}
+    if (!openedRef.current) {
+      openedRef.current = true;
+      trackCard('card_open', { fromCard: fromCardRef.current });
+    }
     try {
       const ua = navigator.userAgent || '';
       setInFacebook(/FBAN|FBAV|FB_IAB|Instagram/i.test(ua));
@@ -123,6 +137,17 @@ export default function AmarSherpur() {
     writeStore(THEME_KEY, theme);
     writeStore(UPAZILA_NAMES_KEY, showUpazilaNames ? '1' : '0');
   }, [name, theme, showUpazilaNames, ready]);
+
+  // এ পর্যন্ত কত জন কার্ড নিয়েছেন (আসল সংখ্যা, ১ জন হলেও দেখাবে)
+  useEffect(() => {
+    let alive = true;
+    fetchCardTotal().then((n) => {
+      if (alive) setTakenTotal(n);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // প্রিভিউ চোখে পড়লে নিচের "কার্ড দেখুন" বার লুকাবে
   useEffect(() => {
@@ -181,6 +206,13 @@ export default function AmarSherpur() {
   const percent = total ? Math.round((selCount / total) * 100) : 0;
   const q = query.trim();
 
+  // কার্ড বানিয়ে ব্যবহারকারী সত্যিই দেখেছেন (প্রিভিউ পর্দায় এসেছে), পাতা-খোলায় একবার
+  useEffect(() => {
+    if (generatedRef.current || !previewVisible || !previewUrl || selCount === 0) return;
+    generatedRef.current = true;
+    trackCard('card_generated', { fromCard: fromCardRef.current, picked: selCount });
+  }, [previewVisible, previewUrl, selCount]);
+
   const stats = useMemo(
     () =>
       UPAZILAS.map((u) => {
@@ -193,12 +225,31 @@ export default function AmarSherpur() {
   );
   const visibleStats = stats.filter((s) => s.shown.length > 0);
 
+  // প্রথমবার বাছাই শুরু করলে একবার গোনা (আগে থেকে সংরক্ষিত বাছাই ধরা হয় না)
+  function noteSelection(addedCount) {
+    if (pickedRef.current || selected.length > 0 || addedCount <= 0) return;
+    pickedRef.current = true;
+    trackCard('first_pick', { fromCard: fromCardRef.current, picked: addedCount });
+  }
+
+  // শেয়ার, লিংক কপি বা ছবি সংরক্ষণ: যেকোনো একটি চাপলেই "কার্ড নেওয়া" গোনা হয়
+  function trackSaved() {
+    trackCard('card_saved', { fromCard: fromCardRef.current, picked: selected.length });
+  }
+
+  function selectAll() {
+    noteSelection(PLACES.length);
+    setSelected(PLACES.map((p) => p.id));
+  }
+
   function toggle(id) {
+    if (!selectedSet.has(id)) noteSelection(1);
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
   function toggleUpazila(upazilaId) {
     const ids = PLACES.filter((p) => p.upazila === upazilaId).map((p) => p.id);
+    if (!ids.every((id) => selectedSet.has(id))) noteSelection(ids.length);
     setSelected((prev) => {
       const all = ids.every((id) => prev.includes(id));
       return all ? prev.filter((id) => !ids.includes(id)) : Array.from(new Set([...prev, ...ids]));
@@ -276,12 +327,14 @@ export default function AmarSherpur() {
   }
 
   async function copyCaption() {
+    trackSaved();
     setError('');
     flashCopied(await copyText(captionText()));
   }
 
   async function shareCard() {
     if (!previewBlob) return;
+    trackSaved();
     // ফেসবুক অ্যাপ ছবির সঙ্গে লেখা নেয় না, তাই শেয়ারের ট্যাপেই লিংকসহ লেখা কপি হয়ে যায়
     const copyPromise = copyText(captionText());
     try {
@@ -333,6 +386,13 @@ export default function AmarSherpur() {
               </li>
             ))}
           </ul>
+          {takenTotal !== null && takenTotal >= 1 && (
+            <p className="mt-4 text-sm text-ink/70">
+              এ পর্যন্ত{' '}
+              <b className="font-numeric text-green-dark text-base">{num(takenTotal.toLocaleString('en-IN'))}</b> জন
+              কার্ড নিয়েছেন
+            </p>
+          )}
           <HeroArt />
         </section>
 
@@ -361,7 +421,7 @@ export default function AmarSherpur() {
               className="mt-3 w-full rounded-xl border border-ink/15 bg-paper px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green/40"
             />
             <div className="flex gap-4 mt-2 text-xs">
-              <button type="button" onClick={() => setSelected(PLACES.map((p) => p.id))} className="text-green underline">
+              <button type="button" onClick={selectAll} className="text-green underline">
                 সব বাছাই করুন
               </button>
               <button type="button" onClick={() => setSelected([])} className="text-ink/60 underline">
@@ -589,6 +649,7 @@ export default function AmarSherpur() {
               <a
                 href={previewUrl}
                 download="amar-sherpur.png"
+                onClick={trackSaved}
                 className={`w-full text-center text-base font-semibold py-3.5 rounded-xl ${
                   canShare ? 'border border-green/40 text-green' : 'bg-green text-white'
                 }`}
