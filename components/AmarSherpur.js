@@ -1,84 +1,111 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PLACES, UPAZILAS, mapsSearchUrl } from '../lib/sherpurPlaces';
-import { UPAZILA_SHAPES, MAP_WIDTH, MAP_HEIGHT, project } from '../lib/sherpurMap';
-import { renderCard, prepareSquarePhoto, canvasToBlob, sanitizeName } from '../lib/cardRender';
+import { renderCard, prepareSquarePhoto, canvasToBlob, sanitizeName, CARD_THEMES } from '../lib/cardRender';
 import { toBn } from '../lib/format';
 import { SITE_URL } from '../lib/site';
 
 const STORAGE_KEY = 'amar_sherpur_v1';
 const NAME_KEY = 'amar_sherpur_name';
+const THEME_KEY = 'amar_sherpur_theme';
+const UPAZILA_NAMES_KEY = 'amar_sherpur_upz';
 const VALID_IDS = new Set(PLACES.map((p) => p.id));
+const THEME_IDS = new Set(CARD_THEMES.map((t) => t.id));
 const num = (n) => toBn(n);
 
-// ম্যাপে যেসব স্থানের অবস্থান নিশ্চিত, শুধু সেগুলোর মার্কার বসবে
-const PINNED = PLACES.filter((p) => p.lat != null && p.lng != null).map((p) => ({
-  ...p,
-  ...project(p.lat, p.lng),
-}));
-const UNPINNED_COUNT = PLACES.length - PINNED.length;
-
-function loadSaved() {
+function readStore(key) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStore(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {}
+}
+
+function loadSelected() {
+  try {
+    const arr = JSON.parse(readStore(STORAGE_KEY) || '[]');
     return Array.isArray(arr) ? arr.filter((id) => VALID_IDS.has(id)) : [];
   } catch {
     return [];
   }
 }
 
-function saveSelected(ids) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
-  } catch {}
-}
-
-function loadName() {
-  try {
-    return localStorage.getItem(NAME_KEY) || '';
-  } catch {
-    return '';
-  }
-}
-
-function saveName(name) {
-  try {
-    localStorage.setItem(NAME_KEY, name);
-  } catch {}
+// হিরোর ছবি: গারো পাহাড়ের ঢেউ, রাবার গাছ আর বারদুয়ারী মসজিদের গম্বুজ (নিজস্ব নকশা)
+function HeroArt() {
+  return (
+    <svg viewBox="0 0 380 150" className="w-full block mt-2" aria-hidden="true">
+      <circle cx="300" cy="46" r="22" fill="#F6D98B" />
+      <path d="M0 110 Q60 60 130 92 T260 84 T380 70 V150 H0Z" fill="#CFE8D6" />
+      <path d="M0 126 Q70 84 150 112 T300 100 T380 108 V150 H0Z" fill="#8FC9A3" />
+      <g fill="#E8B9A6" stroke="#fff" strokeWidth="1.5">
+        <rect x="96" y="96" width="96" height="26" rx="2" />
+        <path d="M102 96 a10 10 0 0 1 20 0Z M128 96 a10 10 0 0 1 20 0Z M154 96 a10 10 0 0 1 20 0Z" />
+        <path d="M174 96 a8 8 0 0 1 16 0Z" />
+      </g>
+      <g fill="#fff">
+        <rect x="108" y="106" width="6" height="16" rx="3" />
+        <rect x="134" y="106" width="6" height="16" rx="3" />
+        <rect x="160" y="106" width="6" height="16" rx="3" />
+      </g>
+      <path d="M0 140 Q80 112 170 130 T380 124 V150 H0Z" fill="#1C8A4C" />
+      <g stroke="#0E5C33" strokeWidth="2">
+        <path d="M232 124 v-14 M246 126 v-16 M260 124 v-14 M274 126 v-15" />
+      </g>
+      <g fill="#2E9C5E">
+        <circle cx="232" cy="106" r="7" />
+        <circle cx="246" cy="106" r="8" />
+        <circle cx="260" cy="107" r="7" />
+        <circle cx="274" cy="107" r="8" />
+      </g>
+    </svg>
+  );
 }
 
 export default function AmarSherpur() {
   const [selected, setSelected] = useState([]);
   const [ready, setReady] = useState(false);
-  const [filter, setFilter] = useState('all');
+  const [query, setQuery] = useState('');
+  const [openIds, setOpenIds] = useState(['sadar']);
 
-  // কার্ড তৈরির ধাপ: pick (স্থান বাছাই), form (নাম ও ছবি), result (কার্ড)
-  const [step, setStep] = useState('pick');
   const [name, setName] = useState('');
+  const [theme, setTheme] = useState('sabuj');
+  const [showUpazilaNames, setShowUpazilaNames] = useState(true);
   const [photo, setPhoto] = useState(null);
   const [photoThumb, setPhotoThumb] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [cardUrl, setCardUrl] = useState('');
-  const [cardBlob, setCardBlob] = useState(null);
-  const [canShare, setCanShare] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [inFacebook, setInFacebook] = useState(false);
-  const fileRef = useRef(null);
-  const urlRef = useRef('');
 
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [previewBlob, setPreviewBlob] = useState(null);
+  const [rendering, setRendering] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [canShare, setCanShare] = useState(false);
+  const [inFacebook, setInFacebook] = useState(false);
+
+  const fileRef = useRef(null);
+  const previewRef = useRef(null);
+  const urlRef = useRef('');
+  const requestRef = useRef(0);
+
+  // শুরুতে সংরক্ষিত তথ্য ফেরত আনা
   useEffect(() => {
-    setSelected(loadSaved());
-    setName(loadName());
+    setSelected(loadSelected());
+    setName(readStore(NAME_KEY) || '');
+    const savedTheme = readStore(THEME_KEY);
+    if (savedTheme && THEME_IDS.has(savedTheme)) setTheme(savedTheme);
+    if (readStore(UPAZILA_NAMES_KEY) === '0') setShowUpazilaNames(false);
     setReady(true);
     try {
       const ua = navigator.userAgent || '';
       setInFacebook(/FBAN|FBAV|FB_IAB|Instagram/i.test(ua));
       if (navigator.canShare && typeof File !== 'undefined') {
-        const probe = new File([''], 'a.png', { type: 'image/png' });
-        setCanShare(navigator.canShare({ files: [probe] }));
+        setCanShare(navigator.canShare({ files: [new File([''], 'a.png', { type: 'image/png' })] }));
       }
     } catch {}
     return () => {
@@ -87,40 +114,105 @@ export default function AmarSherpur() {
   }, []);
 
   useEffect(() => {
-    if (ready) saveSelected(selected);
+    if (ready) writeStore(STORAGE_KEY, JSON.stringify(selected));
   }, [selected, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    writeStore(NAME_KEY, name);
+    writeStore(THEME_KEY, theme);
+    writeStore(UPAZILA_NAMES_KEY, showUpazilaNames ? '1' : '0');
+  }, [name, theme, showUpazilaNames, ready]);
+
+  // প্রিভিউ চোখে পড়লে নিচের "কার্ড দেখুন" বার লুকাবে
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver(([entry]) => setPreviewVisible(entry.isIntersecting), {
+      threshold: 0.15,
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // লাইভ প্রিভিউ: কিছু বদলালে একটু থেমে কার্ড আবার আঁকা হয়
+  useEffect(() => {
+    if (!ready) return undefined;
+    const id = ++requestRef.current;
+    if (selected.length === 0) {
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+      urlRef.current = '';
+      setPreviewUrl('');
+      setPreviewBlob(null);
+      setRendering(false);
+      return undefined;
+    }
+    setRendering(true);
+    const timer = setTimeout(async () => {
+      try {
+        const canvas = await renderCard({
+          name: sanitizeName(name),
+          photo,
+          selectedIds: selected,
+          theme,
+          showUpazilaNames,
+        });
+        const blob = await canvasToBlob(canvas);
+        if (id !== requestRef.current) return;
+        if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+        const url = URL.createObjectURL(blob);
+        urlRef.current = url;
+        setPreviewUrl(url);
+        setPreviewBlob(blob);
+        setRendering(false);
+      } catch {
+        if (id === requestRef.current) {
+          setRendering(false);
+          setError('কার্ড বানানো যায়নি, আবার চেষ্টা করুন।');
+        }
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [ready, selected, name, theme, showUpazilaNames, photo]);
 
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const total = PLACES.length;
   const selCount = selected.length;
   const percent = total ? Math.round((selCount / total) * 100) : 0;
+  const q = query.trim();
 
   const stats = useMemo(
     () =>
       UPAZILAS.map((u) => {
         const items = PLACES.filter((p) => p.upazila === u.id);
         const sel = items.filter((p) => selectedSet.has(p.id)).length;
-        return { ...u, items, total: items.length, sel };
+        const shown = q ? items.filter((p) => p.name.includes(q) || p.short.includes(q)) : items;
+        return { ...u, items, shown, total: items.length, sel };
       }),
-    [selectedSet]
+    [selectedSet, q]
   );
-
-  const visibleStats = filter === 'all' ? stats : stats.filter((s) => s.id === filter);
-  const visitedIds = new Set(stats.filter((s) => s.sel > 0).map((s) => s.id));
+  const visibleStats = stats.filter((s) => s.shown.length > 0);
 
   function toggle(id) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  function resetAll() {
-    setSelected([]);
+  function toggleUpazila(upazilaId) {
+    const ids = PLACES.filter((p) => p.upazila === upazilaId).map((p) => p.id);
+    setSelected((prev) => {
+      const all = ids.every((id) => prev.includes(id));
+      return all ? prev.filter((id) => !ids.includes(id)) : Array.from(new Set([...prev, ...ids]));
+    });
   }
 
-  function goTo(next) {
-    setError('');
-    setStep(next);
+  function toggleOpen(id) {
+    setOpenIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function jumpTo(elementId) {
     try {
-      window.scrollTo(0, 0);
+      const el = document.getElementById(elementId);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch {}
   }
 
@@ -145,27 +237,6 @@ export default function AmarSherpur() {
   function removePhoto() {
     setPhoto(null);
     setPhotoThumb('');
-  }
-
-  async function generate() {
-    const clean = sanitizeName(name);
-    if (!clean || busy) return;
-    setBusy(true);
-    setError('');
-    try {
-      const canvas = await renderCard({ name: clean, photo, selectedIds: selected });
-      const blob = await canvasToBlob(canvas);
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-      const url = URL.createObjectURL(blob);
-      urlRef.current = url;
-      setCardUrl(url);
-      setCardBlob(blob);
-      saveName(clean);
-      goTo('result');
-    } catch {
-      setError('কার্ড বানানো যায়নি, আবার চেষ্টা করুন।');
-    }
-    setBusy(false);
   }
 
   // শেয়ারের সঙ্গে যাওয়া লেখা ও লিংক (?ref=card দিয়ে বোঝা যাবে কার্ড থেকে কতজন এল)
@@ -210,11 +281,11 @@ export default function AmarSherpur() {
   }
 
   async function shareCard() {
-    if (!cardBlob) return;
+    if (!previewBlob) return;
     // ফেসবুক অ্যাপ ছবির সঙ্গে লেখা নেয় না, তাই শেয়ারের ট্যাপেই লিংকসহ লেখা কপি হয়ে যায়
     const copyPromise = copyText(captionText());
     try {
-      const file = new File([cardBlob], 'amar-sherpur.png', { type: 'image/png' });
+      const file = new File([previewBlob], 'amar-sherpur.png', { type: 'image/png' });
       await navigator.share({ files: [file], title: 'আমার শেরপুর', text: captionText() });
     } catch (err) {
       // ব্যবহারকারী নিজে বাতিল করলে কিছু বলার নেই
@@ -233,318 +304,351 @@ export default function AmarSherpur() {
         </div>
       </header>
 
-      {step === 'form' && (
-        <main className="max-w-4xl mx-auto px-4 pt-5 pb-16">
-          <button type="button" onClick={() => goTo('pick')} className="text-sm text-green font-medium">
-            ← স্থান বদলান
-          </button>
-          <h1 className="text-2xl font-bold text-green-dark mt-3">আপনার কার্ড</h1>
-          <p className="text-sm text-ink/60 mt-1">
-            {num(selCount)}টি স্থান নিয়ে কার্ড তৈরি হবে। নাম ও ছবি শুধু আপনার ফোনেই থাকবে।
+      <main className="max-w-4xl mx-auto pb-28">
+        {/* হিরো */}
+        <section className="bg-gradient-to-b from-green/10 to-paper px-4 pt-6 text-center">
+          <span className="inline-block bg-green/15 text-green-dark text-xs font-semibold px-3.5 py-1.5 rounded-full">
+            {num(UPAZILAS.length)} উপজেলা · {num(total)} স্থান
+          </span>
+          <p className="text-xs tracking-widest text-ink/50 mt-4">খুঁজি শেরপুর</p>
+          <h1 className="text-3xl font-bold text-green-dark leading-tight mt-1">
+            নিজ শেরপুর জেলা
+            <br />
+            কতটুকু ঘুরেছেন?
+          </h1>
+          <p className="text-sm text-ink/60 mt-3 px-2">
+            ঘোরা জায়গাগুলো বেছে নিন, বানিয়ে ফেলুন নিজের শেরপুর কার্ড।
           </p>
-
-          <label htmlFor="amar-name" className="block text-sm font-semibold mt-6">
-            আপনার নাম
-          </label>
-          <input
-            id="amar-name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={40}
-            autoComplete="name"
-            placeholder="যেমন: আরিফ হোসেন"
-            className="mt-2 w-full rounded-xl border border-ink/20 bg-white px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green/40"
-          />
-
-          <p className="text-sm font-semibold mt-6">আপনার ছবি (ঐচ্ছিক)</p>
-          <div className="mt-2 flex items-center gap-3">
-            {photoThumb ? (
-              <img src={photoThumb} alt="নির্বাচিত ছবি" className="w-20 h-20 rounded-2xl object-cover border-2 border-green" />
-            ) : (
-              <div className="w-20 h-20 rounded-2xl bg-white border border-dashed border-ink/25 flex items-center justify-center text-2xl text-ink/25">
-                👤
-              </div>
-            )}
-            <div className="flex flex-col items-start gap-2">
-              <button
-                type="button"
-                onClick={() => fileRef.current && fileRef.current.click()}
-                className="border border-green/40 text-green text-sm font-medium px-4 py-2 rounded-xl"
-              >
-                {photoThumb ? 'অন্য ছবি দিন' : 'ছবি যোগ করুন'}
-              </button>
-              {photoThumb && (
-                <button type="button" onClick={removePhoto} className="text-xs text-ink/50 underline">
-                  ছবি সরান
-                </button>
-              )}
-            </div>
-            <input ref={fileRef} type="file" accept="image/*" onChange={onPickPhoto} className="hidden" />
-          </div>
-
-          {error && (
-            <p className="mt-4 text-sm text-red-600" role="alert">
-              {error}
-            </p>
-          )}
-
           <button
             type="button"
-            onClick={generate}
-            disabled={!sanitizeName(name) || busy}
-            className="mt-8 w-full bg-green text-white text-base font-semibold py-3.5 rounded-xl disabled:opacity-40"
+            onClick={() => jumpTo('select')}
+            className="mt-4 bg-green text-white font-semibold text-base px-6 py-3 rounded-full shadow-sm"
           >
-            {busy ? 'কার্ড বানানো হচ্ছে...' : 'কার্ড তৈরি করুন'}
+            জায়গা বাছাই শুরু করুন ↓
           </button>
-        </main>
-      )}
+          <ul className="flex flex-wrap justify-center gap-2 mt-4">
+            {['জায়গা বাছুন', 'নাম ও রং', 'কার্ড শেয়ার'].map((label, i) => (
+              <li key={label} className="bg-white border border-ink/10 rounded-full px-3 py-1.5 text-xs">
+                <b className="text-green font-numeric">{num(i + 1)}</b> {label}
+              </li>
+            ))}
+          </ul>
+          <HeroArt />
+        </section>
 
-      {step === 'result' && (
-        <main className="max-w-4xl mx-auto px-4 pt-5 pb-16">
-          <h1 className="text-xl font-bold text-green-dark">আপনার কার্ড তৈরি</h1>
-          <img
-            src={cardUrl}
-            alt="আপনার আমার শেরপুর কার্ড"
-            className="w-full max-w-md mx-auto mt-4 rounded-2xl border border-ink/10 shadow-sm"
-          />
+        {/* জায়গা বাছাই */}
+        <section id="select" className="px-4 mt-4 scroll-mt-16">
+          <div className="bg-white rounded-2xl border border-ink/10 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-base font-bold">যেসব জায়গায় গিয়েছি</h2>
+              <span className="bg-green/10 text-green-dark font-bold text-sm px-3 py-1 rounded-full font-numeric">
+                {num(selCount)} / {num(total)}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-ink/10 mt-3 overflow-hidden">
+              <div className="h-full rounded-full bg-green transition-all" style={{ width: `${percent}%` }} />
+            </div>
 
-          <div className="max-w-md mx-auto mt-5 flex flex-col gap-3">
-            {canShare && (
-              <button
-                type="button"
-                onClick={shareCard}
-                className="w-full bg-green text-white text-base font-semibold py-3.5 rounded-xl"
-              >
-                শেয়ার করুন
+            <label htmlFor="amar-search" className="sr-only">
+              জায়গা খুঁজুন
+            </label>
+            <input
+              id="amar-search"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="🔍 জায়গা খুঁজুন…"
+              className="mt-3 w-full rounded-xl border border-ink/15 bg-paper px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green/40"
+            />
+            <div className="flex gap-4 mt-2 text-xs">
+              <button type="button" onClick={() => setSelected(PLACES.map((p) => p.id))} className="text-green underline">
+                সব বাছাই করুন
               </button>
-            )}
-            <button
-              type="button"
-              onClick={copyCaption}
-              className="w-full border border-green/40 text-green text-base font-semibold py-3.5 rounded-xl"
-            >
-              {copied ? 'লিংক কপি হয়েছে ✓' : 'লিংক কপি করুন'}
-            </button>
-            <a
-              href={cardUrl}
-              download="amar-sherpur.png"
-              className={`w-full text-center text-base font-semibold py-3.5 rounded-xl ${
-                canShare ? 'border border-green/40 text-green' : 'bg-green text-white'
-              }`}
-            >
-              ছবি সংরক্ষণ করুন
-            </a>
-            <button type="button" onClick={() => goTo('form')} className="text-sm text-ink/60 underline py-2">
-              নাম বা ছবি বদলান
-            </button>
-          </div>
+              <button type="button" onClick={() => setSelected([])} className="text-ink/60 underline">
+                সব মুছুন
+              </button>
+            </div>
 
-          {copied && (
-            <p
-              className="max-w-md mx-auto mt-4 rounded-xl bg-green/10 border border-green/30 px-3 py-2.5 text-sm text-green-dark font-medium leading-relaxed"
-              role="status"
-            >
-              লিংকসহ লেখা কপি হয়েছে ✓ ফেসবুকে পোস্টের ঘরে ধরে রেখে "পেস্ট" চাপুন।
-            </p>
+            <div className="mt-3">
+              {q && visibleStats.length === 0 && (
+                <p className="text-sm text-ink/50 py-4 text-center">এই নামে কোনো জায়গা মিলছে না।</p>
+              )}
+              {visibleStats.map((s) => {
+                const open = q ? true : openIds.includes(s.id);
+                const complete = s.sel === s.total;
+                const missing = s.shown.filter((p) => p.lat == null || p.lng == null);
+                return (
+                  <div key={s.id} className="border-t border-ink/10 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleOpen(s.id)}
+                        aria-expanded={open}
+                        className="flex-1 min-w-0 flex items-center gap-2 text-left font-bold"
+                      >
+                        <span aria-hidden="true" className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>
+                          ›
+                        </span>
+                        <span>{s.name}</span>
+                        <span className="font-numeric text-ink/40 font-medium text-sm">
+                          {num(s.sel)}/{num(s.total)}
+                        </span>
+                        {complete && (
+                          <span className="text-[11px] font-semibold bg-marigold/25 text-ink px-2 py-0.5 rounded-full">
+                            ✓ সম্পূর্ণ
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleUpazila(s.id)}
+                        className="flex-shrink-0 text-xs text-green underline"
+                      >
+                        {complete ? 'সব মুছুন' : 'সব বাছাই'}
+                      </button>
+                    </div>
+                    {open && (
+                      <>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {s.shown.map((p) => {
+                            const checked = selectedSet.has(p.id);
+                            const unpinned = p.lat == null || p.lng == null;
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => toggle(p.id)}
+                                aria-pressed={checked}
+                                title={p.name}
+                                className={`text-sm font-medium px-3.5 py-2 rounded-full border transition-colors ${
+                                  checked
+                                    ? 'bg-green text-white border-green'
+                                    : 'bg-green/10 text-green-dark border-green/20'
+                                } ${unpinned ? 'border-dashed' : ''}`}
+                              >
+                                {p.short}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {missing.length > 0 && (
+                          <p className="text-xs text-ink/50 mt-2 leading-relaxed">
+                            ছেঁড়া দাগের জায়গার অবস্থান ম্যাপে এখনো বসেনি:{' '}
+                            {missing.map((p) => (
+                              <a
+                                key={p.id}
+                                href={mapsSearchUrl(p)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-green underline mr-2"
+                              >
+                                {p.short} ↗
+                              </a>
+                            ))}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* কার্ড সাজানো */}
+        <section id="customize" className="px-4 mt-4 scroll-mt-16">
+          <div className="bg-white rounded-2xl border border-ink/10 p-4">
+            <h2 className="text-base font-bold">কার্ড সাজান</h2>
+
+            <p className="text-xs font-semibold text-ink/60 mt-4">রং</p>
+            <div className="flex gap-3 mt-2">
+              {CARD_THEMES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTheme(t.id)}
+                  aria-pressed={theme === t.id}
+                  aria-label={`রং: ${t.label}`}
+                  className="flex flex-col items-center gap-1"
+                >
+                  <span
+                    className={`relative block w-11 h-11 rounded-full border-2 ${
+                      theme === t.id ? 'border-ink' : 'border-ink/15'
+                    }`}
+                    style={{ background: t.bg }}
+                  >
+                    <span
+                      className="absolute right-1.5 bottom-1.5 block w-4 h-4"
+                      style={{ background: t.accent, borderRadius: '50% 0 50% 50%' }}
+                    />
+                  </span>
+                  <span className="text-[11px] text-ink/60">{t.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center gap-3">
+              {photoThumb ? (
+                <img
+                  src={photoThumb}
+                  alt="নির্বাচিত ছবি"
+                  className="w-16 h-16 rounded-2xl object-cover border-2 border-green flex-shrink-0"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-2xl bg-paper border border-dashed border-ink/25 flex items-center justify-center text-2xl text-ink/25 flex-shrink-0">
+                  👤
+                </div>
+              )}
+              <div className="flex flex-col items-start gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current && fileRef.current.click()}
+                  className="border border-green/40 text-green text-sm font-medium px-4 py-2 rounded-xl"
+                >
+                  {photoThumb ? 'অন্য ছবি দিন' : 'ছবি যোগ করুন (ঐচ্ছিক)'}
+                </button>
+                {photoThumb && (
+                  <button type="button" onClick={removePhoto} className="text-xs text-ink/50 underline">
+                    ছবি সরান
+                  </button>
+                )}
+              </div>
+              <input ref={fileRef} type="file" accept="image/*" onChange={onPickPhoto} className="hidden" />
+            </div>
+
+            <label htmlFor="amar-name" className="block text-xs font-semibold text-ink/60 mt-4">
+              আপনার নাম (ঐচ্ছিক)
+            </label>
+            <input
+              id="amar-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={40}
+              autoComplete="name"
+              placeholder="যেমন: আরিফ হোসেন"
+              className="mt-1.5 w-full rounded-xl border border-ink/15 bg-paper px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-green/40"
+            />
+
+            <label className="flex items-center gap-2.5 mt-4 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showUpazilaNames}
+                onChange={(e) => setShowUpazilaNames(e.target.checked)}
+                className="w-5 h-5 accent-green"
+              />
+              উপজেলার নাম ম্যাপে দেখান
+            </label>
+            <p className="text-xs text-ink/40 mt-3">নাম ও ছবি শুধু আপনার ফোনেই থাকে, কোথাও জমা হয় না।</p>
+          </div>
+        </section>
+
+        {/* লাইভ প্রিভিউ */}
+        <section id="card-preview" ref={previewRef} className="px-4 mt-4 scroll-mt-16">
+          <h2 className="text-sm font-semibold text-ink/60 mb-2">
+            লাইভ প্রিভিউ <span className="font-normal">(বাছাই বদলালেই বদলায়)</span>
+          </h2>
+
+          {selCount === 0 ? (
+            <div className="max-w-md mx-auto aspect-[4/5] rounded-2xl bg-white border border-dashed border-ink/20 flex items-center justify-center text-center text-sm text-ink/40 px-8">
+              ওপর থেকে জায়গা বেছে নিলেই আপনার কার্ড এখানে তৈরি হবে।
+            </div>
+          ) : previewUrl ? (
+            <img
+              src={previewUrl}
+              alt="আপনার আমার শেরপুর কার্ড"
+              className={`w-full max-w-md mx-auto block rounded-2xl border border-ink/10 shadow-sm transition-opacity ${
+                rendering ? 'opacity-60' : ''
+              }`}
+            />
+          ) : (
+            <div className="max-w-md mx-auto aspect-[4/5] rounded-2xl bg-white border border-ink/10 flex items-center justify-center text-sm text-ink/40">
+              কার্ড তৈরি হচ্ছে...
+            </div>
           )}
 
-          <div className="max-w-md mx-auto mt-4 bg-white rounded-xl border border-ink/10 p-3">
-            <p className="text-xs font-semibold text-ink/60 leading-relaxed">
-              ফেসবুক অ্যাপ ছবির সঙ্গে লিংক নেয় না। তাই "শেয়ার করুন" চাপলে নিচের লেখা নিজে থেকেই কপি হয়ে যায়।
-              ফেসবুকে পোস্টের ঘরে ধরে রেখে "পেস্ট" চাপুন।
-            </p>
-            <p className="text-sm mt-2 whitespace-pre-line break-words select-all">{captionText()}</p>
-          </div>
+          {selCount > 0 && previewUrl && (
+            <div className="max-w-md mx-auto mt-5 flex flex-col gap-3">
+              {canShare && (
+                <button
+                  type="button"
+                  onClick={shareCard}
+                  className="w-full bg-green text-white text-base font-semibold py-3.5 rounded-xl"
+                >
+                  শেয়ার করুন
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={copyCaption}
+                className="w-full border border-green/40 text-green text-base font-semibold py-3.5 rounded-xl"
+              >
+                {copied ? 'লিংক কপি হয়েছে ✓' : 'লিংক কপি করুন'}
+              </button>
+              <a
+                href={previewUrl}
+                download="amar-sherpur.png"
+                className={`w-full text-center text-base font-semibold py-3.5 rounded-xl ${
+                  canShare ? 'border border-green/40 text-green' : 'bg-green text-white'
+                }`}
+              >
+                ছবি সংরক্ষণ করুন
+              </a>
+            </div>
+          )}
 
           {error && (
             <p className="max-w-md mx-auto mt-3 text-sm text-red-600" role="alert">
               {error}
             </p>
           )}
-          <p className="max-w-md mx-auto mt-3 text-xs text-ink/50 leading-relaxed">
-            {inFacebook
-              ? 'ফেসবুকের ভেতরের ব্রাউজারে সংরক্ষণ কাজ না করলে ছবিতে চেপে ধরে সংরক্ষণ করুন, অথবা মেনু থেকে "ব্রাউজারে খুলুন" বেছে নিন।'
-              : 'সংরক্ষণ কাজ না করলে ছবিতে চেপে ধরে সংরক্ষণ করতে পারবেন।'}
-          </p>
-        </main>
-      )}
 
-      {step === 'pick' && (
-        <>
-          <main className="max-w-4xl mx-auto px-4 pt-5 pb-32">
-            <section>
-              <h1 className="text-2xl font-bold text-green-dark">আমার শেরপুর</h1>
-              <p className="text-sm text-ink/60 mt-1">যেসব জায়গা ঘুরেছেন, ট্যাপ করে বেছে নিন।</p>
-
-              <div className="flex items-end justify-between mt-4">
-                <p className="font-numeric text-green-dark leading-none">
-                  <span className="text-5xl font-bold">{num(selCount)}</span>
-                  <span className="text-xl text-ink/40"> /{num(total)}</span>
-                </p>
-                <p className="text-sm text-ink/60 font-medium">{num(percent)}% শেরপুর ঘোরা হয়েছে</p>
-              </div>
-
-              <div className="h-2 rounded-full bg-ink/10 mt-3 overflow-hidden">
-                <div className="h-full rounded-full bg-green transition-all" style={{ width: `${percent}%` }} />
-              </div>
-            </section>
-
-            <section className="mt-5 bg-white rounded-2xl border border-ink/10 p-3">
-              <svg
-                viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
-                className="w-full max-w-sm mx-auto block"
-                role="img"
-                aria-label={`শেরপুর জেলার মানচিত্র, ${num(visitedIds.size)}টি উপজেলায় ঘোরা হয়েছে`}
-              >
-                {UPAZILA_SHAPES.map((u) => (
-                  <path
-                    key={u.id}
-                    d={u.path}
-                    fill={visitedIds.has(u.id) ? '#1C8A4C' : '#E5DFD0'}
-                    stroke="#FFFFFF"
-                    strokeWidth="1.5"
-                    strokeLinejoin="round"
-                  />
-                ))}
-                {UPAZILA_SHAPES.map((u) => (
-                  <text
-                    key={`l-${u.id}`}
-                    x={u.labelX}
-                    y={u.labelY}
-                    textAnchor="middle"
-                    fontSize="11"
-                    fill={visitedIds.has(u.id) ? '#CFEBDA' : '#77725F'}
-                    style={{ pointerEvents: 'none' }}
-                  >
-                    {u.name}
-                  </text>
-                ))}
-                {PINNED.filter((p) => !selectedSet.has(p.id)).map((p) => (
-                  <circle key={`g-${p.id}`} cx={p.x} cy={p.y} r="2.5" fill="#A8A394" opacity="0.7" />
-                ))}
-                {PINNED.filter((p) => selectedSet.has(p.id)).map((p) => (
-                  <circle
-                    key={`r-${p.id}`}
-                    cx={p.x}
-                    cy={p.y}
-                    r="4.5"
-                    fill="#E5384F"
-                    stroke="#FFFFFF"
-                    strokeWidth="1.5"
-                  />
-                ))}
-              </svg>
-              <p className="text-[11px] text-ink/40 text-center mt-2">
-                ম্যাপে মার্কার শুধু সেই স্থানগুলোর, যাদের অবস্থান নিশ্চিত।
-                {UNPINNED_COUNT > 0 ? ` ${num(UNPINNED_COUNT)}টির অবস্থান এখনো যোগ হয়নি।` : ''}
-              </p>
-            </section>
-
-            <section className="mt-5">
-              <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-                <button
-                  type="button"
-                  onClick={() => setFilter('all')}
-                  aria-pressed={filter === 'all'}
-                  className={`flex-shrink-0 whitespace-nowrap text-sm font-medium px-4 py-2 rounded-full border ${
-                    filter === 'all' ? 'bg-green text-white border-green' : 'bg-white text-ink/70 border-ink/15'
-                  }`}
+          {selCount > 0 && previewUrl && (
+            <>
+              {copied && (
+                <p
+                  className="max-w-md mx-auto mt-4 rounded-xl bg-green/10 border border-green/30 px-3 py-2.5 text-sm text-green-dark font-medium leading-relaxed"
+                  role="status"
                 >
-                  সব
-                </button>
-                {stats.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setFilter(s.id)}
-                    aria-pressed={filter === s.id}
-                    className={`flex-shrink-0 whitespace-nowrap text-sm font-medium px-4 py-2 rounded-full border ${
-                      filter === s.id ? 'bg-green text-white border-green' : 'bg-white text-ink/70 border-ink/15'
-                    }`}
-                  >
-                    {s.name} <span className="font-numeric">{num(s.sel)}/{num(s.total)}</span>
-                  </button>
-                ))}
-              </div>
-
-              {visibleStats.map((s) => (
-                <div key={s.id} className="mt-4">
-                  <h2 className="text-sm font-semibold text-ink/70 mb-2">
-                    {s.name} <span className="font-numeric text-ink/40">{num(s.sel)}/{num(s.total)}</span>
-                  </h2>
-                  <ul className="flex flex-col gap-2">
-                    {s.items.map((p) => {
-                      const checked = selectedSet.has(p.id);
-                      const unpinned = p.lat == null || p.lng == null;
-                      return (
-                        <li key={p.id} className="flex items-center gap-2">
-                          <label
-                            className={`flex-1 min-w-0 flex items-center gap-3 rounded-xl border px-3 py-3 cursor-pointer select-none focus-within:ring-2 focus-within:ring-green/40 ${
-                              checked ? 'bg-green/10 border-green' : 'bg-white border-ink/10'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              className="sr-only"
-                              checked={checked}
-                              onChange={() => toggle(p.id)}
-                            />
-                            <span
-                              aria-hidden="true"
-                              className={`w-6 h-6 rounded-md border-2 flex items-center justify-center text-sm flex-shrink-0 ${
-                                checked ? 'bg-green border-green text-white' : 'bg-white border-ink/25'
-                              }`}
-                            >
-                              {checked ? '✓' : ''}
-                            </span>
-                            <span className="text-sm font-medium leading-snug min-w-0">{p.name}</span>
-                          </label>
-                          {unpinned && (
-                            <a
-                              href={mapsSearchUrl(p)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex-shrink-0 text-[11px] text-green font-medium px-2 py-2"
-                            >
-                              📍 খুঁজুন
-                            </a>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
-            </section>
-
-            <p className="text-[10px] text-ink/40 text-center mt-8">মানচিত্র: geoBoundaries (CC BY 4.0)</p>
-          </main>
-
-          <div className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-ink/10 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
-            <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold" aria-live="polite">
-                  {num(selCount)}টি নির্বাচিত
+                  লিংকসহ লেখা কপি হয়েছে ✓ ফেসবুকে পোস্টের ঘরে ধরে রেখে "পেস্ট" চাপুন।
                 </p>
-                {selCount > 0 && (
-                  <button type="button" onClick={resetAll} className="text-xs text-ink/50 underline">
-                    সব বাতিল করুন
-                  </button>
-                )}
+              )}
+              <div className="max-w-md mx-auto mt-4 bg-white rounded-xl border border-ink/10 p-3">
+                <p className="text-xs font-semibold text-ink/60 leading-relaxed">
+                  ফেসবুক অ্যাপ ছবির সঙ্গে লিংক নেয় না। তাই "শেয়ার করুন" চাপলে নিচের লেখা নিজে থেকেই কপি হয়ে যায়।
+                  ফেসবুকে পোস্টের ঘরে ধরে রেখে "পেস্ট" চাপুন।
+                </p>
+                <p className="text-sm mt-2 whitespace-pre-line break-words select-all">{captionText()}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => goTo('form')}
-                disabled={selCount === 0}
-                className="bg-green text-white text-sm font-semibold px-5 py-2.5 rounded-xl disabled:opacity-40"
-              >
-                কার্ড তৈরি করুন
-              </button>
-            </div>
-            <div className="pb-[env(safe-area-inset-bottom)]" />
+              <p className="max-w-md mx-auto mt-3 text-xs text-ink/50 leading-relaxed">
+                {inFacebook
+                  ? 'ফেসবুকের ভেতরের ব্রাউজারে সংরক্ষণ কাজ না করলে ছবিতে চেপে ধরে সংরক্ষণ করুন, অথবা মেনু থেকে "ব্রাউজারে খুলুন" বেছে নিন।'
+                  : 'সংরক্ষণ কাজ না করলে ছবিতে চেপে ধরে সংরক্ষণ করতে পারবেন।'}
+              </p>
+            </>
+          )}
+        </section>
+
+        <p className="text-[10px] text-ink/40 text-center mt-8">মানচিত্র: geoBoundaries (CC BY 4.0)</p>
+      </main>
+
+      {selCount > 0 && !previewVisible && (
+        <div className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-ink/10 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
+          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
+            <p className="flex-1 text-sm font-semibold" aria-live="polite">
+              {num(selCount)}টি নির্বাচিত
+            </p>
+            <button
+              type="button"
+              onClick={() => jumpTo('card-preview')}
+              className="bg-green text-white text-sm font-semibold px-5 py-2.5 rounded-xl"
+            >
+              কার্ড দেখুন ↓
+            </button>
           </div>
-        </>
+          <div className="pb-[env(safe-area-inset-bottom)]" />
+        </div>
       )}
     </div>
   );
