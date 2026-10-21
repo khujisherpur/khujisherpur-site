@@ -8,6 +8,7 @@ import ReviewsTab from '../../components/admin/ReviewsTab';
 import ModerationTab from '../../components/admin/ModerationTab';
 import ReportsTab from '../../components/admin/ReportsTab';
 import AnalyticsTab from '../../components/admin/AnalyticsTab';
+import DonorsTab from '../../components/admin/DonorsTab';
 import PendingBadge from '../../components/admin/PendingBadge';
 import PageSkeleton from '../../components/PageSkeleton';
 const navIcon = (emoji, short, badge) => (
@@ -27,6 +28,7 @@ const sidebarItems = [
   { key: 'reviews', icon: navIcon('⭐', 'রিভিউ'), label: 'রিভিউ ব্যবস্থাপনা', enabled: true },
   { key: 'banners', icon: navIcon('🖼️', 'ব্যানার'), label: 'ব্যানার ব্যবস্থাপনা', enabled: true },
   { key: 'users', icon: navIcon('👥', 'ইউজার'), label: 'ব্যবহারকারী ব্যবস্থাপনা', enabled: true },
+  { key: 'donors', icon: navIcon('🩸', 'রক্তদাতা'), label: 'রক্তদাতা ব্যবস্থাপনা', enabled: true },
   { key: 'categories', icon: navIcon('📁', 'ক্যাটাগরি'), label: 'ক্যাটাগরি ব্যবস্থাপনা', enabled: true },
   { key: 'settings', icon: navIcon('⚙️', 'সেটিংস'), label: 'সাইট সেটিংস', enabled: true },
 ];
@@ -377,6 +379,7 @@ export default function AdminPage() {
         {activeTab === 'mod_reports' && <ReportsTab />}
         {activeTab === 'reviews' && <ReviewsTab />}
         {activeTab === 'users' && <UsersTab currentUserId={user.id} currentRole={role} />}
+        {activeTab === 'donors' && <DonorsTab />}
 
         {activeTab === 'banners' && (
           <div>
