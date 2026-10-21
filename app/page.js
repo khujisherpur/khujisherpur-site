@@ -12,6 +12,7 @@ import HeroSearch from '../components/HeroSearch';
 import AnnouncementBar from '../components/AnnouncementBar';
 import HomeJsonLd from '../components/HomeJsonLd';
 import AmarSherpurBanner from '../components/AmarSherpurBanner';
+import InstallButton from '../components/InstallButton';
 import { formatPrice, timeAgo as timeAgoFmt, toBn } from '../lib/format';
 import { getServicesFor, providerHref } from '../lib/services';
 import { SITE_NAME, DEFAULT_OG_IMAGE } from '../lib/site';
@@ -456,6 +457,7 @@ export default async function HomePage() {
             <a href="/privacy" className="hover:text-ink">{t.privacy}</a>
             <a href="/disclaimer" className="hover:text-ink">{t.disclaimer}</a>
           </div>
+          <InstallButton />
           {(settings.contact_phone || settings.contact_email || settings.facebook_url) && (
             <div className="flex gap-4 flex-wrap justify-center text-xs">
               {settings.contact_phone && (
