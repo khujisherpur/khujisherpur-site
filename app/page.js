@@ -13,6 +13,7 @@ import AnnouncementBar from '../components/AnnouncementBar';
 import HomeJsonLd from '../components/HomeJsonLd';
 import AmarSherpurBanner from '../components/AmarSherpurBanner';
 import InstallButton from '../components/InstallButton';
+import { formatBloodDate } from '../lib/bloodFormat';
 import { formatPrice, timeAgo as timeAgoFmt, toBn } from '../lib/format';
 import { getServicesFor, providerHref } from '../lib/services';
 import { SITE_NAME, DEFAULT_OG_IMAGE } from '../lib/site';
@@ -129,6 +130,13 @@ export default async function HomePage() {
     supabase.from('providers').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
   ]);
   const totalActiveCount = (activeListingsCount || 0) + (approvedProvidersCount || 0);
+    const { data: bloodRows, count: bloodCount } = await supabase
+    .from('blood_requests')
+    .select('id, blood_group, bags_needed, hospital_or_area, hemoglobin, donation_date, created_at', { count: 'exact' })
+    .eq('status', 'active')
+    .gte('created_at', new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(4);
 
   const [{ data: recentProviders }, { data: recentListings }] = await Promise.all([
     supabase
@@ -163,6 +171,12 @@ export default async function HomePage() {
     badge: categoryLabels[l.categories?.slug]?.[lang].name || '', href: `/listing/${l.id}`,
   }));
 
+    const bloodItems = (bloodRows || []).map((r) => ({
+    id: r.id, type: 'blood', group: r.blood_group, bags: r.bags_needed,
+    hb: r.hemoglobin, place: r.hospital_or_area, donationDate: r.donation_date,
+    date: r.created_at, href: `/blood/${r.id}`,
+  }));
+  recentItems.unshift(...bloodItems);
   const providersWithRating = await Promise.all(
     (recentProviders || []).slice(0, 6).map(async (p) => {
       const { data: reviews } = await supabase
@@ -295,7 +309,7 @@ export default async function HomePage() {
           <div className="grid grid-cols-4 gap-2">
             {categories.map((c) => {
               const label = categoryLabels[c.slug];
-              const count = countMap[c.slug] || 0;
+              const count = c.type === 'blood' ? (bloodCount || 0) : (countMap[c.slug] || 0);
               const isExternal = c.type === 'external';
               return (
                 <a
@@ -399,6 +413,37 @@ export default async function HomePage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               {recentItems.map((item) => {
+                  if (item.type === 'blood') {
+                  return (
+                    <a
+                      key={`blood-${item.id}`}
+                      href={item.href}
+                      className="block bg-white rounded-xl border-2 border-red-200 overflow-hidden hover:shadow-md transition-shadow"
+                    >
+                      <div className="bg-red-50 px-3 py-1.5">
+                        <span className="text-[11px] font-semibold text-red-600">
+                          🩸 {lang === 'bn' ? 'জরুরি রক্তের অনুরোধ' : 'Urgent Blood Request'}
+                        </span>
+                      </div>
+                      <div className="p-3">
+                        <p className="text-3xl font-bold text-red-500 leading-none">{item.group}</p>
+                        <p className="text-xs text-ink/70 mt-2">
+                          {lang === 'bn' ? 'ব্যাগ' : 'Bags'}: <span className="font-semibold">{num(item.bags)}</span>
+                        </p>
+                        {item.hb && (
+                          <p className="text-xs text-ink/70 mt-0.5">
+                            {lang === 'bn' ? 'হিমোগ্লোবিন' : 'Hb'}: <span className="font-semibold">{item.hb}</span>
+                          </p>
+                        )}
+                        <p className="text-xs text-ink/70 mt-0.5 line-clamp-1">📍 {item.place}</p>
+                        {item.donationDate && (
+                          <p className="text-xs text-ink/70 mt-0.5">📅 {formatBloodDate(item.donationDate, lang)}</p>
+                        )}
+                        <p className="text-[10px] text-ink/30 mt-1.5">{timeAgoFmt(item.date, lang)}</p>
+                      </div>
+                    </a>
+                  );
+                }
                 const label = categoryLabels[item.slug];
                 const place = [item.upazila, item.area].filter(Boolean).join(', ');
                 return (
