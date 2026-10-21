@@ -192,7 +192,6 @@ export default function MyBloodRequestsPage() {
               >
                 🗑️ অনুরোধ মুছুন
               </button>
-              )}
             </div>
           ))}
         </div>
