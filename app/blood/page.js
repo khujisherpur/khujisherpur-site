@@ -2,7 +2,8 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 import { supabase } from '../../lib/supabaseClient';
 import { getLang } from '../../lib/getLang';
-import { toBn } from '../../lib/format';
+import { toBn, timeAgo } from '../../lib/format';
+import { formatBloodDate } from '../../lib/bloodFormat';
 import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../lib/site';
 import SiteHeader from '../../components/SiteHeader';
 
@@ -144,7 +145,7 @@ export default async function BloodPage() {
 
   const { data: requests } = await supabase
     .from('blood_requests')
-    .select('id, blood_group, bags_needed, hospital_or_area, created_at')
+    .select('id, title, blood_group, bags_needed, hospital_or_area, hemoglobin, donation_date, created_at')
     .eq('status', 'active')
     .gte('created_at', sinceISO())
     .order('created_at', { ascending: false })
@@ -199,17 +200,36 @@ export default async function BloodPage() {
         {(!requests || requests.length === 0) && (
           <p className="text-ink/50 text-sm py-6 text-center">{t.noRequests}</p>
         )}
-        <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
           {(requests || []).map((r) => (
             <a
               key={r.id}
               href={`/blood/${r.id}`}
-              className="flex items-center gap-4 bg-white p-4 border-l-4 border-red-400 hover:bg-paper transition-colors"
+              className="block bg-white rounded-xl border-2 border-red-200 overflow-hidden hover:shadow-md transition-shadow"
             >
-              <span className="text-2xl font-bold text-red-500 flex-shrink-0">{r.blood_group}</span>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{r.hospital_or_area}</p>
-                <p className="text-sm text-ink/60">{num(r.bags_needed)} {t.bags}</p>
+              <div className="bg-red-50 px-3 py-1.5">
+                <span className="text-[11px] font-semibold text-red-600">
+                  🩸 {lang === 'bn' ? 'জরুরি রক্তের অনুরোধ' : 'Urgent Blood Request'}
+                </span>
+              </div>
+              <div className="p-3">
+                {r.title && (
+                  <p className="text-sm font-semibold leading-snug line-clamp-2 mb-1.5">{r.title}</p>
+                )}
+                <p className="text-3xl font-bold text-red-500 leading-none">{r.blood_group}</p>
+                <p className="text-xs text-ink/70 mt-2">
+                  {lang === 'bn' ? 'ব্যাগ' : 'Bags'}: <span className="font-semibold">{num(r.bags_needed)}</span>
+                </p>
+                {r.hemoglobin && (
+                  <p className="text-xs text-ink/70 mt-0.5">
+                    {lang === 'bn' ? 'হিমোগ্লোবিন' : 'Hb'}: <span className="font-semibold">{r.hemoglobin}</span>
+                  </p>
+                )}
+                <p className="text-xs text-ink/70 mt-0.5 line-clamp-1">📍 {r.hospital_or_area}</p>
+                {r.donation_date && (
+                  <p className="text-xs text-ink/70 mt-0.5">📅 {formatBloodDate(r.donation_date, lang)}</p>
+                )}
+                <p className="text-[10px] text-ink/30 mt-1.5">{timeAgo(r.created_at, lang)}</p>
               </div>
             </a>
           ))}
