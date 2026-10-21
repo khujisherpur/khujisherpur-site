@@ -65,7 +65,7 @@ export default function UsersTab({ currentUserId, currentRole }) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState('');
-  const [items, setItems] = useState({ loading: false, listings: [], providers: [], error: '' });
+  const [items, setItems] = useState({ loading: false, listings: [], providers: [], donors: [], requests: [], error: '' });
 
   useEffect(() => {
     load();
@@ -103,9 +103,9 @@ export default function UsersTab({ currentUserId, currentRole }) {
     setLoading(false);
   }
 
-  async function loadItems(userId) {
-    setItems({ loading: true, listings: [], providers: [], error: '' });
-    const [l, p] = await Promise.all([
+    async function loadItems(userId) {
+    setItems({ loading: true, listings: [], providers: [], donors: [], requests: [], error: '' });
+    const [l, p, d, r] = await Promise.all([
       supabase
         .from('listings')
         .select('id, title, area, price_or_salary, status, posted_at, photos, categories(name)')
@@ -116,12 +116,23 @@ export default function UsersTab({ currentUserId, currentRole }) {
         .select('id, name, area, phone, status, photo_url, created_at, is_verified, categories(name)')
         .eq('user_id', userId)
         .order('created_at', { ascending: false }),
+      supabase
+        .from('blood_donors')
+        .select('id, name, blood_group, phone, area, is_active')
+        .eq('user_id', userId),
+      supabase
+        .from('blood_requests')
+        .select('id, title, patient_name, patient_problem, blood_group, bags_needed, hospital_or_area, hemoglobin, donation_date, contact_phone, status, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
     ]);
     setItems({
       loading: false,
       listings: l.data || [],
       providers: p.data || [],
-      error: l.error?.message || p.error?.message || '',
+      donors: d.data || [],
+      requests: r.data || [],
+      error: l.error?.message || p.error?.message || d.error?.message || r.error?.message || '',
     });
   }
 
@@ -382,16 +393,18 @@ export default function UsersTab({ currentUserId, currentRole }) {
                 <button onClick={() => setSelected(null)} className="text-ink/40 text-xl px-2" aria-label="বন্ধ">✕</button>
               </div>
 
-              <div className="grid grid-cols-3 gap-1 mt-3 bg-paper rounded-lg p-1">
+              <div className="flex gap-1 mt-3 bg-paper rounded-lg p-1 overflow-x-auto scrollbar-hide">
                 {[
                   { key: 'info', label: 'বিস্তারিত' },
                   { key: 'posts', label: `পোস্ট (${items.loading ? '…' : items.listings.length})` },
                   { key: 'profiles', label: `প্রোফাইল (${items.loading ? '…' : items.providers.length})` },
+                  { key: 'donors', label: `🩸 রক্তদাতা (${items.loading ? '…' : items.donors.length})` },
+                  { key: 'requests', label: `🆘 অনুরোধ (${items.loading ? '…' : items.requests.length})` },
                 ].map((t) => (
                   <button
                     key={t.key}
                     onClick={() => setTab(t.key)}
-                    className={`text-xs py-2 rounded-md transition-colors ${
+                    className={`text-xs py-2 px-3 whitespace-nowrap flex-shrink-0 rounded-md transition-colors ${
                       tab === t.key ? 'bg-white shadow-sm font-medium text-green-dark' : 'text-ink/60'
                     }`}
                   >
@@ -522,6 +535,75 @@ export default function UsersTab({ currentUserId, currentRole }) {
                     </div>
                   )}
                   {items.providers.map((p) => <ItemCard key={p.id} kind="provider" item={p} />)}
+                </>
+              )}
+                              {tab === 'donors' && !items.loading && (
+                <>
+                  {items.donors.length === 0 && !items.error && (
+                    <div className="text-center py-12">
+                      <p className="text-3xl mb-2">🩸</p>
+                      <p className="text-sm text-ink/50">এই ইউজার রক্তদাতা হিসেবে নিবন্ধিত নন।</p>
+                    </div>
+                  )}
+                  {items.donors.map((d) => (
+                    <div key={d.id} className="bg-white rounded-xl border-l-4 border-l-red-500 border-t border-r border-b border-ink/10 p-3 flex items-center gap-3">
+                      <span className="w-12 h-12 rounded-full bg-red-50 text-red-600 font-bold flex items-center justify-center flex-shrink-0">
+                        {d.blood_group}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{d.name}</p>
+                        <p className="text-xs text-ink/50">{d.area || '—'} · {d.phone}</p>
+                      </div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full flex-shrink-0 ${d.is_active ? 'bg-green/10 text-green' : 'bg-ink/5 text-ink/50'}`}>
+                        {d.is_active ? 'সক্রিয়' : 'নিষ্ক্রিয়'}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {tab === 'requests' && !items.loading && (
+                <>
+                  {items.requests.length === 0 && !items.error && (
+                    <div className="text-center py-12">
+                      <p className="text-3xl mb-2">🆘</p>
+                      <p className="text-sm text-ink/50">এই ইউজার কোনো রক্তের অনুরোধ দেননি।</p>
+                    </div>
+                  )}
+                  {items.requests.map((r) => (
+                    <div key={r.id} className="bg-white rounded-xl border-l-4 border-l-red-500 border-t border-r border-b border-ink/10 p-3">
+                      <div className="flex gap-3">
+                        <span className="w-12 h-12 rounded-full bg-red-50 text-red-600 font-bold flex items-center justify-center flex-shrink-0">
+                          {r.blood_group}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">{r.title || r.hospital_or_area}</p>
+                          <p className="text-xs text-ink/50 mt-0.5">
+                            📍 {r.hospital_or_area} · {r.bags_needed} ব্যাগ
+                            {r.hemoglobin ? ` · Hb ${r.hemoglobin}` : ''}
+                          </p>
+                          {r.patient_problem && <p className="text-xs text-ink/60 mt-0.5">সমস্যা: {r.patient_problem}</p>}
+                          <p className="text-xs text-ink/50 mt-0.5">
+                            {r.patient_name ? `রোগী: ${r.patient_name} · ` : ''}📞 {r.contact_phone}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${r.status === 'active' ? 'bg-green/10 text-green' : 'bg-ink/5 text-ink/50'}`}>
+                              {r.status === 'active' ? 'চলছে' : r.status === 'fulfilled' ? 'রক্ত পাওয়া গেছে' : 'মেয়াদ শেষ'}
+                            </span>
+                            <span className="text-[10px] text-ink/40">{fmtDate(r.created_at)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <a
+                        href={`/blood/${r.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-center text-xs border border-ink/20 py-2 rounded-lg mt-3"
+                      >
+                        দেখুন ↗
+                      </a>
+                    </div>
+                  ))}
                 </>
               )}
             </div>
