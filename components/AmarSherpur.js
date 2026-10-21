@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PLACES, UPAZILAS, mapsSearchUrl } from '../lib/sherpurPlaces';
+import { UPAZILA_SHAPES, MAP_WIDTH, MAP_HEIGHT, project } from '../lib/sherpurMap';
 import { renderCard, prepareSquarePhoto, canvasToBlob, sanitizeName, CARD_THEMES } from '../lib/cardRender';
 import { toBn } from '../lib/format';
 import { SITE_URL } from '../lib/site';
@@ -13,6 +14,13 @@ const UPAZILA_NAMES_KEY = 'amar_sherpur_upz';
 const VALID_IDS = new Set(PLACES.map((p) => p.id));
 const THEME_IDS = new Set(CARD_THEMES.map((t) => t.id));
 const num = (n) => toBn(n);
+
+// ম্যাপে যেসব স্থানের অবস্থান নিশ্চিত, শুধু সেগুলোর মার্কার বসবে
+const PINNED = PLACES.filter((p) => p.lat != null && p.lng != null).map((p) => ({
+  ...p,
+  ...project(p.lat, p.lng),
+}));
+const UNPINNED_COUNT = PLACES.length - PINNED.length;
 
 function readStore(key) {
   try {
@@ -35,37 +43,6 @@ function loadSelected() {
   } catch {
     return [];
   }
-}
-
-// হিরোর ছবি: গারো পাহাড়ের ঢেউ, রাবার গাছ আর বারদুয়ারী মসজিদের গম্বুজ (নিজস্ব নকশা)
-function HeroArt() {
-  return (
-    <svg viewBox="0 0 380 150" className="w-full block mt-2" aria-hidden="true">
-      <circle cx="300" cy="46" r="22" fill="#F6D98B" />
-      <path d="M0 110 Q60 60 130 92 T260 84 T380 70 V150 H0Z" fill="#CFE8D6" />
-      <path d="M0 126 Q70 84 150 112 T300 100 T380 108 V150 H0Z" fill="#8FC9A3" />
-      <g fill="#E8B9A6" stroke="#fff" strokeWidth="1.5">
-        <rect x="96" y="96" width="96" height="26" rx="2" />
-        <path d="M102 96 a10 10 0 0 1 20 0Z M128 96 a10 10 0 0 1 20 0Z M154 96 a10 10 0 0 1 20 0Z" />
-        <path d="M174 96 a8 8 0 0 1 16 0Z" />
-      </g>
-      <g fill="#fff">
-        <rect x="108" y="106" width="6" height="16" rx="3" />
-        <rect x="134" y="106" width="6" height="16" rx="3" />
-        <rect x="160" y="106" width="6" height="16" rx="3" />
-      </g>
-      <path d="M0 140 Q80 112 170 130 T380 124 V150 H0Z" fill="#1C8A4C" />
-      <g stroke="#0E5C33" strokeWidth="2">
-        <path d="M232 124 v-14 M246 126 v-16 M260 124 v-14 M274 126 v-15" />
-      </g>
-      <g fill="#2E9C5E">
-        <circle cx="232" cy="106" r="7" />
-        <circle cx="246" cy="106" r="8" />
-        <circle cx="260" cy="107" r="7" />
-        <circle cx="274" cy="107" r="8" />
-      </g>
-    </svg>
-  );
 }
 
 export default function AmarSherpur() {
@@ -244,6 +221,7 @@ export default function AmarSherpur() {
     [selectedSet, q]
   );
   const visibleStats = stats.filter((s) => s.shown.length > 0);
+  const visitedIds = new Set(stats.filter((s) => s.sel > 0).map((s) => s.id));
 
   // প্রথমবার বাছাই শুরু করলে একবার গোনা (আগে থেকে সংরক্ষিত বাছাই ধরা হয় না)
   function noteSelection(addedCount) {
@@ -406,42 +384,73 @@ export default function AmarSherpur() {
       </header>
 
       <main className="max-w-4xl mx-auto pb-28">
-        {/* হিরো */}
-        <section className="bg-gradient-to-b from-green/10 to-paper px-4 pt-6 text-center">
-          <span className="inline-block bg-green/15 text-green-dark text-xs font-semibold px-3.5 py-1.5 rounded-full">
-            {num(UPAZILAS.length)} উপজেলা · {num(total)} স্থান
-          </span>
-          <p className="text-xs tracking-widest text-ink/50 mt-4">খুঁজি শেরপুর</p>
-          <h1 className="text-3xl font-bold text-green-dark leading-tight mt-1">
-            নিজ শেরপুর জেলা
-            <br />
-            কতটুকু ঘুরেছেন?
-          </h1>
-          <p className="text-sm text-ink/60 mt-3 px-2">
-            ঘোরা জায়গাগুলো বেছে নিন, বানিয়ে ফেলুন নিজের শেরপুর কার্ড।
-          </p>
-          <button
-            type="button"
-            onClick={() => jumpTo('select')}
-            className="mt-4 bg-green text-white font-semibold text-base px-6 py-3 rounded-full shadow-sm"
-          >
-            জায়গা বাছাই শুরু করুন ↓
-          </button>
-          <ul className="flex flex-wrap justify-center gap-2 mt-4">
-            {['জায়গা বাছুন', 'নাম ও রং', 'কার্ড শেয়ার'].map((label, i) => (
-              <li key={label} className="bg-white border border-ink/10 rounded-full px-3 py-1.5 text-xs">
-                <b className="text-green font-numeric">{num(i + 1)}</b> {label}
-              </li>
-            ))}
-          </ul>
+        {/* ওপরের অংশ: আগের মতো সহজ */}
+        <section className="px-4 pt-5">
+          <h1 className="text-2xl font-bold text-green-dark">আমার শেরপুর</h1>
+          <p className="text-sm text-ink/60 mt-1">যেসব জায়গা ঘুরেছেন, ট্যাপ করে বেছে নিন।</p>
+
+          <div className="flex items-end justify-between mt-4">
+            <p className="font-numeric text-green-dark leading-none">
+              <span className="text-5xl font-bold">{num(selCount)}</span>
+              <span className="text-xl text-ink/40"> /{num(total)}</span>
+            </p>
+            <p className="text-sm text-ink/60 font-medium">{num(percent)}% শেরপুর ঘোরা হয়েছে</p>
+          </div>
+
+          <div className="h-2 rounded-full bg-ink/10 mt-3 overflow-hidden">
+            <div className="h-full rounded-full bg-green transition-all" style={{ width: `${percent}%` }} />
+          </div>
+
           {takenTotal !== null && takenTotal >= 1 && (
-            <p className="mt-4 text-sm text-ink/70">
+            <p className="mt-3 text-sm text-ink/60">
               এ পর্যন্ত{' '}
-              <b className="font-numeric text-green-dark text-base">{num(takenTotal.toLocaleString('en-IN'))}</b> জন
-              কার্ড নিয়েছেন
+              <b className="font-numeric text-green-dark">{num(takenTotal.toLocaleString('en-IN'))}</b> জন কার্ড
+              নিয়েছেন
             </p>
           )}
-          <HeroArt />
+        </section>
+
+        <section className="mt-5 mx-4 bg-white rounded-2xl border border-ink/10 p-3">
+          <svg
+            viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
+            className="w-full max-w-sm mx-auto block"
+            role="img"
+            aria-label={`শেরপুর জেলার মানচিত্র, ${num(visitedIds.size)}টি উপজেলায় ঘোরা হয়েছে`}
+          >
+            {UPAZILA_SHAPES.map((u) => (
+              <path
+                key={u.id}
+                d={u.path}
+                fill={visitedIds.has(u.id) ? '#1C8A4C' : '#E5DFD0'}
+                stroke="#FFFFFF"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+            ))}
+            {UPAZILA_SHAPES.map((u) => (
+              <text
+                key={`l-${u.id}`}
+                x={u.labelX}
+                y={u.labelY}
+                textAnchor="middle"
+                fontSize="11"
+                fill={visitedIds.has(u.id) ? '#CFEBDA' : '#77725F'}
+                style={{ pointerEvents: 'none' }}
+              >
+                {u.name}
+              </text>
+            ))}
+            {PINNED.filter((p) => !selectedSet.has(p.id)).map((p) => (
+              <circle key={`g-${p.id}`} cx={p.x} cy={p.y} r="2.5" fill="#A8A394" opacity="0.7" />
+            ))}
+            {PINNED.filter((p) => selectedSet.has(p.id)).map((p) => (
+              <circle key={`r-${p.id}`} cx={p.x} cy={p.y} r="4.5" fill="#E5384F" stroke="#FFFFFF" strokeWidth="1.5" />
+            ))}
+          </svg>
+          <p className="text-[11px] text-ink/40 text-center mt-2">
+            ম্যাপে মার্কার শুধু সেই স্থানগুলোর, যাদের অবস্থান নিশ্চিত।
+            {UNPINNED_COUNT > 0 ? ` ${num(UNPINNED_COUNT)}টির অবস্থান এখনো যোগ হয়নি।` : ''}
+          </p>
         </section>
 
         {/* জায়গা বাছাই */}
