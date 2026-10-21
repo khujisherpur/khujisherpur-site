@@ -79,6 +79,22 @@ export default function MyBloodRequestsPage() {
     loadRequests(user.id);
   }
 
+    async function handleDelete(id) {
+    if (!confirm('এই রক্তের অনুরোধটি মুছে ফেলতে চান? মুছে ফেললে আর ফেরত পাওয়া যাবে না।')) return;
+    setBusyId(id);
+    const { data: deleted, error } = await supabase
+      .from('blood_requests')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select('id');
+    setBusyId(null);
+    if (error || !deleted || deleted.length === 0) {
+      alert('মুছে ফেলা যায়নি' + (error ? ': ' + error.message : ''));
+      return;
+    }
+    setRequests((list) => list.filter((r) => r.id !== id));
+  }
   if (loading) {
     return (
       <PageShell>
@@ -109,7 +125,7 @@ export default function MyBloodRequestsPage() {
         <a href="/dashboard" className="text-sm text-ink/60 inline-block mb-3">← আমার অ্যাকাউন্ট</a>
         <h1 className="text-xl font-semibold">🩸 আমার রক্তের অনুরোধ</h1>
         <p className="text-xs text-ink/50 mt-1 mb-4">
-          রক্ত পেয়ে গেলে "রক্ত পেয়েছি" চাপুন, তাহলে অনুরোধটি আর কাউকে দেখাবে না।
+          রক্ত পেয়ে গেলে "রক্ত পেয়েছি" চাপুন। ভুল পোস্ট হলে "অনুরোধ মুছুন" চাপুন।
         </p>
 
         {requests.length === 0 && (
@@ -154,7 +170,7 @@ export default function MyBloodRequestsPage() {
                 </div>
               </div>
 
-              {r.status === 'active' && (
+                            {r.status === 'active' && (
                 <div className="grid grid-cols-3 gap-2 mt-3">
                   <button
                     onClick={() => handleFulfilled(r.id)}
@@ -167,6 +183,15 @@ export default function MyBloodRequestsPage() {
                     দেখুন
                   </a>
                 </div>
+              )}
+
+              <button
+                onClick={() => handleDelete(r.id)}
+                disabled={busyId === r.id}
+                className="w-full mt-2 text-xs border border-red-300 text-red-600 py-2.5 rounded-lg font-medium disabled:opacity-50"
+              >
+                🗑️ অনুরোধ মুছুন
+              </button>
               )}
             </div>
           ))}
