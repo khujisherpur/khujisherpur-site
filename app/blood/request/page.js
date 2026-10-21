@@ -5,33 +5,41 @@ import { cleanPhone, isValidBdPhone } from '../../../lib/format';
 import SiteHeader from '../../../components/SiteHeader';
 
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const inputCls = 'w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-red-400 bg-white';
+const labelCls = 'block text-sm mb-1.5 text-ink/70';
 
-// কাঁচা ইংরেজি এরর বদলে বাংলা বার্তা; ডাটাবেস ট্রিগারের নিজের বাংলা বার্তা (সাসপেন্ড, দৈনিক সীমা) সরাসরি দেখাই
 function friendlyError(err) {
   const msg = (err && err.message) || '';
   const code = err && err.code;
   if (/[\u0980-\u09FF]/.test(msg)) return msg;
-  if (code === '23505' || /duplicate key|unique/i.test(msg)) {
-    return 'এই অনুরোধ ইতিমধ্যে পোস্ট করা আছে';
-  }
-  if (/row-level security|permission denied|not authorized/i.test(msg)) {
-    return 'এই কাজের অনুমতি নেই। লগআউট করে আবার লগইন করে চেষ্টা করুন';
-  }
-  if (/failed to fetch|networkerror|network request|load failed/i.test(msg)) {
-    return 'ইন্টারনেট সংযোগ চেক করে আবার চেষ্টা করুন';
-  }
-  if (/jwt|token|session/i.test(msg)) {
-    return 'আপনার সেশনের মেয়াদ শেষ। আবার লগইন করুন';
-  }
+  if (code === '23505' || /duplicate key|unique/i.test(msg)) return 'এই অনুরোধ ইতিমধ্যে পোস্ট করা আছে';
+  if (/row-level security|permission denied|not authorized/i.test(msg)) return 'এই কাজের অনুমতি নেই। লগআউট করে আবার লগইন করে চেষ্টা করুন';
+  if (/failed to fetch|networkerror|network request|load failed/i.test(msg)) return 'ইন্টারনেট সংযোগ চেক করে আবার চেষ্টা করুন';
+  if (/jwt|token|session/i.test(msg)) return 'আপনার সেশনের মেয়াদ শেষ। আবার লগইন করুন';
   return 'কিছু একটা সমস্যা হয়েছে, একটু পরে আবার চেষ্টা করুন';
+}
+
+function Section({ title, children }) {
+  return (
+    <div className="bg-white border border-red-100 rounded-2xl p-4 space-y-4 shadow-sm">
+      <h2 className="text-sm font-semibold text-red-600">{title}</h2>
+      {children}
+    </div>
+  );
+}
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function BloodRequestForm() {
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [form, setForm] = useState({
-    applicantName: '', relationToPatient: '', patientName: '',
-    bloodGroup: 'A+', bagsNeeded: '1', hospitalOrArea: '',
+    applicantName: '', relationToPatient: '', patientName: '', patientProblem: '',
+    bloodGroup: 'A+', bagsNeeded: '1', hemoglobin: '',
+    hospitalOrArea: '', donationDate: '', donationTime: '',
     contactPhone: '', altPhone: '', note: '',
   });
   const [submitting, setSubmitting] = useState(false);
@@ -71,9 +79,13 @@ function BloodRequestForm() {
         applicant_name: form.applicantName.trim(),
         relation_to_patient: form.relationToPatient.trim(),
         patient_name: form.patientName.trim(),
+        patient_problem: form.patientProblem.trim(),
         blood_group: form.bloodGroup,
         bags_needed: bags,
+        hemoglobin: form.hemoglobin.trim() || null,
         hospital_or_area: form.hospitalOrArea.trim(),
+        donation_date: form.donationDate || null,
+        donation_time: form.donationTime.trim() || null,
         contact_phone: cleanPhone(form.contactPhone),
         alt_phone: cleanPhone(form.altPhone),
         note: form.note.trim(),
@@ -118,108 +130,119 @@ function BloodRequestForm() {
 
   return (
     <main className="max-w-xl mx-auto px-4 py-6">
-      <div className="flex items-center gap-2 mb-6">
-        <span className="text-2xl">🩸</span>
-        <h1 className="text-xl font-semibold">রক্তের অনুরোধ করুন</h1>
+      <div className="mb-5">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🩸</span>
+          <h1 className="text-xl font-semibold">জরুরি রক্তের অনুরোধ</h1>
+        </div>
+        <p className="text-xs text-ink/50 mt-1">সঠিক তথ্য দিন, যাতে রক্তদাতারা দ্রুত সাড়া দিতে পারেন।</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white border-2 border-red-200 p-6 space-y-4">
-        <div>
-          <label className="block text-sm mb-1.5 text-ink/70">আপনার নাম (আবেদনকারী)</label>
-          <input
-            type="text" required maxLength={80} value={form.applicantName}
-            onChange={(e) => updateField('applicantName', e.target.value)}
-            className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm mb-1.5 text-ink/70">রোগীর সাথে সম্পর্ক</label>
-          <input
-            type="text" required maxLength={40} value={form.relationToPatient}
-            onChange={(e) => updateField('relationToPatient', e.target.value)}
-            className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
-            placeholder="যেমন: ভাই, স্বামী, বন্ধু"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm mb-1.5 text-ink/70">রোগীর নাম (ঐচ্ছিক)</label>
-          <input
-            type="text" maxLength={80} value={form.patientName}
-            onChange={(e) => updateField('patientName', e.target.value)}
-            className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Section title="👤 আবেদনকারীর তথ্য">
           <div>
-            <label className="block text-sm mb-1.5 text-ink/70">রক্তের গ্রুপ</label>
-            <select
-              required value={form.bloodGroup}
-              onChange={(e) => updateField('bloodGroup', e.target.value)}
-              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400 bg-white"
-            >
-              {bloodGroups.map((bg) => <option key={bg} value={bg}>{bg}</option>)}
-            </select>
+            <label className={labelCls}>আপনার নাম</label>
+            <input type="text" required maxLength={80} value={form.applicantName}
+              onChange={(e) => updateField('applicantName', e.target.value)}
+              className={inputCls} placeholder="যেমন: রফিকুল ইসলাম" />
           </div>
           <div>
-            <label className="block text-sm mb-1.5 text-ink/70">ব্যাগ সংখ্যা</label>
-            <input
-              type="number" min="1" max="10" required value={form.bagsNeeded}
-              onChange={(e) => updateField('bagsNeeded', e.target.value)}
-              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm mb-1.5 text-ink/70">হাসপাতাল/এলাকা</label>
-          <input
-            type="text" required maxLength={120} value={form.hospitalOrArea}
-            onChange={(e) => updateField('hospitalOrArea', e.target.value)}
-            className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
-            placeholder="যেমন: শেরপুর সদর হাসপাতাল"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm mb-1.5 text-ink/70">যোগাযোগ নম্বর</label>
-            <input
-              type="tel" required inputMode="tel" maxLength={20} value={form.contactPhone}
-              onChange={(e) => updateField('contactPhone', e.target.value)}
-              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
-              placeholder="01XXXXXXXXX"
-            />
+            <label className={labelCls}>রোগীর সাথে সম্পর্ক</label>
+            <input type="text" required maxLength={40} value={form.relationToPatient}
+              onChange={(e) => updateField('relationToPatient', e.target.value)}
+              className={inputCls} placeholder="যেমন: ভাই, স্বামী, ছেলে, বন্ধু" />
           </div>
           <div>
-            <label className="block text-sm mb-1.5 text-ink/70">বিকল্প নম্বর (ঐচ্ছিক)</label>
-            <input
-              type="tel" inputMode="tel" maxLength={20} value={form.altPhone}
-              onChange={(e) => updateField('altPhone', e.target.value)}
-              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400"
-              placeholder="01XXXXXXXXX"
-            />
+            <label className={labelCls}>রোগীর নাম (ঐচ্ছিক)</label>
+            <input type="text" maxLength={80} value={form.patientName}
+              onChange={(e) => updateField('patientName', e.target.value)}
+              className={inputCls} placeholder="যেমন: মোছাঃ রহিমা খাতুন" />
           </div>
-        </div>
+        </Section>
 
-        <div>
-          <label className="block text-sm mb-1.5 text-ink/70">নোট (ঐচ্ছিক)</label>
-          <textarea
-            rows={3} maxLength={500} value={form.note}
+        <Section title="🩸 রক্তের তথ্য">
+          <div>
+            <label className={labelCls}>রোগীর সমস্যা</label>
+            <input type="text" required maxLength={200} value={form.patientProblem}
+              onChange={(e) => updateField('patientProblem', e.target.value)}
+              className={inputCls} placeholder="যেমন: অপারেশন, ডেঙ্গু, থ্যালাসেমিয়া, প্রসূতি মা" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>রক্তের গ্রুপ</label>
+              <select required value={form.bloodGroup}
+                onChange={(e) => updateField('bloodGroup', e.target.value)}
+                className={inputCls}>
+                {bloodGroups.map((bg) => <option key={bg} value={bg}>{bg}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>কত ব্যাগ রক্ত লাগবে</label>
+              <input type="number" min="1" max="10" required value={form.bagsNeeded}
+                onChange={(e) => updateField('bagsNeeded', e.target.value)}
+                className={inputCls} />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>হিমোগ্লোবিন (ঐচ্ছিক)</label>
+            <input type="text" inputMode="decimal" maxLength={10} value={form.hemoglobin}
+              onChange={(e) => updateField('hemoglobin', e.target.value)}
+              className={inputCls} placeholder="যেমন: ৭.৫ (জানা না থাকলে ফাঁকা রাখুন)" />
+          </div>
+        </Section>
+
+        <Section title="📍 কোথায় ও কখন">
+          <div>
+            <label className={labelCls}>হাসপাতাল / এলাকা</label>
+            <input type="text" required maxLength={120} value={form.hospitalOrArea}
+              onChange={(e) => updateField('hospitalOrArea', e.target.value)}
+              className={inputCls} placeholder="যেমন: শেরপুর সদর হাসপাতাল, ২ নং ওয়ার্ড" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>রক্তদানের তারিখ</label>
+              <input type="date" required min={todayStr()} value={form.donationDate}
+                onChange={(e) => updateField('donationDate', e.target.value)}
+                className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>রক্তদানের সময়</label>
+              <input type="text" maxLength={40} value={form.donationTime}
+                onChange={(e) => updateField('donationTime', e.target.value)}
+                className={inputCls} placeholder="যেমন: সকাল ১০টা" />
+            </div>
+          </div>
+        </Section>
+
+        <Section title="📞 যোগাযোগ">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>যোগাযোগ নম্বর</label>
+              <input type="tel" required inputMode="tel" maxLength={20} value={form.contactPhone}
+                onChange={(e) => updateField('contactPhone', e.target.value)}
+                className={inputCls} placeholder="01XXXXXXXXX" />
+            </div>
+            <div>
+              <label className={labelCls}>বিকল্প নম্বর (ঐচ্ছিক)</label>
+              <input type="tel" inputMode="tel" maxLength={20} value={form.altPhone}
+                onChange={(e) => updateField('altPhone', e.target.value)}
+                className={inputCls} placeholder="01XXXXXXXXX" />
+            </div>
+          </div>
+        </Section>
+
+        <Section title="📝 অতিরিক্ত নোট (ঐচ্ছিক)">
+          <textarea rows={4} maxLength={500} value={form.note}
             onChange={(e) => updateField('note', e.target.value)}
-            className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-red-400 resize-none"
-          />
-        </div>
+            className={inputCls + ' resize-none'}
+            placeholder={'উদাহরণ: রোগীর কাল সকালে অপারেশন। কেবিন নম্বর ৫। হাসপাতালে এসে ফোন করলে আমি নিচে এসে নিয়ে যাব। দ্রুত যোগাযোগ করুন।'} />
+        </Section>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
-        <button
-          type="submit" disabled={submitting}
-          className="w-full bg-red-500 text-white font-semibold py-2.5 hover:bg-red-600 transition-colors disabled:opacity-50"
-        >
-          {submitting ? 'পাঠানো হচ্ছে...' : 'অনুরোধ পোস্ট করুন'}
+        <button type="submit" disabled={submitting}
+          className="w-full bg-red-500 text-white font-semibold py-3 rounded-xl hover:bg-red-600 transition-colors disabled:opacity-50">
+          {submitting ? 'পাঠানো হচ্ছে...' : '🩸 অনুরোধ পোস্ট করুন'}
         </button>
       </form>
     </main>
