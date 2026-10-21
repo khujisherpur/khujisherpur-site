@@ -88,6 +88,7 @@ export default function AmarSherpur() {
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
   const [inFacebook, setInFacebook] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
   const [takenTotal, setTakenTotal] = useState(null);
 
   const fileRef = useRef(null);
@@ -107,6 +108,24 @@ export default function AmarSherpur() {
     const savedTheme = readStore(THEME_KEY);
     if (savedTheme && THEME_IDS.has(savedTheme)) setTheme(savedTheme);
     if (readStore(UPAZILA_NAMES_KEY) === '0') setShowUpazilaNames(false);
+    // ফেসবুকের ভেতরের ব্রাউজার থেকে অন্য ব্রাউজারে খুললে বাছাই যেন হারিয়ে না যায়
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const s = params.get('s');
+      if (s) {
+        const ids = Array.from(new Set(s.split('.').filter((id) => VALID_IDS.has(id))));
+        if (ids.length) setSelected(ids);
+        const t = params.get('t');
+        if (t && THEME_IDS.has(t)) setTheme(t);
+        const n = params.get('n');
+        if (n) setName(n.slice(0, 40));
+        params.delete('s');
+        params.delete('t');
+        params.delete('n');
+        const rest = params.toString();
+        window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : ''));
+      }
+    } catch {}
     setReady(true);
     try {
       fromCardRef.current = new URLSearchParams(window.location.search).get('ref') === 'card';
@@ -118,6 +137,7 @@ export default function AmarSherpur() {
     try {
       const ua = navigator.userAgent || '';
       setInFacebook(/FBAN|FBAV|FB_IAB|Instagram/i.test(ua));
+      setIsAndroid(/Android/i.test(ua));
       if (navigator.canShare && typeof File !== 'undefined') {
         setCanShare(navigator.canShare({ files: [new File([''], 'a.png', { type: 'image/png' })] }));
       }
@@ -332,6 +352,33 @@ export default function AmarSherpur() {
     flashCopied(await copyText(captionText()));
   }
 
+  // অন্য ব্রাউজারে খোলার লিংক: বাছাই, রং ও নাম সঙ্গে যায় (ছবি যায় না)
+  function handoffUrl() {
+    const params = new URLSearchParams();
+    params.set('s', selected.join('.'));
+    params.set('t', theme);
+    const n = sanitizeName(name);
+    if (n) params.set('n', n);
+    return `${SITE_URL}/amar-sherpur?${params.toString()}`;
+  }
+
+  function chromeIntentUrl() {
+    const https = handoffUrl();
+    const rest = https.replace(/^https?:\/\//, '');
+    return `intent://${rest}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(https)};end`;
+  }
+
+  async function copyHandoff() {
+    setError('');
+    const ok = await copyText(handoffUrl());
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 8000);
+    } else {
+      setError('কপি করা যায়নি।');
+    }
+  }
+
   async function shareCard() {
     if (!previewBlob) return;
     trackSaved();
@@ -339,7 +386,8 @@ export default function AmarSherpur() {
     const copyPromise = copyText(captionText());
     try {
       const file = new File([previewBlob], 'amar-sherpur.png', { type: 'image/png' });
-      await navigator.share({ files: [file], title: 'আমার শেরপুর', text: captionText() });
+      // শুধু ছবি: লিংকসহ লেখা পাঠালে মেসেঞ্জার/ফেসবুক ছবি ফেলে লিংক নেয়
+      await navigator.share({ files: [file], title: 'আমার শেরপুর' });
     } catch (err) {
       // ব্যবহারকারী নিজে বাতিল করলে কিছু বলার নেই
       if (err && err.name !== 'AbortError') setError('শেয়ার করা যায়নি, ছবি সংরক্ষণ করে শেয়ার করুন।');
@@ -628,6 +676,36 @@ export default function AmarSherpur() {
             </div>
           )}
 
+          {selCount > 0 && previewUrl && inFacebook && (
+            <div className="max-w-md mx-auto mt-5 rounded-xl border border-marigold/50 bg-marigold/10 p-3">
+              <p className="text-sm font-semibold leading-relaxed">
+                ফেসবুক বা মেসেঞ্জারের ভেতরের ব্রাউজারে ছবি সংরক্ষণ ও শেয়ার কাজ করে না। ব্রাউজারে খুলে নিন, আপনার বাছাই
+                সঙ্গে যাবে (ছবি আবার দিতে হবে)।
+              </p>
+              <div className="flex flex-col gap-2 mt-3">
+                {isAndroid && (
+                  <a
+                    href={chromeIntentUrl()}
+                    className="w-full text-center bg-green text-white text-sm font-semibold py-3 rounded-xl"
+                  >
+                    Chrome-এ খুলুন
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={copyHandoff}
+                  className="w-full border border-green/40 text-green text-sm font-semibold py-3 rounded-xl"
+                >
+                  ব্রাউজারে খোলার লিংক কপি করুন
+                </button>
+              </div>
+              <p className="text-xs text-ink/60 mt-2 leading-relaxed">
+                না হলে ওপরের বা নিচের ⋮ মেনু থেকে "ব্রাউজারে খুলুন" বেছে নিন। কপি করা লিংক Chrome বা Safari-র ঠিকানার ঘরে
+                পেস্ট করলেও হবে।
+              </p>
+            </div>
+          )}
+
           {selCount > 0 && previewUrl && (
             <div className="max-w-md mx-auto mt-5 flex flex-col gap-3">
               {canShare && (
@@ -677,8 +755,8 @@ export default function AmarSherpur() {
               )}
               <div className="max-w-md mx-auto mt-4 bg-white rounded-xl border border-ink/10 p-3">
                 <p className="text-xs font-semibold text-ink/60 leading-relaxed">
-                  ফেসবুক অ্যাপ ছবির সঙ্গে লিংক নেয় না। তাই "শেয়ার করুন" চাপলে নিচের লেখা নিজে থেকেই কপি হয়ে যায়।
-                  ফেসবুকে পোস্টের ঘরে ধরে রেখে "পেস্ট" চাপুন।
+                  ফেসবুক ও মেসেঞ্জার একসঙ্গে ছবি আর লিংক নেয় না। তাই "শেয়ার করুন" চাপলে শুধু ছবি যায়, আর নিচের
+                  লিংকসহ লেখা নিজে থেকেই কপি হয়ে যায়। পোস্টের ঘরে ধরে রেখে "পেস্ট" চাপুন।
                 </p>
                 <p className="text-sm mt-2 whitespace-pre-line break-words select-all">{captionText()}</p>
               </div>
