@@ -9,6 +9,7 @@ import ModerationTab from '../../components/admin/ModerationTab';
 import ReportsTab from '../../components/admin/ReportsTab';
 import AnalyticsTab from '../../components/admin/AnalyticsTab';
 import DonorsTab from '../../components/admin/DonorsTab';
+import InstallsTab from '../../components/admin/InstallsTab';
 import PendingBadge from '../../components/admin/PendingBadge';
 import PageSkeleton from '../../components/PageSkeleton';
 const navIcon = (emoji, short, badge) => (
@@ -22,6 +23,7 @@ const navIcon = (emoji, short, badge) => (
 const sidebarItems = [
   { key: 'dashboard', icon: navIcon('🏠', 'হোম'), label: 'ড্যাশবোর্ড', enabled: true },
   { key: 'analytics', icon: navIcon('📊', 'হিসাব'), label: 'অ্যানালিটিক্স', enabled: true },
+  { key: 'installs', icon: navIcon('📲', 'ইনস্টল'), label: 'অ্যাপ ইনস্টল', enabled: true },
   { key: 'mod_posts', icon: navIcon('📄', 'পোস্ট', 'listings'), label: 'পোস্ট ব্যবস্থাপনা', enabled: true },
   { key: 'mod_profiles', icon: navIcon('👤', 'প্রোফাইল', 'providers'), label: 'প্রোফাইল ব্যবস্থাপনা', enabled: true },
   { key: 'mod_reports', icon: navIcon('⚠️', 'রিপোর্ট', 'reports'), label: 'রিপোর্ট/অভিযোগ', enabled: true },
@@ -374,6 +376,7 @@ export default function AdminPage() {
         )}
 
         {activeTab === 'analytics' && <AnalyticsTab />}
+        {activeTab === 'installs' && <InstallsTab />}
         {activeTab === 'mod_posts' && <ModerationTab key="mod-posts" kind="listing" />}
         {activeTab === 'mod_profiles' && <ModerationTab key="mod-profiles" kind="provider" />}
         {activeTab === 'mod_reports' && <ReportsTab />}
