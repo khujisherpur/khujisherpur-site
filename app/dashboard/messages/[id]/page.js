@@ -30,7 +30,7 @@ export default function ConversationPage({ params }) {
   async function load(uid) {
     const { data: c } = await supabase
       .from('conversations')
-      .select('id, kind, ref_id, ref_title, owner_id, starter_id, owner_unread, starter_unread')
+      .select('id, kind, ref_id, ref_title, owner_id, starter_id, owner_unread, starter_unread, owner_last_read, starter_last_read')
       .eq('id', convId)
       .maybeSingle();
     if (!c) { setConv(null); return; }
@@ -119,10 +119,16 @@ export default function ConversationPage({ params }) {
   }
 
   const isParticipant = me.id === conv.owner_id || me.id === conv.starter_id;
-    const postHref =
+  const postHref =
     conv.kind === 'provider' ? `/provider/${conv.ref_id}`
     : conv.kind === 'blood' ? `/blood/${conv.ref_id}`
     : `/listing/${conv.ref_id}`;
+  const kindLabel =
+    conv.kind === 'provider' ? 'প্রোফাইল' : conv.kind === 'blood' ? 'রক্তের অনুরোধ' : 'পোস্ট';
+
+  // অপর পক্ষ কখন শেষবার পড়েছে, আর আমার শেষ বার্তা কোনটা
+  const otherReadAt = me.id === conv.owner_id ? conv.starter_last_read : conv.owner_last_read;
+  const lastMine = [...msgs].reverse().find((m) => m.sender_id === me.id);
 
   return (
     <>
@@ -133,13 +139,14 @@ export default function ConversationPage({ params }) {
           href={postHref}
           className="block bg-white border border-ink/10 rounded-xl px-3 py-2.5 mb-3"
         >
-                    <p className="text-[11px] text-ink/40">{conv.kind === 'provider' ? 'প্রোফাইল' : conv.kind === 'blood' ? 'রক্তের অনুরোধ' : 'পোস্ট'}</p>
+          <p className="text-[11px] text-ink/40">{kindLabel}</p>
           <p className="text-sm font-medium line-clamp-1">{conv.ref_title} ↗</p>
         </a>
 
         <div className="space-y-2 min-h-[40vh] pb-4">
           {msgs.map((m) => {
             const mine = m.sender_id === me.id;
+            const seen = otherReadAt && new Date(otherReadAt) >= new Date(m.created_at);
             return (
               <div key={m.id} className={mine ? 'flex justify-end' : 'flex justify-start'}>
                 <div
@@ -151,6 +158,11 @@ export default function ConversationPage({ params }) {
                   <p className={`text-[10px] mt-1 ${mine ? 'text-white/60' : 'text-ink/35'}`}>
                     {timeAgo(m.created_at, 'bn')}
                   </p>
+                  {mine && lastMine && m.id === lastMine.id && (
+                    <p className={`text-[10px] mt-0.5 ${seen ? 'text-white font-medium' : 'text-white/60'}`}>
+                      {seen ? '✓✓ দেখা হয়েছে' : '✓ পাঠানো হয়েছে'}
+                    </p>
+                  )}
                 </div>
               </div>
             );
