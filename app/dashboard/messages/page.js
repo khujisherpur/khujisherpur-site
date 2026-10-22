@@ -10,6 +10,11 @@ export default function MessagesPage() {
   const [me, setMe] = useState(null);
   const [convs, setConvs] = useState([]);
   const [loading, setLoading] = useState(true);
+    useEffect(() => {
+    const h = (e) => { if (e.persisted) window.location.reload(); };
+    window.addEventListener('pageshow', h);
+    return () => window.removeEventListener('pageshow', h);
+  }, []);
 
   useEffect(() => {
     (async () => {
