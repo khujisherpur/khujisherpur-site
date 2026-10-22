@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { timeAgo } from '../../../lib/format';
 import SiteHeader from '../../../components/SiteHeader';
@@ -10,28 +10,39 @@ export default function MessagesPage() {
   const [me, setMe] = useState(null);
   const [convs, setConvs] = useState([]);
   const [loading, setLoading] = useState(true);
-    useEffect(() => {
-    const h = (e) => { if (e.persisted) window.location.reload(); };
-    window.addEventListener('pageshow', h);
-    return () => window.removeEventListener('pageshow', h);
+
+  const load = useCallback(async () => {
+    const { data } = await supabase.auth.getSession();
+    const u = data.session?.user || null;
+    setMe(u);
+    if (u) {
+      const { data: rows } = await supabase
+        .from('conversations')
+        .select('id, kind, ref_title, owner_id, last_message, last_message_at, owner_unread, starter_unread')
+        .or(`owner_id.eq.${u.id},starter_id.eq.${u.id}`)
+        .order('last_message_at', { ascending: false });
+      setConvs(rows || []);
+    }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      const u = data.session?.user || null;
-      setMe(u);
-      if (u) {
-        const { data: rows } = await supabase
-          .from('conversations')
-          .select('id, kind, ref_title, owner_id, last_message, last_message_at, owner_unread, starter_unread')
-          .or(`owner_id.eq.${u.id},starter_id.eq.${u.id}`)
-          .order('last_message_at', { ascending: false });
-        setConvs(rows || []);
-      }
-      setLoading(false);
-    })();
-  }, []);
+    load();
+    const onShow = () => load();
+    const onVis = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    window.addEventListener('pageshow', onShow);
+    window.addEventListener('focus', onShow);
+    document.addEventListener('visibilitychange', onVis);
+    const t = setInterval(load, 15000);
+    return () => {
+      window.removeEventListener('pageshow', onShow);
+      window.removeEventListener('focus', onShow);
+      document.removeEventListener('visibilitychange', onVis);
+      clearInterval(t);
+    };
+  }, [load]);
 
   if (loading) {
     return (
@@ -94,7 +105,7 @@ export default function MessagesPage() {
                 <p className="text-[11px] text-ink/40 mt-0.5">
                   {mine ? '📥 আপনার পোস্টে বার্তা' : '📤 আপনি বার্তা পাঠিয়েছেন'}
                   {' · '}
-                {c.kind === 'provider' ? 'প্রোফাইল' : c.kind === 'blood' ? 'রক্তের অনুরোধ' : 'পোস্ট'}
+                  {c.kind === 'provider' ? 'প্রোফাইল' : c.kind === 'blood' ? 'রক্তের অনুরোধ' : 'পোস্ট'}
                 </p>
                 <p className={`text-xs mt-1 line-clamp-1 ${unread > 0 ? 'text-ink font-medium' : 'text-ink/60'}`}>
                   {c.last_message}
