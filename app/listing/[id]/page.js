@@ -346,7 +346,7 @@ export default async function ListingDetailPage({ params }) {
 
   const { data: listing } = await supabase
     .from('listings')
-    .select('id, category_id, title, area, upazila, union_name, price_or_salary, description, photos, rent_type, owner_name, posted_at, expiry_date, view_count, contact_phone, whatsapp, contact_email, deadline, categories(slug)')
+    .select('id, user_id, category_id, title, area, upazila, union_name, price_or_salary, description, photos, rent_type, owner_name, posted_at, expiry_date, view_count, contact_phone, whatsapp, contact_email, deadline, categories(slug)')
     .eq('id', params.id)
     .eq('status', 'active')
     .gt('expiry_date', new Date().toISOString())
@@ -595,6 +595,9 @@ export default async function ListingDetailPage({ params }) {
                 <ContactButtons phone={listing.contact_phone} whatsapp={listing.whatsapp} t={t} />
               </div>
             )}
+            <div className="mt-3">
+              <MessageButton kind="listing" refId={listing.id} ownerId={listing.user_id} lang={lang} />
+            </div>
 
             {/* যোগাযোগ */}
             <div className="mt-6 pt-5 border-t border-ink/10">
