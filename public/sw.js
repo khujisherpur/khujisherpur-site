@@ -5,9 +5,14 @@ self.addEventListener('push', (event) => {
   let d = {};
   try { d = event.data ? event.data.json() : {}; } catch (e) {}
   event.waitUntil(
-    self.registration.showNotification(d.title || 'খুঁজি শেরপুর', {
+        self.registration.showNotification(d.title || 'খুঁজি শেরপুর', {
       body: d.body || '',
       icon: '/logo-full.png',
+      badge: '/icon-192.png',
+      vibrate: [200, 100, 200],
+      silent: false,
+      tag: d.url || 'khuji',
+      renotify: true,
       data: { url: d.url || '/' },
     })
   );
