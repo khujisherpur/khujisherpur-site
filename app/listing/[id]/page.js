@@ -9,6 +9,7 @@ import FavoriteButton from '../../../components/FavoriteButton';
 import TrackTarget from '../../../components/TrackTarget';
 import ProfileMenu from '../../../components/ProfileMenu';
 import SiteHeader from '../../../components/SiteHeader';
+import MessageButton from '../../../components/MessageButton';
 import { getLang } from '../../../lib/getLang';
 import { categoryLabels } from '../../../lib/categoryLabels';
 import { SITE_URL, SITE_NAME, DEFAULT_OG_IMAGE } from '../../../lib/site';
