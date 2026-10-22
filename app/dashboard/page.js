@@ -7,6 +7,7 @@ import BottomNav from '../../components/BottomNav';
 import SiteHeader from '../../components/SiteHeader';
 import PushToggle from '../../components/PushToggle';
 import PageSkeleton from '../../components/PageSkeleton';
+import MessagesLink from '../../components/MessagesLink';
 
 const text = {
   bn: {
@@ -354,6 +355,7 @@ export default function DashboardPage() {
             <span className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">📋</span>
             <span className="text-sm font-medium leading-tight">{t.bloodRequests}</span>
           </a>
+          <MessagesLink lang={lang} />
           {isStaff && (
             <a
               href="/admin"
