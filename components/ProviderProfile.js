@@ -4,6 +4,7 @@ import ReportButton from './ReportButton';
 import FavoriteButton from './FavoriteButton';
 import ProfileMenu from './ProfileMenu';
 import TrackTarget from './TrackTarget';
+import MessageButton from './MessageButton';
 import { supabase } from '../lib/supabaseClient';
 import { getServicesFor, providerHref } from '../lib/services';
 import { toBn } from '../lib/format';
@@ -201,6 +202,9 @@ export default async function ProviderProfile({
           {/* কল ও WhatsApp */}
           <div className="mt-5">
             <ContactButtons phone={provider.phone} whatsapp={provider.whatsapp} t={t} />
+          </div>
+          <div className="mt-2">
+            <MessageButton kind="provider" refId={provider.id} ownerId={provider.user_id} lang={lang} />
           </div>
 
           {/* স্ট্যাট কার্ড */}
