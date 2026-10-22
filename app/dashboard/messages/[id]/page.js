@@ -119,7 +119,10 @@ export default function ConversationPage({ params }) {
   }
 
   const isParticipant = me.id === conv.owner_id || me.id === conv.starter_id;
-  const postHref = conv.kind === 'provider' ? `/provider/${conv.ref_id}` : `/listing/${conv.ref_id}`;
+    const postHref =
+    conv.kind === 'provider' ? `/provider/${conv.ref_id}`
+    : conv.kind === 'blood' ? `/blood/${conv.ref_id}`
+    : `/listing/${conv.ref_id}`;
 
   return (
     <>
@@ -130,7 +133,7 @@ export default function ConversationPage({ params }) {
           href={postHref}
           className="block bg-white border border-ink/10 rounded-xl px-3 py-2.5 mb-3"
         >
-          <p className="text-[11px] text-ink/40">{conv.kind === 'provider' ? 'প্রোফাইল' : 'পোস্ট'}</p>
+                    <p className="text-[11px] text-ink/40">{conv.kind === 'provider' ? 'প্রোফাইল' : conv.kind === 'blood' ? 'রক্তের অনুরোধ' : 'পোস্ট'}</p>
           <p className="text-sm font-medium line-clamp-1">{conv.ref_title} ↗</p>
         </a>
 
