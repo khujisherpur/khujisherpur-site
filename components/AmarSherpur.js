@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PLACES, UPAZILAS, mapsSearchUrl } from '../lib/sherpurPlaces';
-import { UPAZILA_SHAPES, MAP_WIDTH, MAP_HEIGHT, project } from '../lib/sherpurMap';
+import { project } from '../lib/sherpurMap';
 import { renderCard, prepareSquarePhoto, canvasToBlob, sanitizeName, CARD_THEMES } from '../lib/cardRender';
 import { toBn } from '../lib/format';
 import { SITE_URL } from '../lib/site';
@@ -384,73 +384,52 @@ export default function AmarSherpur() {
       </header>
 
       <main className="max-w-4xl mx-auto pb-28">
-        {/* ওপরের অংশ: আগের মতো সহজ */}
-        <section className="px-4 pt-5">
-          <h1 className="text-2xl font-bold text-green-dark">আমার শেরপুর</h1>
-          <p className="text-sm text-ink/60 mt-1">যেসব জায়গা ঘুরেছেন, ট্যাপ করে বেছে নিন।</p>
-
-          <div className="flex items-end justify-between mt-4">
-            <p className="font-numeric text-green-dark leading-none">
-              <span className="text-5xl font-bold">{num(selCount)}</span>
-              <span className="text-xl text-ink/40"> /{num(total)}</span>
+        {/* ওপরের অংশ: নতুন হিরো */}
+        <section className="relative overflow-hidden rounded-b-3xl bg-gradient-to-b from-green-dark to-green text-white">
+          <div className="px-5 pt-6 text-center">
+            <span className="inline-block rounded-full bg-white/15 px-3 py-1 text-xs font-semibold tracking-wide">
+              {num(UPAZILAS.length)} উপজেলা · {num(total)} স্থান
+            </span>
+            <h1 className="mt-3 text-[26px] leading-snug font-bold">নিজ শেরপুর জেলা কতটুকু ঘুরেছেন?</h1>
+            <p className="mt-2 text-sm text-white/85">
+              জায়গা বেছে নিন, নিজের কার্ড সাজান, বন্ধুদের সঙ্গে শেয়ার করুন।
             </p>
-            <p className="text-sm text-ink/60 font-medium">{num(percent)}% শেরপুর ঘোরা হয়েছে</p>
+            <a
+              href="#select"
+              className="mt-4 inline-block rounded-full px-6 py-3 text-sm font-bold text-white shadow-lg"
+              style={{ backgroundColor: '#2563EB' }}
+            >
+              জায়গা বাছাই শুরু করুন
+            </a>
+            <ul className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-medium">
+              {['জায়গা বাছুন', 'কার্ড সাজান', 'শেয়ার করুন'].map((t, i) => (
+                <li key={t} className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5">
+                  <span className="font-numeric flex h-5 w-5 items-center justify-center rounded-full bg-white text-green-dark text-[11px] font-bold">
+                    {num(i + 1)}
+                  </span>
+                  {t}
+                </li>
+              ))}
+            </ul>
+            {takenTotal !== null && takenTotal >= 1 && (
+              <p className="mt-4 text-sm text-white/85">
+                এ পর্যন্ত <b className="font-numeric text-white">{num(takenTotal.toLocaleString('en-IN'))}</b> জন কার্ড
+                নিয়েছেন
+              </p>
+            )}
           </div>
-
-          <div className="h-2 rounded-full bg-ink/10 mt-3 overflow-hidden">
-            <div className="h-full rounded-full bg-green transition-all" style={{ width: `${percent}%` }} />
-          </div>
-
-          {takenTotal !== null && takenTotal >= 1 && (
-            <p className="mt-3 text-sm text-ink/60">
-              এ পর্যন্ত{' '}
-              <b className="font-numeric text-green-dark">{num(takenTotal.toLocaleString('en-IN'))}</b> জন কার্ড
-              নিয়েছেন
-            </p>
-          )}
-        </section>
-
-        <section className="mt-5 mx-4 bg-white rounded-2xl border border-ink/10 p-3">
-          <svg
-            viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
-            className="w-full max-w-sm mx-auto block"
-            role="img"
-            aria-label={`শেরপুর জেলার মানচিত্র, ${num(visitedIds.size)}টি উপজেলায় ঘোরা হয়েছে`}
-          >
-            {UPAZILA_SHAPES.map((u) => (
-              <path
-                key={u.id}
-                d={u.path}
-                fill={visitedIds.has(u.id) ? '#1C8A4C' : '#E5DFD0'}
-                stroke="#FFFFFF"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-              />
-            ))}
-            {UPAZILA_SHAPES.map((u) => (
-              <text
-                key={`l-${u.id}`}
-                x={u.labelX}
-                y={u.labelY}
-                textAnchor="middle"
-                fontSize="11"
-                fill={visitedIds.has(u.id) ? '#CFEBDA' : '#77725F'}
-                style={{ pointerEvents: 'none' }}
-              >
-                {u.name}
-              </text>
-            ))}
-            {PINNED.filter((p) => !selectedSet.has(p.id)).map((p) => (
-              <circle key={`g-${p.id}`} cx={p.x} cy={p.y} r="2.5" fill="#A8A394" opacity="0.7" />
-            ))}
-            {PINNED.filter((p) => selectedSet.has(p.id)).map((p) => (
-              <circle key={`r-${p.id}`} cx={p.x} cy={p.y} r="4.5" fill="#E5384F" stroke="#FFFFFF" strokeWidth="1.5" />
-            ))}
+          <svg viewBox="0 0 400 130" className="block w-full mt-3" role="img" aria-label="শেরপুরের সবুজ পাহাড়ের ছবি">
+            <circle cx="320" cy="38" r="20" fill="#E3A72E" opacity="0.95" />
+            <path d="M0 95 C40 60 80 55 120 80 C150 58 190 50 230 78 C265 56 310 60 350 82 C375 70 390 72 400 78 V130 H0 Z" fill="#2FA866" opacity="0.65" />
+            <path d="M0 108 C35 84 70 82 105 100 C145 78 185 80 220 102 C255 84 300 86 335 104 C365 92 385 94 400 100 V130 H0 Z" fill="#1C8A4C" />
+            <path d="M0 122 C50 106 100 108 150 120 C200 108 260 106 320 120 C355 112 380 114 400 118 V130 H0 Z" fill="#0A3F25" />
+            <g fill="#0A3F25">
+              <path d="M60 118 l7 -20 l7 20 Z" />
+              <path d="M78 118 l6 -16 l6 16 Z" />
+              <path d="M300 119 l7 -19 l7 19 Z" />
+              <path d="M318 119 l6 -15 l6 15 Z" />
+            </g>
           </svg>
-          <p className="text-[11px] text-ink/40 text-center mt-2">
-            ম্যাপে মার্কার শুধু সেই স্থানগুলোর, যাদের অবস্থান নিশ্চিত।
-            {UNPINNED_COUNT > 0 ? ` ${num(UNPINNED_COUNT)}টির অবস্থান এখনো যোগ হয়নি।` : ''}
-          </p>
         </section>
 
         {/* জায়গা বাছাই */}
