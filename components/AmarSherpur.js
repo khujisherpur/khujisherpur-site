@@ -49,7 +49,7 @@ export default function AmarSherpur() {
   const [selected, setSelected] = useState([]);
   const [ready, setReady] = useState(false);
   const [query, setQuery] = useState('');
-  const [openIds, setOpenIds] = useState(['sadar']);
+  const [activeUpz, setActiveUpz] = useState('all');
 
   const [name, setName] = useState('');
   const [theme, setTheme] = useState('sabuj');
@@ -254,10 +254,6 @@ export default function AmarSherpur() {
     });
   }
 
-  function toggleOpen(id) {
-    setOpenIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }
-
   function jumpTo(elementId) {
     try {
       const el = document.getElementById(elementId);
@@ -384,67 +380,155 @@ export default function AmarSherpur() {
       </header>
 
       <main className="max-w-4xl mx-auto pb-28">
-        {/* ওপরের অংশ: নতুন হিরো */}
-        <section className="relative overflow-hidden rounded-b-3xl bg-gradient-to-b from-green-dark to-green text-white">
-          <div className="px-5 pt-6 text-center">
-            <span className="inline-block rounded-full bg-white/15 px-3 py-1 text-xs font-semibold tracking-wide">
+        {/* ওপরের অংশ: হিরো */}
+        <section className="bg-gradient-to-b from-green/10 to-paper pt-6">
+          <div className="px-5 text-center">
+            <span className="inline-block rounded-full bg-green/15 px-4 py-1.5 text-sm font-semibold text-green-dark">
               {num(UPAZILAS.length)} উপজেলা · {num(total)} স্থান
             </span>
-            <h1 className="mt-3 text-[26px] leading-snug font-bold">নিজ শেরপুর জেলা কতটুকু ঘুরেছেন?</h1>
-            <p className="mt-2 text-sm text-white/85">
-              জায়গা বেছে নিন, নিজের কার্ড সাজান, বন্ধুদের সঙ্গে শেয়ার করুন।
+            <p className="mt-5 text-sm text-ink/40">খুঁজি শেরপুর</p>
+            <h1 className="mt-1 text-[34px] leading-tight font-bold text-green-dark">
+              নিজ শেরপুর জেলা কতটুকু ঘুরেছেন?
+            </h1>
+            <p className="mt-3 text-base text-ink/60 leading-relaxed">
+              ঘোরা জায়গাগুলো বেছে নিন, বানিয়ে ফেলুন নিজের শেরপুর কার্ড।
             </p>
-            <a
-              href="#select"
-              className="mt-4 inline-block rounded-full px-6 py-3 text-sm font-bold text-white shadow-lg"
-              style={{ backgroundColor: '#2563EB' }}
+            <button
+              type="button"
+              onClick={() => jumpTo('select')}
+              className="mt-5 rounded-full bg-green px-8 py-4 text-base font-bold text-white shadow-lg"
             >
-              জায়গা বাছাই শুরু করুন
-            </a>
-            <ul className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-medium">
-              {['জায়গা বাছুন', 'কার্ড সাজান', 'শেয়ার করুন'].map((t, i) => (
-                <li key={t} className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5">
-                  <span className="font-numeric flex h-5 w-5 items-center justify-center rounded-full bg-white text-green-dark text-[11px] font-bold">
-                    {num(i + 1)}
-                  </span>
-                  {t}
+              জায়গা বাছাই শুরু করুন ↓
+            </button>
+            <ul className="mt-5 flex flex-wrap justify-center gap-2 text-sm text-ink/70">
+              {['জায়গা বাছুন', 'নাম ও রং', 'কার্ড শেয়ার'].map((t, i) => (
+                <li key={t} className="rounded-full border border-ink/10 bg-white px-4 py-2">
+                  <span className="font-numeric">{num(i + 1)}</span> {t}
                 </li>
               ))}
             </ul>
             {takenTotal !== null && takenTotal >= 1 && (
-              <p className="mt-4 text-sm text-white/85">
-                এ পর্যন্ত <b className="font-numeric text-white">{num(takenTotal.toLocaleString('en-IN'))}</b> জন কার্ড
-                নিয়েছেন
+              <p className="mt-5 text-base text-ink/60">
+                এ পর্যন্ত <b className="font-numeric text-green-dark">{num(takenTotal.toLocaleString('en-IN'))}</b> জন
+                কার্ড নিয়েছেন
               </p>
             )}
           </div>
-          <svg viewBox="0 0 400 130" className="block w-full mt-3" role="img" aria-label="শেরপুরের সবুজ পাহাড়ের ছবি">
-            <circle cx="320" cy="38" r="20" fill="#E3A72E" opacity="0.95" />
-            <path d="M0 95 C40 60 80 55 120 80 C150 58 190 50 230 78 C265 56 310 60 350 82 C375 70 390 72 400 78 V130 H0 Z" fill="#2FA866" opacity="0.65" />
-            <path d="M0 108 C35 84 70 82 105 100 C145 78 185 80 220 102 C255 84 300 86 335 104 C365 92 385 94 400 100 V130 H0 Z" fill="#1C8A4C" />
-            <path d="M0 122 C50 106 100 108 150 120 C200 108 260 106 320 120 C355 112 380 114 400 118 V130 H0 Z" fill="#0A3F25" />
-            <g fill="#0A3F25">
-              <path d="M60 118 l7 -20 l7 20 Z" />
-              <path d="M78 118 l6 -16 l6 16 Z" />
-              <path d="M300 119 l7 -19 l7 19 Z" />
-              <path d="M318 119 l6 -15 l6 15 Z" />
-            </g>
-          </svg>
+          <div className="px-4 mt-6">
+            <svg viewBox="0 0 660 240" className="as-hero block w-full" role="img" aria-label="শেরপুরের উত্তরের গারো পাহাড়, শালবন, নদী ও বারদুয়ারী মসজিদের ছবি">
+              <style>{`
+                .as-hero .as-sway{transform-box:fill-box;transform-origin:50% 100%;animation:as-sway 4.5s ease-in-out infinite alternate}
+                .as-hero .as-cloud-a{animation:as-drift 38s ease-in-out infinite alternate}
+                .as-hero .as-cloud-b{animation:as-drift 52s ease-in-out infinite alternate-reverse}
+                .as-hero .as-glow{transform-box:fill-box;transform-origin:center;animation:as-pulse 4s ease-in-out infinite}
+                .as-hero .as-rays{transform-box:fill-box;transform-origin:center;animation:as-spin 70s linear infinite}
+                .as-hero .as-flow{stroke-dasharray:5 16;animation:as-flow 2.4s linear infinite}
+                .as-hero .as-bird{animation:as-fly 22s linear infinite}
+                .as-hero .as-wing{transform-box:fill-box;transform-origin:center;animation:as-flap .5s ease-in-out infinite alternate}
+                @keyframes as-sway{from{transform:rotate(-3deg)}to{transform:rotate(3deg)}}
+                @keyframes as-drift{from{transform:translateX(-18px)}to{transform:translateX(34px)}}
+                @keyframes as-pulse{from{transform:scale(1);opacity:.35}to{transform:scale(1.18);opacity:.15}}
+                @keyframes as-spin{to{transform:rotate(360deg)}}
+                @keyframes as-flow{to{stroke-dashoffset:-42}}
+                @keyframes as-fly{from{transform:translate(-40px,0)}to{transform:translate(700px,-24px)}}
+                @keyframes as-flap{from{transform:scaleY(1)}to{transform:scaleY(.35)}}
+                @media (prefers-reduced-motion:reduce){.as-hero *{animation:none!important}}
+              `}</style>
+
+              {/* সূর্য */}
+              <g className="as-rays" stroke="#F5D98A" strokeWidth="3" strokeLinecap="round" opacity="0.8">
+                <path d="M540 4 V14 M540 82 V92 M500 48 H510 M570 48 H580 M512 20 L519 27 M561 69 L568 76 M568 20 L561 27 M519 69 L512 76" />
+              </g>
+              <circle className="as-glow" cx="540" cy="48" r="40" fill="#F5D98A" />
+              <circle cx="540" cy="48" r="28" fill="#F5D98A" />
+
+              {/* মেঘ */}
+              <g className="as-cloud-a" fill="#FFFFFF" opacity="0.85">
+                <ellipse cx="110" cy="46" rx="34" ry="10" />
+                <ellipse cx="132" cy="38" rx="22" ry="10" />
+                <ellipse cx="92" cy="40" rx="16" ry="8" />
+              </g>
+              <g className="as-cloud-b" fill="#FFFFFF" opacity="0.75">
+                <ellipse cx="340" cy="28" rx="30" ry="8" />
+                <ellipse cx="358" cy="22" rx="18" ry="8" />
+              </g>
+
+              {/* উত্তরের গারো পাহাড় */}
+              <path d="M0 140 C40 100 80 70 130 95 C170 60 230 50 280 90 C330 62 390 70 430 100 C480 78 560 80 660 110 V240 H0 Z" fill="#CFE5DA" />
+              <path d="M0 172 C70 132 150 122 230 152 C300 127 380 132 450 157 C520 137 600 137 660 152 V240 H0 Z" fill="#94CBA2" />
+
+              {/* পাহাড়ের শালবন */}
+              <g fill="#2E7D4F">
+                {[[52, 150, 0], [70, 146, 0.8], [88, 152, 1.6], [286, 152, 0.4], [304, 148, 1.2], [570, 154, 0.2], [590, 150, 1], [610, 156, 1.8]].map(([x, y, d]) => (
+                  <g key={`s-${x}`} className="as-sway" style={{ animationDelay: `-${d}s` }}>
+                    <rect x={x - 1.5} y={y} width="3" height="12" fill="#1F5A38" />
+                    <ellipse cx={x} cy={y - 6} rx="6" ry="15" />
+                  </g>
+                ))}
+              </g>
+
+              {/* সামনের সমতল ও ধানখেত */}
+              <path d="M0 205 C150 185 350 205 500 195 C580 190 630 188 660 190 V240 H0 Z" fill="#1C8A4C" />
+              <g stroke="#2FA866" strokeWidth="1.5" fill="none" opacity="0.7">
+                <path d="M0 214 C150 196 350 216 500 206 C580 201 630 199 660 201" />
+                <path d="M0 224 C150 207 350 227 500 217 C580 212 630 210 660 212" />
+              </g>
+
+              {/* সোমেশ্বরী-ভোগাইয়ের মতো নদী */}
+              <path d="M452 150 C432 178 505 192 474 218 C458 232 474 238 468 244" fill="none" stroke="#8EC9E3" strokeWidth="14" strokeLinecap="round" />
+              <path className="as-flow" d="M452 150 C432 178 505 192 474 218 C458 232 474 238 468 244" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" opacity="0.85" />
+
+              {/* বারদুয়ারী মসজিদ */}
+              <g>
+                <g fill="#E8B4A6" stroke="#FFFFFF" strokeWidth="2.5">
+                  <path d="M156 160 a14 14 0 0 1 28 0 Z" />
+                  <path d="M192 160 a14 14 0 0 1 28 0 Z" />
+                  <path d="M228 160 a14 14 0 0 1 28 0 Z" />
+                  <path d="M264 160 a14 14 0 0 1 28 0 Z" />
+                  <rect x="152" y="160" width="144" height="38" rx="3" />
+                </g>
+                <g fill="#FFFFFF">
+                  <rect x="172" y="170" width="9" height="22" rx="4.5" />
+                  <rect x="212" y="170" width="9" height="22" rx="4.5" />
+                  <rect x="252" y="170" width="9" height="22" rx="4.5" />
+                </g>
+              </g>
+
+              {/* মসজিদের পাশের গাছ */}
+              <g fill="#2FA866">
+                {[[330, 198, 0.3], [348, 194, 1.1], [366, 199, 2]].map(([x, y, d]) => (
+                  <g key={`t-${x}`} className="as-sway" style={{ animationDelay: `-${d}s` }}>
+                    <rect x={x - 1.5} y={y - 14} width="3" height="16" fill="#1F5A38" />
+                    <circle cx={x} cy={y - 20} r="12" />
+                  </g>
+                ))}
+              </g>
+
+              {/* সামনের ঘাস */}
+              <path d="M0 226 C160 212 360 234 660 218 V240 H0 Z" fill="#0E5C33" />
+              <g stroke="#2FA866" strokeWidth="2" strokeLinecap="round" fill="none">
+                {[30, 120, 210, 300, 400, 510, 600].map((x, i) => (
+                  <g key={`g-${x}`} className="as-sway" style={{ animationDelay: `-${i * 0.6}s` }}>
+                    <path d={`M${x} 232 q-2 -9 -5 -12 M${x} 232 q1 -10 1 -14 M${x} 232 q3 -9 6 -12`} />
+                  </g>
+                ))}
+              </g>
+
+              {/* পাখি */}
+              {[[0, 70, 0], [0, 96, -11]].map(([x, y, d]) => (
+                <g key={`b-${y}`} className="as-bird" style={{ animationDelay: `${d}s` }}>
+                  <g transform={`translate(${x} ${y})`}>
+                    <path className="as-wing" d="M0 0 q5 -6 10 0 q5 -6 10 0" fill="none" stroke="#3A6B52" strokeWidth="1.8" strokeLinecap="round" />
+                  </g>
+                </g>
+              ))}
+            </svg>
+          </div>
         </section>
 
-        {/* জায়গা বাছাই */}
-        <section id="select" className="px-4 mt-4 scroll-mt-16">
-          <div className="bg-white rounded-2xl border border-ink/10 p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-base font-bold">যেসব জায়গায় গিয়েছি</h2>
-              <span className="bg-green/10 text-green-dark font-bold text-sm px-3 py-1 rounded-full font-numeric">
-                {num(selCount)} / {num(total)}
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-ink/10 mt-3 overflow-hidden">
-              <div className="h-full rounded-full bg-green transition-all" style={{ width: `${percent}%` }} />
-            </div>
-
+        {/* জায়গা বাছাই: প্রথম সংস্করণের মতো */}
+        <section id="select" className="mt-5 scroll-mt-16">
+          <div className="px-4 mb-3">
             <label htmlFor="amar-search" className="sr-only">
               জায়গা খুঁজুন
             </label>
@@ -454,9 +538,9 @@ export default function AmarSherpur() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="🔍 জায়গা খুঁজুন…"
-              className="mt-3 w-full rounded-xl border border-ink/15 bg-paper px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green/40"
+              className="w-full rounded-xl border border-ink/15 bg-white px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green/40"
             />
-            <div className="flex gap-4 mt-2 text-xs">
+            <div className="flex gap-4 mt-2 text-sm">
               <button type="button" onClick={selectAll} className="text-green underline">
                 সব বাছাই করুন
               </button>
@@ -464,91 +548,84 @@ export default function AmarSherpur() {
                 সব মুছুন
               </button>
             </div>
+          </div>
+          <div className="flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+            <button
+              type="button"
+              onClick={() => setActiveUpz('all')}
+              aria-pressed={activeUpz === 'all'}
+              className={`flex-shrink-0 whitespace-nowrap rounded-full border px-6 py-3 text-base font-semibold ${
+                activeUpz === 'all' ? 'bg-green text-white border-green' : 'bg-white text-ink/70 border-ink/15'
+              }`}
+            >
+              সব
+            </button>
+            {stats.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setActiveUpz(s.id)}
+                aria-pressed={activeUpz === s.id}
+                className={`flex-shrink-0 whitespace-nowrap rounded-full border px-6 py-3 text-base font-semibold ${
+                  activeUpz === s.id ? 'bg-green text-white border-green' : 'bg-white text-ink/70 border-ink/15'
+                }`}
+              >
+                {s.name} <span className="font-numeric">{num(s.sel)}/{num(s.total)}</span>
+              </button>
+            ))}
+          </div>
 
-            <div className="mt-3">
-              {q && visibleStats.length === 0 && (
-                <p className="text-sm text-ink/50 py-4 text-center">এই নামে কোনো জায়গা মিলছে না।</p>
-              )}
-              {visibleStats.map((s) => {
-                const open = q ? true : openIds.includes(s.id);
-                const complete = s.sel === s.total;
-                const missing = s.shown.filter((p) => p.lat == null || p.lng == null);
-                return (
-                  <div key={s.id} className="border-t border-ink/10 py-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleOpen(s.id)}
-                        aria-expanded={open}
-                        className="flex-1 min-w-0 flex items-center gap-2 text-left font-bold"
-                      >
-                        <span aria-hidden="true" className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>
-                          ›
-                        </span>
-                        <span>{s.name}</span>
-                        <span className="font-numeric text-ink/40 font-medium text-sm">
-                          {num(s.sel)}/{num(s.total)}
-                        </span>
-                        {complete && (
-                          <span className="text-[11px] font-semibold bg-marigold/25 text-ink px-2 py-0.5 rounded-full">
-                            ✓ সম্পূর্ণ
-                          </span>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleUpazila(s.id)}
-                        className="flex-shrink-0 text-xs text-green underline"
-                      >
-                        {complete ? 'সব মুছুন' : 'সব বাছাই'}
-                      </button>
-                    </div>
-                    {open && (
-                      <>
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {s.shown.map((p) => {
-                            const checked = selectedSet.has(p.id);
-                            const unpinned = p.lat == null || p.lng == null;
-                            return (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => toggle(p.id)}
-                                aria-pressed={checked}
-                                title={p.name}
-                                className={`text-sm font-medium px-3.5 py-2 rounded-full border transition-colors ${
-                                  checked
-                                    ? 'bg-green text-white border-green'
-                                    : 'bg-green/10 text-green-dark border-green/20'
-                                } ${unpinned ? 'border-dashed' : ''}`}
-                              >
-                                {p.short}
-                              </button>
-                            );
-                          })}
+          <div className="px-4 mt-5">
+            {q && visibleStats.length === 0 && (
+              <p className="text-sm text-ink/50 py-4 text-center">এই নামে কোনো জায়গা মিলছে না।</p>
+            )}
+            {stats
+              .filter((s) => s.shown.length > 0 && (q || activeUpz === 'all' || activeUpz === s.id))
+              .map((s) => (
+                <div key={s.id} className="mb-5">
+                  <h2 className="text-base font-semibold text-ink/60 mb-3">
+                    {s.name} <span className="font-numeric text-sm">{num(s.sel)}/{num(s.total)}</span>
+                  </h2>
+                  <div className="flex flex-col gap-3">
+                    {s.shown.map((p) => {
+                      const checked = selectedSet.has(p.id);
+                      const unpinned = p.lat == null || p.lng == null;
+                      return (
+                        <div key={p.id} className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => toggle(p.id)}
+                            aria-pressed={checked}
+                            className={`flex-1 min-w-0 flex items-center gap-4 rounded-2xl border px-4 py-4 text-left text-base ${
+                              checked ? 'bg-green/10 border-green' : 'bg-white border-ink/10'
+                            }`}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={`flex-shrink-0 flex h-6 w-6 items-center justify-center rounded-md border-2 text-sm font-bold ${
+                                checked ? 'bg-green border-green text-white' : 'border-ink/25 bg-white text-transparent'
+                              }`}
+                            >
+                              ✓
+                            </span>
+                            <span>{p.name}</span>
+                          </button>
+                          {unpinned && (
+                            <a
+                              href={mapsSearchUrl(p)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-shrink-0 text-sm font-medium text-green"
+                            >
+                              📍 খুঁজুন
+                            </a>
+                          )}
                         </div>
-                        {missing.length > 0 && (
-                          <p className="text-xs text-ink/50 mt-2 leading-relaxed">
-                            ছেঁড়া দাগের জায়গার অবস্থান ম্যাপে এখনো বসেনি:{' '}
-                            {missing.map((p) => (
-                              <a
-                                key={p.id}
-                                href={mapsSearchUrl(p)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-green underline mr-2"
-                              >
-                                {p.short} ↗
-                              </a>
-                            ))}
-                          </p>
-                        )}
-                      </>
-                    )}
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              ))}
           </div>
         </section>
 
@@ -760,18 +837,22 @@ export default function AmarSherpur() {
         <p className="text-[10px] text-ink/40 text-center mt-8">মানচিত্র: geoBoundaries (CC BY 4.0)</p>
       </main>
 
-      {selCount > 0 && !previewVisible && (
+      {!previewVisible && (
         <div className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-ink/10 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
           <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
-            <p className="flex-1 text-sm font-semibold" aria-live="polite">
-              {num(selCount)}টি নির্বাচিত
-            </p>
+            <div className="flex-1" aria-live="polite">
+              <p className="text-base font-bold">{num(selCount)}টি নির্বাচিত</p>
+              <button type="button" onClick={() => setSelected([])} className="text-sm text-ink/50 underline">
+                সব বাতিল করুন
+              </button>
+            </div>
             <button
               type="button"
-              onClick={() => jumpTo('card-preview')}
-              className="bg-green text-white text-sm font-semibold px-5 py-2.5 rounded-xl"
+              disabled={selCount === 0}
+              onClick={() => jumpTo('customize')}
+              className="bg-green text-white text-base font-semibold px-6 py-3.5 rounded-xl disabled:opacity-40"
             >
-              কার্ড দেখুন ↓
+              কার্ড তৈরি করুন
             </button>
           </div>
           <div className="pb-[env(safe-area-inset-bottom)]" />
