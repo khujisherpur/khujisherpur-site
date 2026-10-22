@@ -84,8 +84,15 @@ export default function AuthButton({ lang = 'bn', variant = 'default' }) {
 
   if (!user) {
     return (
-      <a
+            <a
         href="/login"
+        onClick={(e) => {
+          const here = window.location.pathname + window.location.search;
+          if (!here.startsWith('/login')) {
+            e.preventDefault();
+            window.location.href = '/login?next=' + encodeURIComponent(here);
+          }
+        }}
         className={`text-sm rounded-full px-4 py-1.5 transition-colors border ${
           isLight
             ? 'border-white/40 text-white hover:bg-white/10'
