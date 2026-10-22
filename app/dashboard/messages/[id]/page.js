@@ -42,7 +42,10 @@ export default function ConversationPage({ params }) {
     setConv(c);
     setMsgs(m || []);
     const unread = uid === c.owner_id ? c.owner_unread : uid === c.starter_id ? c.starter_unread : 0;
-    if (unread > 0) supabase.rpc('mark_conversation_read', { p_id: convId });
+        if (unread > 0) {
+      const { error: rpcErr } = await supabase.rpc('mark_conversation_read', { p_id: convId });
+      if (rpcErr) setError('পড়া হয়েছে চিহ্নিত করা যায়নি: ' + rpcErr.message);
+    }
   }
 
   useEffect(() => {
