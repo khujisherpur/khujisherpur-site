@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { cleanPhone, toBn } from '../../../lib/format';
 import { formatBloodDate } from '../../../lib/bloodFormat';
 import SiteHeader from '../../../components/SiteHeader';
+import MessageButton from '../../../components/MessageButton';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
@@ -14,7 +15,7 @@ const getRequest = cache(async (id) => {
   if (typeof id !== 'string' || !UUID_RE.test(id)) return null;
   const { data } = await supabase
     .from('blood_requests')
-    .select('id, blood_group, bags_needed, hospital_or_area, patient_name, patient_problem, hemoglobin, donation_date, donation_time, applicant_name, relation_to_patient, note, contact_phone, alt_phone, status, created_at')
+    .select('id, user_id, blood_group, bags_needed, hospital_or_area, patient_name, patient_problem, hemoglobin, donation_date, donation_time, applicant_name, relation_to_patient, note, contact_phone, alt_phone, status, created_at')
     .eq('id', id)
     .maybeSingle();
   return data || null;
