@@ -89,7 +89,7 @@ export default function MessagesPage() {
                 <p className="text-[11px] text-ink/40 mt-0.5">
                   {mine ? '📥 আপনার পোস্টে বার্তা' : '📤 আপনি বার্তা পাঠিয়েছেন'}
                   {' · '}
-                  {c.kind === 'provider' ? 'প্রোফাইল' : 'পোস্ট'}
+                {c.kind === 'provider' ? 'প্রোফাইল' : c.kind === 'blood' ? 'রক্তের অনুরোধ' : 'পোস্ট'}
                 </p>
                 <p className={`text-xs mt-1 line-clamp-1 ${unread > 0 ? 'text-ink font-medium' : 'text-ink/60'}`}>
                   {c.last_message}
