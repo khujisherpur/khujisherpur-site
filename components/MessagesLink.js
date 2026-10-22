@@ -1,26 +1,40 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 export default function MessagesLink({ lang = 'bn' }) {
   const [unread, setUnread] = useState(0);
 
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      const uid = data.session?.user?.id;
-      if (!uid) return;
-      const { data: rows } = await supabase
-        .from('conversations')
-        .select('owner_id, owner_unread, starter_unread')
-        .or(`owner_id.eq.${uid},starter_id.eq.${uid}`);
-      const n = (rows || []).reduce(
-        (s, r) => s + (r.owner_id === uid ? r.owner_unread : r.starter_unread),
-        0
-      );
-      setUnread(n);
-    })();
+  const refresh = useCallback(async () => {
+    const { data } = await supabase.auth.getSession();
+    const uid = data.session?.user?.id;
+    if (!uid) return;
+    const { data: rows } = await supabase
+      .from('conversations')
+      .select('owner_id, owner_unread, starter_unread')
+      .or(`owner_id.eq.${uid},starter_id.eq.${uid}`);
+    setUnread(
+      (rows || []).reduce((s, r) => s + (r.owner_id === uid ? r.owner_unread : r.starter_unread), 0)
+    );
   }, []);
+
+  useEffect(() => {
+    refresh();
+    const onShow = () => refresh();
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    window.addEventListener('pageshow', onShow);
+    window.addEventListener('focus', onShow);
+    document.addEventListener('visibilitychange', onVis);
+    const t = setInterval(refresh, 20000);
+    return () => {
+      window.removeEventListener('pageshow', onShow);
+      window.removeEventListener('focus', onShow);
+      document.removeEventListener('visibilitychange', onVis);
+      clearInterval(t);
+    };
+  }, [refresh]);
 
   return (
     <a
