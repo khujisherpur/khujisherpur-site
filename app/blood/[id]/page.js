@@ -15,7 +15,7 @@ const getRequest = cache(async (id) => {
   if (typeof id !== 'string' || !UUID_RE.test(id)) return null;
   const { data } = await supabase
     .from('blood_requests')
-    .select('id, user_id, blood_group, bags_needed, hospital_or_area, patient_name, patient_problem, hemoglobin, donation_date, donation_time, applicant_name, relation_to_patient, note, contact_phone, alt_phone, status, created_at')
+    .select('id, user_id, title, blood_group, bags_needed, hospital_or_area, patient_name, patient_problem, hemoglobin, donation_date, donation_time, applicant_name, relation_to_patient, note, contact_phone, alt_phone, status, created_at')
     .eq('id', id)
     .maybeSingle();
   return data || null;
@@ -87,6 +87,9 @@ export default async function BloodRequestDetailPage({ params }) {
             </div>
 
             <div className="mt-5 pt-5 border-t border-ink/10 space-y-3 text-sm">
+              <Row label="শিরোনাম">
+                {request.title || `${request.blood_group} রক্ত প্রয়োজন`}
+              </Row>
               {isActive && request.patient_problem && (
                 <Row label="রোগীর সমস্যা">{request.patient_problem}</Row>
               )}
@@ -126,6 +129,7 @@ export default async function BloodRequestDetailPage({ params }) {
                     📞 বিকল্প নম্বর: <span className="font-numeric">{request.alt_phone}</span>
                   </a>
                 )}
+                <MessageButton kind="blood" refId={request.id} ownerId={request.user_id} lang="bn" />
               </div>
             )}
 
