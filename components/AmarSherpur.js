@@ -818,13 +818,6 @@ export default function AmarSherpur() {
                   লিংকসহ লেখা কপি হয়েছে ✓ ফেসবুকে পোস্টের ঘরে ধরে রেখে "পেস্ট" চাপুন।
                 </p>
               )}
-              <div className="max-w-md mx-auto mt-4 bg-white rounded-xl border border-ink/10 p-3">
-                <p className="text-xs font-semibold text-ink/60 leading-relaxed">
-                  ফেসবুক ও মেসেঞ্জার একসঙ্গে ছবি আর লিংক নেয় না। তাই "শেয়ার করুন" চাপলে শুধু ছবি যায়, আর নিচের
-                  লিংকসহ লেখা নিজে থেকেই কপি হয়ে যায়। পোস্টের ঘরে ধরে রেখে "পেস্ট" চাপুন।
-                </p>
-                <p className="text-sm mt-2 whitespace-pre-line break-words select-all">{captionText()}</p>
-              </div>
               <p className="max-w-md mx-auto mt-3 text-xs text-ink/50 leading-relaxed">
                 {inFacebook
                   ? 'ফেসবুকের ভেতরের ব্রাউজারে সংরক্ষণ কাজ না করলে ছবিতে চেপে ধরে সংরক্ষণ করুন, অথবা মেনু থেকে "ব্রাউজারে খুলুন" বেছে নিন।'
