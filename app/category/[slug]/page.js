@@ -8,7 +8,7 @@ import { categoryLabels } from '../../../lib/categoryLabels';
 import { upazilaList } from '../../../lib/locations';
 import { formatPrice, parsePrice, timeAgo, toBn } from '../../../lib/format';
 import { subcategoryIcons } from '../../../lib/services';
-import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../../lib/site';
+import { SITE_NAME, categoryOgImage } from '../../../lib/site';
 import SiteHeader from '../../../components/SiteHeader';
 
 const FILTER_KEYS = ['type', 'upazila', 'sort', 'sub'];
@@ -128,6 +128,8 @@ export async function generateMetadata({ params, searchParams }) {
   // শুধু আসল ফিল্টার থাকলেই noindex; ?fbclid= বা ?utm_ দিয়ে এলে নয়
   const hasFilter = FILTER_KEYS.some((k) => searchParams?.[k]);
   const canonical = `/category/${params.slug}`;
+  // এই ক্যাটাগরির নিজস্ব শেয়ার-ছবি (না থাকলে ডিফল্ট)
+  const ogImage = categoryOgImage(params.slug);
 
   let title;
   let description;
@@ -158,9 +160,9 @@ export async function generateMetadata({ params, searchParams }) {
       siteName: SITE_NAME,
       type: 'website',
       locale: lang === 'bn' ? 'bn_BD' : 'en_US',
-      images: [DEFAULT_OG_IMAGE],
+      images: [ogImage],
     },
-    twitter: { card: 'summary_large_image', title, description, images: [DEFAULT_OG_IMAGE] },
+    twitter: { card: 'summary_large_image', title, description, images: [ogImage] },
   };
 }
 
