@@ -19,8 +19,8 @@ function label(t, hours) {
 
 function TopList({ title, items, color }) {
   const max = Math.max(1, ...items.map((i) => Number(i.n)));
-  return (
-    <div className="bg-white border border-ink/10 rounded-xl p-4">
+    return (
+    <div className="bg-white border border-ink/10 rounded-xl p-4 min-w-0 overflow-hidden">
       <h3 className="font-semibold text-sm mb-3">{title}</h3>
       {items.length === 0 && <p className="text-xs text-ink/40">এখনো তথ্য নেই</p>}
       <div className="space-y-3">
@@ -138,7 +138,7 @@ export default function AnalyticsTab() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             <TopList title="সবচেয়ে বেশি দেখা পোস্ট" items={data.top_listings || []} color="bg-green" />
             <TopList title="সবচেয়ে বেশি দেখা সেবাদাতা" items={data.top_providers || []} color="bg-green" />
             <TopList title="সবচেয়ে বেশি দেখা পেজ" items={data.top_pages || []} color="bg-marigold" />
