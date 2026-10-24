@@ -1,14 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { toBn } from '../../lib/format';
-import LanguageToggle from '../../components/LanguageToggle';
-
-function getCookieLang() {
-  if (typeof document === 'undefined') return 'bn';
-  const match = document.cookie.match(/(?:^|; )lang=([^;]*)/);
-  return match && match[1] === 'en' ? 'en' : 'bn';
-}
 
 // লগইনের পর ফেরার ঠিকানা (?next=): শুধু সাইটের ভেতরের পাথ চলবে, বাইরের লিংকে পাঠানো যাবে না
 function getNextPath() {
@@ -21,95 +13,45 @@ function getNextPath() {
   return next;
 }
 
-// ইমেইলের ঠিকানা দেখে ইনবক্স খোলার লিংক (চেনা না গেলে বোতাম দেখানো হয় না)
-function mailLink(addr) {
-  const d = ((addr || '').split('@')[1] || '').toLowerCase();
-  if (d === 'gmail.com' || d === 'googlemail.com') return 'https://mail.google.com/';
-  if (['outlook.com', 'hotmail.com', 'live.com', 'msn.com'].includes(d)) return 'https://outlook.live.com/mail/';
-  if (d.startsWith('yahoo.')) return 'https://mail.yahoo.com/';
-  return null;
-}
-
 const RESEND_SECONDS = 60;
+const CODE_LENGTH = 6;
 
-const text = {
-  bn: {
-    login: 'লগইন', signup: 'নিবন্ধন', google: 'Google দিয়ে চালিয়ে যান', or: 'অথবা',
-    name: 'নাম', namePh: 'আপনার নাম', email: 'ইমেইল', password: 'পাসওয়ার্ড', passwordPh: 'কমপক্ষে ৬ অক্ষর',
-    newPassword: 'নতুন পাসওয়ার্ড',
-    loginBtn: 'লগইন করুন', signupBtn: 'অ্যাকাউন্ট তৈরি করুন', waiting: 'অপেক্ষা করুন...',
-    resetBtn: 'রিসেট লিংক পাঠান', saveBtn: 'পাসওয়ার্ড বদলান',
-    forgot: 'পাসওয়ার্ড ভুলে গেছেন?', backToLogin: '← লগইনে ফিরে যান',
-    forgotTitle: 'পাসওয়ার্ড রিসেট', forgotHelp: 'আপনার ইমেইল দিন, রিসেট লিংক পাঠিয়ে দেব।',
-    recoveryTitle: 'নতুন পাসওয়ার্ড দিন',
-    tagline: 'শেরপুরের সবকিছু এক জায়গায়',
-    show: 'দেখান', hide: 'লুকান',
-    resetSent: 'রিসেট লিংক ইমেইলে পাঠানো হয়েছে। ইনবক্স (ও স্প্যাম ফোল্ডার) দেখুন।',
-    passwordUpdated: 'পাসওয়ার্ড বদলানো হয়েছে! নিয়ে যাওয়া হচ্ছে...',
-    termsLine1: 'সাইনআপ করলে আপনি আমাদের', terms: 'শর্তাবলি', and: ' ও ', privacy: 'প্রাইভেসি পলিসি', termsLine2: ' মেনে নিচ্ছেন।',
-    // ইমেইল ভেরিফাই পর্দা। ইমেইলের টেমপ্লেট বদলালে ধাপের লেখাও মিলিয়ে নেবেন।
-    verifyTitle: 'আপনার ইমেইল চেক করুন',
-    verifySent: 'আমরা একটি মেইল পাঠিয়েছি এই ঠিকানায়:',
-    verifySteps: [
-      'ইমেইল অ্যাপ খুলুন (যেমন Gmail)।',
-      '"Confirm your email address" নামের মেইলটা খুলুন।',
-      'মেইলের ভেতরে নীল লেখা "Confirm email address"-এ ট্যাপ করুন। ব্যস, অ্যাকাউন্ট চালু!',
-    ],
-    openMail: 'ইনবক্স খুলুন',
-    verifySpam: 'মেইল না পেলে স্প্যাম বা প্রমোশন ফোল্ডার দেখুন। আসতে এক-দুই মিনিট লাগতে পারে।',
-    resend: 'মেইল আবার পাঠান',
-    resent: 'মেইল আবার পাঠানো হয়েছে। ইনবক্স ও স্প্যাম দেখুন।',
-    verifiedBtn: 'ভেরিফাই করেছি, লগইন করুন',
-    wrongEmail: 'ইমেইল ভুল? বদলান',
-    errors: [
-      ['invalid login credentials', 'ইমেইল বা পাসওয়ার্ড ভুল হয়েছে'],
-      ['email not confirmed', 'ইমেইল এখনো ভেরিফাই করা হয়নি। ইনবক্সের কনফার্মেশন লিংকে ক্লিক করুন'],
-      ['already registered', 'এই ইমেইলে আগেই অ্যাকাউন্ট আছে। লগইন করুন'],
-      ['at least', 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে'],
-      ['same password', 'নতুন পাসওয়ার্ড আগেরটার থেকে আলাদা হতে হবে'],
-      ['rate limit', 'অনেকবার চেষ্টা করা হয়েছে, কিছুক্ষণ পর আবার চেষ্টা করুন'],
-      ['too many', 'অনেকবার চেষ্টা করা হয়েছে, কিছুক্ষণ পর আবার চেষ্টা করুন'],
-    ],
-    errorFallback: 'কিছু একটা সমস্যা হয়েছে। আবার চেষ্টা করুন',
-  },
-  en: {
-    login: 'Login', signup: 'Sign Up', google: 'Continue with Google', or: 'or',
-    name: 'Name', namePh: 'Your name', email: 'Email', password: 'Password', passwordPh: 'At least 6 characters',
-    newPassword: 'New password',
-    loginBtn: 'Log In', signupBtn: 'Create Account', waiting: 'Please wait...',
-    resetBtn: 'Send reset link', saveBtn: 'Update password',
-    forgot: 'Forgot password?', backToLogin: '← Back to login',
-    forgotTitle: 'Reset password', forgotHelp: "Enter your email and we'll send a reset link.",
-    recoveryTitle: 'Set a new password',
-    tagline: 'Everything in Sherpur, in one place',
-    show: 'Show', hide: 'Hide',
-    resetSent: 'Reset link sent. Please check your inbox (and spam folder).',
-    passwordUpdated: 'Password updated! Redirecting...',
-    termsLine1: 'By signing up, you agree to our', terms: 'Terms', and: ' and ', privacy: 'Privacy Policy', termsLine2: '.',
-    verifyTitle: 'Check your email',
-    verifySent: 'We sent a message to:',
-    verifySteps: [
-      'Open your email app (for example Gmail).',
-      'Open the email named "Confirm your email address".',
-      'Tap the blue "Confirm email address" link inside. Your account is ready!',
-    ],
-    openMail: 'Open inbox',
-    verifySpam: "Can't find it? Check your spam or promotions folder. It can take a minute or two.",
-    resend: 'Resend email',
-    resent: 'Email sent again. Check your inbox and spam folder.',
-    verifiedBtn: "I've verified, log in",
-    wrongEmail: 'Wrong email? Change it',
-    errors: [
-      ['invalid login credentials', 'Wrong email or password'],
-      ['email not confirmed', 'Email not verified yet. Click the confirmation link in your inbox'],
-      ['already registered', 'An account with this email already exists. Please log in'],
-      ['at least', 'Password must be at least 6 characters'],
-      ['same password', 'New password must be different from the old one'],
-      ['rate limit', 'Too many attempts, please try again later'],
-      ['too many', 'Too many attempts, please try again later'],
-    ],
-    errorFallback: 'Something went wrong. Please try again',
-  },
+// এই পাতা এখন শুধু ইংরেজিতে
+const t = {
+  login: 'Log in', signup: 'Sign up', google: 'Log in with Google', or: 'or',
+  name: 'Name', namePh: 'Your name', email: 'Email', password: 'Password', passwordPh: 'At least 6 characters',
+  newPassword: 'New password',
+  loginBtn: 'Log in', signupBtn: 'Create account', waiting: 'Please wait...',
+  resetBtn: 'Send reset link', saveBtn: 'Update password',
+  forgot: 'Forgot password?', backToLogin: '← Back to log in',
+  forgotTitle: 'Reset password', forgotHelp: "Enter your email and we'll send you a reset link.",
+  recoveryTitle: 'Set a new password',
+  tagline: 'Everything in Sherpur, in one place',
+  show: 'Show', hide: 'Hide',
+  resetSent: 'Reset link sent. Please check your inbox (and spam folder).',
+  passwordUpdated: 'Password updated. Redirecting...',
+  termsLine1: 'By signing up, you agree to our', terms: 'Terms', and: ' and ', privacy: 'Privacy Policy', termsLine2: '.',
+  verifyTitle: 'Verify your email',
+  verifyIntro: 'Enter the 6-digit code we sent to',
+  codePh: '000000',
+  verifyBtn: 'Verify and create account',
+  verifying: 'Verifying...',
+  verifyHint: "Can't find it? Check your spam folder. The code can take a minute to arrive.",
+  resend: 'Resend code',
+  resent: 'A new code has been sent.',
+  wrongEmail: 'Wrong email? Go back',
+  errors: [
+    ['invalid login credentials', 'Wrong email or password'],
+    ['email not confirmed', 'Your email is not verified yet.'],
+    ['already registered', 'An account with this email already exists. Please log in.'],
+    ['token has expired', 'That code is incorrect or has expired. Try again or request a new code.'],
+    ['otp', 'That code is incorrect or has expired. Try again or request a new code.'],
+    ['at least', 'Password must be at least 6 characters'],
+    ['same password', 'New password must be different from the old one'],
+    ['rate limit', 'Too many attempts. Please try again in a little while.'],
+    ['too many', 'Too many attempts. Please try again in a little while.'],
+  ],
+  errorFallback: 'Something went wrong. Please try again.',
 };
 
 function HillsBackground() {
@@ -218,24 +160,19 @@ function IconLock() {
     </svg>
   );
 }
-function IconMailBig() {
-  return (
-    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="5" width="18" height="14" rx="2.5" />
-      <path d="M3.5 7l8.5 6 8.5-6" />
-    </svg>
-  );
-}
 
 const inputClass =
   'w-full rounded-full bg-white/15 border border-white/40 text-white placeholder-white/55 pl-5 pr-12 py-3 text-sm outline-none focus:bg-white/25 focus:border-white/80 transition-colors';
 
+const codeClass =
+  'w-full rounded-2xl bg-white/15 border border-white/40 text-white placeholder-white/30 px-4 py-4 text-center text-2xl font-semibold tracking-[0.45em] outline-none focus:bg-white/25 focus:border-white/80 transition-colors';
+
 export default function LoginPage() {
-  const [lang, setLang] = useState('bn');
   const [mode, setMode] = useState('login'); // login | signup | forgot | recovery | verify
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
@@ -243,31 +180,18 @@ export default function LoginPage() {
   const [resendLeft, setResendLeft] = useState(0);
 
   useEffect(() => {
-    setLang(getCookieLang());
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') setMode('recovery');
     });
     return () => sub?.subscription?.unsubscribe();
   }, []);
 
-  // ভেরিফাই পর্দায় থাকা অবস্থায় (একই ব্রাউজারের অন্য ট্যাবে) লিংকে ট্যাপ হলে নিজে থেকেই এগিয়ে যাবে
-  useEffect(() => {
-    if (mode !== 'verify') return undefined;
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') window.location.href = getNextPath();
-    });
-    return () => sub?.subscription?.unsubscribe();
-  }, [mode]);
-
-  // "আবার পাঠান" বোতামের অপেক্ষার গণনা
+  // "Resend code" বোতামের অপেক্ষার গণনা
   useEffect(() => {
     if (resendLeft <= 0) return undefined;
     const id = setTimeout(() => setResendLeft((s) => s - 1), 1000);
     return () => clearTimeout(id);
   }, [resendLeft]);
-
-  const t = text[lang];
-  const num = (n) => (lang === 'bn' ? toBn(n) : n);
 
   function friendly(msg) {
     const m = (msg || '').toLowerCase();
@@ -279,6 +203,7 @@ export default function LoginPage() {
     setMode(next);
     setError(null);
     setMessage(null);
+    setCode('');
   }
 
   async function handleSubmit(e) {
@@ -286,16 +211,14 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     setMessage(null);
+    const cleanEmail = email.trim();
 
     try {
       if (mode === 'signup') {
         const { data, error } = await supabase.auth.signUp({
-          email,
+          email: cleanEmail,
           password,
-          options: {
-            data: { name },
-            emailRedirectTo: `${window.location.origin}${getNextPath()}`,
-          },
+          options: { data: { name } },
         });
         if (error) {
           setError(friendly(error.message));
@@ -303,18 +226,34 @@ export default function LoginPage() {
           // ইমেইল ভেরিফাই বন্ধ থাকলে সঙ্গে সঙ্গে লগইন হয়ে যায়
           window.location.href = getNextPath();
         } else if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-          // এই ইমেইলে আগেই অ্যাকাউন্ট আছে: Supabase ভুল বোঝায় না, তাই নতুন মেইলও আসবে না
+          // এই ইমেইলে আগেই অ্যাকাউন্ট আছে: Supabase ভুল বোঝায় না, তাই কোডও আসবে না
           setError(friendly('already registered'));
         } else {
+          setEmail(cleanEmail);
           setMode('verify');
+          setCode('');
           setResendLeft(RESEND_SECONDS);
         }
       } else if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) setError(friendly(error.message));
-        else window.location.href = getNextPath();
+        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+        if (!error) {
+          window.location.href = getNextPath();
+        } else if ((error.message || '').toLowerCase().includes('email not confirmed')) {
+          // আগে নিবন্ধন করেছিলেন কিন্তু কোড বসানো হয়নি: নতুন কোড পাঠিয়ে ভেরিফাই পর্দায় নিয়ে যাওয়া
+          const res = await supabase.auth.resend({ type: 'signup', email: cleanEmail });
+          setEmail(cleanEmail);
+          setMode('verify');
+          setCode('');
+          if (res.error) setError(friendly(res.error.message));
+          else {
+            setMessage(t.resent);
+            setResendLeft(RESEND_SECONDS);
+          }
+        } else {
+          setError(friendly(error.message));
+        }
       } else if (mode === 'forgot') {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo: `${window.location.origin}/login`,
         });
         if (error) setError(friendly(error.message));
@@ -336,17 +275,40 @@ export default function LoginPage() {
     setLoading(false);
   }
 
+  // ইমেইলে পাঠানো ৬ সংখ্যার কোড মেলালে তবেই অ্যাকাউন্ট চালু হয়
+  async function verifyCode(value) {
+    if (value.length !== CODE_LENGTH || loading) return;
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { error } = await supabase.auth.verifyOtp({ email, token: value, type: 'signup' });
+      if (error) {
+        setError(friendly(error.message));
+        setCode('');
+      } else {
+        window.location.href = getNextPath();
+        return;
+      }
+    } catch (err) {
+      setError(friendly(err?.message));
+    }
+    setLoading(false);
+  }
+
+  function onCodeChange(e) {
+    const value = e.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH);
+    setCode(value);
+    if (value.length === CODE_LENGTH) verifyCode(value);
+  }
+
   async function handleResend() {
     if (resendLeft > 0 || loading) return;
     setLoading(true);
     setError(null);
     setMessage(null);
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email,
-        options: { emailRedirectTo: `${window.location.origin}${getNextPath()}` },
-      });
+      const { error } = await supabase.auth.resend({ type: 'signup', email });
       if (error) {
         setError(friendly(error.message));
       } else {
@@ -373,88 +335,73 @@ export default function LoginPage() {
   const submitLabel =
     mode === 'login' ? t.loginBtn : mode === 'signup' ? t.signupBtn : mode === 'forgot' ? t.resetBtn : t.saveBtn;
 
-  const inboxUrl = mailLink(email);
-
   return (
     <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#0A3527] via-[#1C8A4C] to-[#F0D58A]">
       <HillsBackground />
 
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-8">
-        <div className="mb-4">
-          <LanguageToggle lang={lang} variant="light" />
-        </div>
-
         <a href="/" className="bg-white rounded-xl px-4 py-2 shadow-lg mb-2">
-          <img src="/logo-full.png" alt="খুঁজি শেরপুর" className="h-9 w-auto" />
+          <img src="/logo-full.png" alt="Khuji Sherpur" className="h-9 w-auto" />
         </a>
         <p className="text-white/85 text-xs mb-5 drop-shadow">{t.tagline}</p>
 
         <div className="w-full max-w-sm bg-[#0A3527]/40 backdrop-blur-xl border border-white/30 rounded-3xl p-5 shadow-2xl text-white">
           {mode === 'verify' ? (
-            <div className="text-center">
-              <div className="mx-auto w-16 h-16 rounded-full bg-white/15 border border-white/30 flex items-center justify-center text-white mb-4">
-                <IconMailBig />
-              </div>
-              <h1 className="text-xl font-bold">{t.verifyTitle}</h1>
-              <p className="text-sm text-white/80 mt-2">{t.verifySent}</p>
-              <p className="mt-1 text-base font-semibold break-all">{email}</p>
+            <div>
+              <button type="button" onClick={() => switchMode('signup')} className="text-xs text-white/70 mb-3">
+                {t.wrongEmail}
+              </button>
+              <h1 className="text-xl font-semibold">{t.verifyTitle}</h1>
+              <p className="text-sm text-white/75 mt-2 leading-relaxed">
+                {t.verifyIntro} <span className="font-semibold text-white break-all">{email}</span>
+              </p>
 
-              <ol className="mt-5 text-left space-y-3">
-                {t.verifySteps.map((step, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-7 h-7 rounded-full bg-marigold text-ink font-bold text-sm flex items-center justify-center">
-                      {num(i + 1)}
-                    </span>
-                    <span className="text-sm leading-relaxed pt-0.5">{step}</span>
-                  </li>
-                ))}
-              </ol>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  verifyCode(code);
+                }}
+                className="mt-5 space-y-3.5"
+              >
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9]*"
+                  maxLength={CODE_LENGTH}
+                  autoFocus
+                  value={code}
+                  onChange={onCodeChange}
+                  placeholder={t.codePh}
+                  aria-label="Verification code"
+                  className={codeClass}
+                />
 
-              {inboxUrl && (
-                <a
-                  href={inboxUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-5 block w-full bg-marigold text-ink font-semibold rounded-full py-3 shadow-lg"
+                {error && (
+                  <p className="text-sm bg-red-500/25 border border-red-300/50 rounded-2xl px-4 py-2.5">{error}</p>
+                )}
+                {message && (
+                  <p className="text-sm bg-white/20 border border-white/40 rounded-2xl px-4 py-2.5">{message}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || code.length !== CODE_LENGTH}
+                  className="w-full bg-marigold text-ink font-semibold rounded-full py-3 shadow-lg active:scale-[0.99] transition-transform disabled:opacity-50"
                 >
-                  {t.openMail}
-                </a>
-              )}
+                  {loading ? t.verifying : t.verifyBtn}
+                </button>
+              </form>
 
-              <p className="text-xs text-white/75 mt-4 leading-relaxed">{t.verifySpam}</p>
-
-              {error && (
-                <p className="text-sm bg-red-500/25 border border-red-300/50 rounded-2xl px-4 py-2.5 mt-4">{error}</p>
-              )}
-              {message && (
-                <p className="text-sm bg-white/20 border border-white/40 rounded-2xl px-4 py-2.5 mt-4">{message}</p>
-              )}
+              <p className="text-xs text-white/65 mt-4 leading-relaxed">{t.verifyHint}</p>
 
               <button
                 type="button"
                 onClick={handleResend}
                 disabled={resendLeft > 0 || loading}
-                className="mt-4 w-full border border-white/50 rounded-full py-2.5 text-sm font-semibold disabled:opacity-50"
+                className="mt-3 text-sm font-semibold underline text-white disabled:opacity-50 disabled:no-underline"
               >
-                {resendLeft > 0 ? `${t.resend} (${num(resendLeft)})` : t.resend}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => switchMode('login')}
-                className="mt-4 text-sm font-semibold underline text-white"
-              >
-                {t.verifiedBtn}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('');
-                  switchMode('signup');
-                }}
-                className="block mx-auto mt-3 text-xs text-white/70 underline"
-              >
-                {t.wrongEmail}
+                {resendLeft > 0 ? `${t.resend} (${resendLeft}s)` : t.resend}
               </button>
             </div>
           ) : (
