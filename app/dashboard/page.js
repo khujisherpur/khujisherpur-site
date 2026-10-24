@@ -13,7 +13,8 @@ const text = {
   bn: {
     myPosts: 'আমার অ্যাকাউন্ট',
     logout: 'লগআউট',
-    providerSection: 'প্রোভাইডার প্রোফাইল',
+    providerSection: 'প্রোভাইডার ও শিক্ষক প্রোফাইল',
+    openProfile: '+ প্রোফাইল খুলুন',
     listingSection: 'আমার পোস্ট',
     noProvider: 'এখনো কোনো প্রোফাইল তৈরি করেননি।',
     noListing: 'এখনো কোনো পোস্ট দেননি।',
@@ -55,7 +56,8 @@ const text = {
   en: {
     myPosts: 'My Account',
     logout: 'Logout',
-    providerSection: 'Provider Profiles',
+    providerSection: 'Provider & Teacher Profiles',
+    openProfile: '+ Open Profile',
     listingSection: 'My Posts',
     noProvider: "You haven't created any profile yet.",
     noListing: "You haven't posted anything yet.",
@@ -377,9 +379,14 @@ export default function DashboardPage() {
             <div className="bg-white border border-dashed border-ink/20 rounded-xl p-6 text-center">
               <p className="text-3xl mb-1">🛠️</p>
               <p className="text-ink/50 text-sm mb-3">{t.noProvider}</p>
-              <a href="/post/new?category=service-provider" className="inline-block bg-marigold text-ink text-sm font-semibold px-4 py-2 rounded-full">
-                {t.createNow}
-              </a>
+               <div className="flex gap-2 justify-center flex-wrap">
+                <a href="/post/new?category=service-provider" className="inline-block bg-marigold text-ink text-sm font-semibold px-4 py-2 rounded-full">
+                  🛠️ {lang === 'bn' ? 'সেবাদাতা প্রোফাইল' : 'Service Profile'}
+                </a>
+                <a href="/post/new?category=teacher" className="inline-block bg-green text-white text-sm font-semibold px-4 py-2 rounded-full">
+                  📚 {lang === 'bn' ? 'শিক্ষক প্রোফাইল' : 'Teacher Profile'}
+                </a>
+              </div>
             </div>
           )}
           <div className="space-y-3">
