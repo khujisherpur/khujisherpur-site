@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { toBn } from '../../lib/format';
 import LanguageToggle from '../../components/LanguageToggle';
 
 function getCookieLang() {
@@ -20,6 +21,17 @@ function getNextPath() {
   return next;
 }
 
+// ইমেইলের ঠিকানা দেখে ইনবক্স খোলার লিংক (চেনা না গেলে বোতাম দেখানো হয় না)
+function mailLink(addr) {
+  const d = ((addr || '').split('@')[1] || '').toLowerCase();
+  if (d === 'gmail.com' || d === 'googlemail.com') return 'https://mail.google.com/';
+  if (['outlook.com', 'hotmail.com', 'live.com', 'msn.com'].includes(d)) return 'https://outlook.live.com/mail/';
+  if (d.startsWith('yahoo.')) return 'https://mail.yahoo.com/';
+  return null;
+}
+
+const RESEND_SECONDS = 60;
+
 const text = {
   bn: {
     login: 'লগইন', signup: 'নিবন্ধন', google: 'Google দিয়ে চালিয়ে যান', or: 'অথবা',
@@ -32,10 +44,23 @@ const text = {
     recoveryTitle: 'নতুন পাসওয়ার্ড দিন',
     tagline: 'শেরপুরের সবকিছু এক জায়গায়',
     show: 'দেখান', hide: 'লুকান',
-    signupSuccess: 'অ্যাকাউন্ট তৈরি হয়েছে! ইমেইলে পাঠানো কনফার্মেশন লিংকে ক্লিক করে ভেরিফাই করুন।',
     resetSent: 'রিসেট লিংক ইমেইলে পাঠানো হয়েছে। ইনবক্স (ও স্প্যাম ফোল্ডার) দেখুন।',
     passwordUpdated: 'পাসওয়ার্ড বদলানো হয়েছে! নিয়ে যাওয়া হচ্ছে...',
     termsLine1: 'সাইনআপ করলে আপনি আমাদের', terms: 'শর্তাবলি', and: ' ও ', privacy: 'প্রাইভেসি পলিসি', termsLine2: ' মেনে নিচ্ছেন।',
+    // ইমেইল ভেরিফাই পর্দা। ইমেইলের টেমপ্লেট বদলালে ধাপের লেখাও মিলিয়ে নেবেন।
+    verifyTitle: 'আপনার ইমেইল চেক করুন',
+    verifySent: 'আমরা একটি মেইল পাঠিয়েছি এই ঠিকানায়:',
+    verifySteps: [
+      'ইমেইল অ্যাপ খুলুন (যেমন Gmail)।',
+      '"Confirm your email address" নামের মেইলটা খুলুন।',
+      'মেইলের ভেতরে নীল লেখা "Confirm email address"-এ ট্যাপ করুন। ব্যস, অ্যাকাউন্ট চালু!',
+    ],
+    openMail: 'ইনবক্স খুলুন',
+    verifySpam: 'মেইল না পেলে স্প্যাম বা প্রমোশন ফোল্ডার দেখুন। আসতে এক-দুই মিনিট লাগতে পারে।',
+    resend: 'মেইল আবার পাঠান',
+    resent: 'মেইল আবার পাঠানো হয়েছে। ইনবক্স ও স্প্যাম দেখুন।',
+    verifiedBtn: 'ভেরিফাই করেছি, লগইন করুন',
+    wrongEmail: 'ইমেইল ভুল? বদলান',
     errors: [
       ['invalid login credentials', 'ইমেইল বা পাসওয়ার্ড ভুল হয়েছে'],
       ['email not confirmed', 'ইমেইল এখনো ভেরিফাই করা হয়নি। ইনবক্সের কনফার্মেশন লিংকে ক্লিক করুন'],
@@ -58,10 +83,22 @@ const text = {
     recoveryTitle: 'Set a new password',
     tagline: 'Everything in Sherpur, in one place',
     show: 'Show', hide: 'Hide',
-    signupSuccess: 'Account created! Please check your email and click the confirmation link.',
     resetSent: 'Reset link sent. Please check your inbox (and spam folder).',
     passwordUpdated: 'Password updated! Redirecting...',
     termsLine1: 'By signing up, you agree to our', terms: 'Terms', and: ' and ', privacy: 'Privacy Policy', termsLine2: '.',
+    verifyTitle: 'Check your email',
+    verifySent: 'We sent a message to:',
+    verifySteps: [
+      'Open your email app (for example Gmail).',
+      'Open the email named "Confirm your email address".',
+      'Tap the blue "Confirm email address" link inside. Your account is ready!',
+    ],
+    openMail: 'Open inbox',
+    verifySpam: "Can't find it? Check your spam or promotions folder. It can take a minute or two.",
+    resend: 'Resend email',
+    resent: 'Email sent again. Check your inbox and spam folder.',
+    verifiedBtn: "I've verified, log in",
+    wrongEmail: 'Wrong email? Change it',
     errors: [
       ['invalid login credentials', 'Wrong email or password'],
       ['email not confirmed', 'Email not verified yet. Click the confirmation link in your inbox'],
@@ -181,13 +218,21 @@ function IconLock() {
     </svg>
   );
 }
+function IconMailBig() {
+  return (
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <path d="M3.5 7l8.5 6 8.5-6" />
+    </svg>
+  );
+}
 
 const inputClass =
   'w-full rounded-full bg-white/15 border border-white/40 text-white placeholder-white/55 pl-5 pr-12 py-3 text-sm outline-none focus:bg-white/25 focus:border-white/80 transition-colors';
 
 export default function LoginPage() {
   const [lang, setLang] = useState('bn');
-  const [mode, setMode] = useState('login'); // login | signup | forgot | recovery
+  const [mode, setMode] = useState('login'); // login | signup | forgot | recovery | verify
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -195,6 +240,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+  const [resendLeft, setResendLeft] = useState(0);
 
   useEffect(() => {
     setLang(getCookieLang());
@@ -204,7 +250,24 @@ export default function LoginPage() {
     return () => sub?.subscription?.unsubscribe();
   }, []);
 
+  // ভেরিফাই পর্দায় থাকা অবস্থায় (একই ব্রাউজারের অন্য ট্যাবে) লিংকে ট্যাপ হলে নিজে থেকেই এগিয়ে যাবে
+  useEffect(() => {
+    if (mode !== 'verify') return undefined;
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') window.location.href = getNextPath();
+    });
+    return () => sub?.subscription?.unsubscribe();
+  }, [mode]);
+
+  // "আবার পাঠান" বোতামের অপেক্ষার গণনা
+  useEffect(() => {
+    if (resendLeft <= 0) return undefined;
+    const id = setTimeout(() => setResendLeft((s) => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [resendLeft]);
+
   const t = text[lang];
+  const num = (n) => (lang === 'bn' ? toBn(n) : n);
 
   function friendly(msg) {
     const m = (msg || '').toLowerCase();
@@ -226,13 +289,26 @@ export default function LoginPage() {
 
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { name } },
+          options: {
+            data: { name },
+            emailRedirectTo: `${window.location.origin}${getNextPath()}`,
+          },
         });
-        if (error) setError(friendly(error.message));
-        else setMessage(t.signupSuccess);
+        if (error) {
+          setError(friendly(error.message));
+        } else if (data?.session) {
+          // ইমেইল ভেরিফাই বন্ধ থাকলে সঙ্গে সঙ্গে লগইন হয়ে যায়
+          window.location.href = getNextPath();
+        } else if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          // এই ইমেইলে আগেই অ্যাকাউন্ট আছে: Supabase ভুল বোঝায় না, তাই নতুন মেইলও আসবে না
+          setError(friendly('already registered'));
+        } else {
+          setMode('verify');
+          setResendLeft(RESEND_SECONDS);
+        }
       } else if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) setError(friendly(error.message));
@@ -260,6 +336,29 @@ export default function LoginPage() {
     setLoading(false);
   }
 
+  async function handleResend() {
+    if (resendLeft > 0 || loading) return;
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: `${window.location.origin}${getNextPath()}` },
+      });
+      if (error) {
+        setError(friendly(error.message));
+      } else {
+        setMessage(t.resent);
+        setResendLeft(RESEND_SECONDS);
+      }
+    } catch (err) {
+      setError(friendly(err?.message));
+    }
+    setLoading(false);
+  }
+
   async function handleGoogleLogin() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -273,6 +372,8 @@ export default function LoginPage() {
 
   const submitLabel =
     mode === 'login' ? t.loginBtn : mode === 'signup' ? t.signupBtn : mode === 'forgot' ? t.resetBtn : t.saveBtn;
+
+  const inboxUrl = mailLink(email);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#0A3527] via-[#1C8A4C] to-[#F0D58A]">
@@ -289,153 +390,226 @@ export default function LoginPage() {
         <p className="text-white/85 text-xs mb-5 drop-shadow">{t.tagline}</p>
 
         <div className="w-full max-w-sm bg-[#0A3527]/40 backdrop-blur-xl border border-white/30 rounded-3xl p-5 shadow-2xl text-white">
-          {showTabs ? (
-            <div className="grid grid-cols-2 gap-1 bg-white/10 rounded-full p-1 mb-5">
-              {[
-                ['login', t.login],
-                ['signup', t.signup],
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => switchMode(key)}
-                  className={`py-2 rounded-full text-sm font-semibold transition-colors ${
-                    mode === key ? 'bg-white text-[#0F4D3A] shadow' : 'text-white/80'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="mb-5">
-              {mode === 'forgot' && (
-                <button type="button" onClick={() => switchMode('login')} className="text-xs text-white/70 mb-3">
-                  {t.backToLogin}
-                </button>
-              )}
-              <h1 className="text-lg font-semibold">{mode === 'forgot' ? t.forgotTitle : t.recoveryTitle}</h1>
-              {mode === 'forgot' && <p className="text-xs text-white/70 mt-1">{t.forgotHelp}</p>}
-            </div>
-          )}
+          {mode === 'verify' ? (
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 rounded-full bg-white/15 border border-white/30 flex items-center justify-center text-white mb-4">
+                <IconMailBig />
+              </div>
+              <h1 className="text-xl font-bold">{t.verifyTitle}</h1>
+              <p className="text-sm text-white/80 mt-2">{t.verifySent}</p>
+              <p className="mt-1 text-base font-semibold break-all">{email}</p>
 
-          {showTabs && (
-            <>
+              <ol className="mt-5 text-left space-y-3">
+                {t.verifySteps.map((step, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="flex-shrink-0 w-7 h-7 rounded-full bg-marigold text-ink font-bold text-sm flex items-center justify-center">
+                      {num(i + 1)}
+                    </span>
+                    <span className="text-sm leading-relaxed pt-0.5">{step}</span>
+                  </li>
+                ))}
+              </ol>
+
+              {inboxUrl && (
+                <a
+                  href={inboxUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-5 block w-full bg-marigold text-ink font-semibold rounded-full py-3 shadow-lg"
+                >
+                  {t.openMail}
+                </a>
+              )}
+
+              <p className="text-xs text-white/75 mt-4 leading-relaxed">{t.verifySpam}</p>
+
+              {error && (
+                <p className="text-sm bg-red-500/25 border border-red-300/50 rounded-2xl px-4 py-2.5 mt-4">{error}</p>
+              )}
+              {message && (
+                <p className="text-sm bg-white/20 border border-white/40 rounded-2xl px-4 py-2.5 mt-4">{message}</p>
+              )}
+
               <button
                 type="button"
-                onClick={handleGoogleLogin}
-                className="w-full flex items-center justify-center gap-3 bg-white text-ink rounded-full py-3 shadow active:scale-[0.99] transition-transform"
+                onClick={handleResend}
+                disabled={resendLeft > 0 || loading}
+                className="mt-4 w-full border border-white/50 rounded-full py-2.5 text-sm font-semibold disabled:opacity-50"
               >
-                <svg width="18" height="18" viewBox="0 0 18 18">
-                  <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.09-1.8 2.73v2.27h2.91c1.7-1.57 2.69-3.88 2.69-6.64z"/>
-                  <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.27c-.81.54-1.84.86-3.05.86-2.35 0-4.34-1.58-5.05-3.71H.96v2.34C2.44 15.98 5.48 18 9 18z"/>
-                  <path fill="#FBBC05" d="M3.95 10.7c-.18-.54-.28-1.11-.28-1.7s.1-1.16.28-1.7V4.96H.96A8.996 8.996 0 000 9c0 1.45.35 2.83.96 4.04l2.99-2.34z"/>
-                  <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.48 0 2.44 2.02.96 4.96l2.99 2.34C4.66 5.16 6.65 3.58 9 3.58z"/>
-                </svg>
-                <span className="text-sm font-medium">{t.google}</span>
+                {resendLeft > 0 ? `${t.resend} (${num(resendLeft)})` : t.resend}
               </button>
 
-              <div className="flex items-center gap-3 my-5">
-                <div className="flex-1 h-px bg-white/25" />
-                <span className="text-xs text-white/60">{t.or}</span>
-                <div className="flex-1 h-px bg-white/25" />
-              </div>
-            </>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-3.5">
-            {mode === 'signup' && (
-              <div>
-                <label className="block text-xs mb-1.5 text-white/80 pl-3">{t.name}</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    maxLength={80}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className={inputClass}
-                    placeholder={t.namePh}
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70"><IconUser /></span>
+              <button
+                type="button"
+                onClick={() => switchMode('login')}
+                className="mt-4 text-sm font-semibold underline text-white"
+              >
+                {t.verifiedBtn}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('');
+                  switchMode('signup');
+                }}
+                className="block mx-auto mt-3 text-xs text-white/70 underline"
+              >
+                {t.wrongEmail}
+              </button>
+            </div>
+          ) : (
+            <>
+              {showTabs ? (
+                <div className="grid grid-cols-2 gap-1 bg-white/10 rounded-full p-1 mb-5">
+                  {[
+                    ['login', t.login],
+                    ['signup', t.signup],
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => switchMode(key)}
+                      className={`py-2 rounded-full text-sm font-semibold transition-colors ${
+                        mode === key ? 'bg-white text-[#0F4D3A] shadow' : 'text-white/80'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
-              </div>
-            )}
-
-            {needsEmail && (
-              <div>
-                <label className="block text-xs mb-1.5 text-white/80 pl-3">{t.email}</label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    required
-                    maxLength={120}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className={inputClass}
-                    placeholder="you@example.com"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70"><IconMail /></span>
+              ) : (
+                <div className="mb-5">
+                  {mode === 'forgot' && (
+                    <button type="button" onClick={() => switchMode('login')} className="text-xs text-white/70 mb-3">
+                      {t.backToLogin}
+                    </button>
+                  )}
+                  <h1 className="text-lg font-semibold">{mode === 'forgot' ? t.forgotTitle : t.recoveryTitle}</h1>
+                  {mode === 'forgot' && <p className="text-xs text-white/70 mt-1">{t.forgotHelp}</p>}
                 </div>
-              </div>
-            )}
+              )}
 
-            {needsPassword && (
-              <div>
-                <label className="block text-xs mb-1.5 text-white/80 pl-3">
-                  {mode === 'recovery' ? t.newPassword : t.password}
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    minLength={6}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className={inputClass}
-                    placeholder={t.passwordPh}
-                  />
+              {showTabs && (
+                <>
                   <button
                     type="button"
-                    onClick={() => setShowPassword((s) => !s)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 text-[11px] font-medium"
-                    aria-label={showPassword ? t.hide : t.show}
+                    onClick={handleGoogleLogin}
+                    className="w-full flex items-center justify-center gap-3 bg-white text-ink rounded-full py-3 shadow active:scale-[0.99] transition-transform"
                   >
-                    {showPassword ? t.hide : t.show}
+                    <svg width="18" height="18" viewBox="0 0 18 18">
+                      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.09-1.8 2.73v2.27h2.91c1.7-1.57 2.69-3.88 2.69-6.64z"/>
+                      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.27c-.81.54-1.84.86-3.05.86-2.35 0-4.34-1.58-5.05-3.71H.96v2.34C2.44 15.98 5.48 18 9 18z"/>
+                      <path fill="#FBBC05" d="M3.95 10.7c-.18-.54-.28-1.11-.28-1.7s.1-1.16.28-1.7V4.96H.96A8.996 8.996 0 000 9c0 1.45.35 2.83.96 4.04l2.99-2.34z"/>
+                      <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.48 0 2.44 2.02.96 4.96l2.99 2.34C4.66 5.16 6.65 3.58 9 3.58z"/>
+                    </svg>
+                    <span className="text-sm font-medium">{t.google}</span>
                   </button>
-                </div>
-                {mode === 'login' && (
-                  <div className="text-right mt-2">
-                    <button type="button" onClick={() => switchMode('forgot')} className="text-xs text-white/80 underline">
-                      {t.forgot}
-                    </button>
+
+                  <div className="flex items-center gap-3 my-5">
+                    <div className="flex-1 h-px bg-white/25" />
+                    <span className="text-xs text-white/60">{t.or}</span>
+                    <div className="flex-1 h-px bg-white/25" />
+                  </div>
+                </>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-3.5">
+                {mode === 'signup' && (
+                  <div>
+                    <label className="block text-xs mb-1.5 text-white/80 pl-3">{t.name}</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        maxLength={80}
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className={inputClass}
+                        placeholder={t.namePh}
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70"><IconUser /></span>
+                    </div>
                   </div>
                 )}
-              </div>
-            )}
 
-            {error && (
-              <p className="text-sm bg-red-500/25 border border-red-300/50 rounded-2xl px-4 py-2.5">{error}</p>
-            )}
-            {message && (
-              <p className="text-sm bg-white/20 border border-white/40 rounded-2xl px-4 py-2.5">{message}</p>
-            )}
+                {needsEmail && (
+                  <div>
+                    <label className="block text-xs mb-1.5 text-white/80 pl-3">{t.email}</label>
+                    <div className="relative">
+                      <input
+                        type="email"
+                        required
+                        maxLength={120}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className={inputClass}
+                        placeholder="you@example.com"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70"><IconMail /></span>
+                    </div>
+                  </div>
+                )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-marigold text-ink font-semibold rounded-full py-3 shadow-lg active:scale-[0.99] transition-transform disabled:opacity-50"
-            >
-              {loading ? t.waiting : submitLabel}
-            </button>
-          </form>
+                {needsPassword && (
+                  <div>
+                    <label className="block text-xs mb-1.5 text-white/80 pl-3">
+                      {mode === 'recovery' ? t.newPassword : t.password}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        minLength={6}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={inputClass}
+                        placeholder={t.passwordPh}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((s) => !s)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 text-[11px] font-medium"
+                        aria-label={showPassword ? t.hide : t.show}
+                      >
+                        {showPassword ? t.hide : t.show}
+                      </button>
+                    </div>
+                    {mode === 'login' && (
+                      <div className="text-right mt-2">
+                        <button type="button" onClick={() => switchMode('forgot')} className="text-xs text-white/80 underline">
+                          {t.forgot}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {error && (
+                  <p className="text-sm bg-red-500/25 border border-red-300/50 rounded-2xl px-4 py-2.5">{error}</p>
+                )}
+                {message && (
+                  <p className="text-sm bg-white/20 border border-white/40 rounded-2xl px-4 py-2.5">{message}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-marigold text-ink font-semibold rounded-full py-3 shadow-lg active:scale-[0.99] transition-transform disabled:opacity-50"
+                >
+                  {loading ? t.waiting : submitLabel}
+                </button>
+              </form>
+            </>
+          )}
         </div>
 
-        <p className="text-center text-xs text-white/80 mt-5 max-w-xs drop-shadow">
-          {t.termsLine1}{' '}
-          <a href="/terms" className="underline">{t.terms}</a>{t.and}
-          <a href="/privacy" className="underline">{t.privacy}</a>{t.termsLine2}
-        </p>
+        {mode !== 'verify' && (
+          <p className="text-center text-xs text-white/80 mt-5 max-w-xs drop-shadow">
+            {t.termsLine1}{' '}
+            <a href="/terms" className="underline">{t.terms}</a>{t.and}
+            <a href="/privacy" className="underline">{t.privacy}</a>{t.termsLine2}
+          </p>
+        )}
       </div>
     </main>
   );
