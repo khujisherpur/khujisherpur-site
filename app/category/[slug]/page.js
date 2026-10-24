@@ -7,11 +7,14 @@ import { getLang } from '../../../lib/getLang';
 import { categoryLabels } from '../../../lib/categoryLabels';
 import { upazilaList } from '../../../lib/locations';
 import { formatPrice, parsePrice, timeAgo, toBn } from '../../../lib/format';
-import { subcategoryIcons } from '../../../lib/services';
+import { subcategoryIcons, getServicesFor, providerHref } from '../../../lib/services';
 import { SITE_NAME, categoryOgImage } from '../../../lib/site';
 import SiteHeader from '../../../components/SiteHeader';
 
 const FILTER_KEYS = ['type', 'upazila', 'sort', 'sub'];
+// শিক্ষকের জন্য আলাদা বিষয়-ক্যাটাগরি বন্ধ রেখে সব শিক্ষক এক তালিকায় দেখানো হবে।
+// পরে শিক্ষক বেশি হলে এটা false করলে আগের মতো বিষয় অনুযায়ী ক্যাটাগরি ফিরে আসবে।
+const TEACHER_FLAT_LIST = true;
 
 // গুগল ও ফেসবুকে দেখানো শিরোনাম: মানুষ যা টাইপ করে সেই শব্দ আগে
 const SEO_TITLES = {
@@ -262,6 +265,102 @@ export default async function CategoryPage({ params, searchParams }) {
 
   // সেবাদাতা: সাব-ক্যাটাগরি বাছাইয়ের পেজ
   if (isServiceProvider) {
+        if (category.slug === 'teacher' && TEACHER_FLAT_LIST) {
+      const { data: teachers } = await supabase
+        .from('providers')
+        .select('id, slug, name, area, upazila, is_available, photo_url, experience_years, primary_subcategory_id, is_verified')
+        .eq('category_id', category.id)
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      const list = teachers || [];
+      const tsvc = await getServicesFor(list, lang);
+
+      return (
+        <>
+          <SiteHeader lang={lang} />
+          <main className="max-w-4xl mx-auto px-4">
+            <div className="py-6">
+              <a href="/" className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
+              <div className="flex items-center gap-3 mt-3">
+                <span className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-[#EEF1F8]">{label.icon}</span>
+                <h1 className="text-xl md:text-3xl font-semibold leading-snug">{pageHeading}</h1>
+              </div>
+              <p className="text-ink/60 text-sm mt-2">
+                {num(list.length)}{lang === 'bn' ? ' জন শিক্ষক' : ' teachers'}
+              </p>
+              <a
+                href="/post/new?category=teacher"
+                className="mt-4 inline-block bg-marigold text-ink font-semibold text-sm px-5 py-2.5 rounded-full"
+              >
+                {lang === 'bn' ? '+ প্রোফাইল খুলুন' : '+ Open Profile'}
+              </a>
+            </div>
+
+            <section className="pb-16 space-y-3">
+              {list.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-4xl mb-2">📭</p>
+                  <p className="text-ink/55 text-sm">{t.noProvider}</p>
+                  <p className="text-ink/45 text-xs mt-1">{t.beFirst}</p>
+                </div>
+              )}
+
+              {list.map((p) => {
+                const services = tsvc[p.id] || [];
+                const shown = services.slice(0, 3);
+                const extra = services.length - shown.length;
+                return (
+                  <a
+                    key={p.id}
+                    href={providerHref(p, services)}
+                    className="flex gap-3 bg-white rounded-xl p-3 border-l-4 border-l-green border-t border-r border-b border-ink/10 hover:shadow-md transition-shadow"
+                  >
+                    {p.photo_url ? (
+                      <img src={p.photo_url} alt={p.name || ''} loading="lazy" className="w-16 h-16 rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                      <span className="w-16 h-16 rounded-full bg-[#EEF1F8] text-green-dark text-xl font-semibold flex items-center justify-center flex-shrink-0">
+                        {p.name?.charAt(0)}
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1 self-center">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium leading-tight truncate">{p.name}</p>
+                        {p.is_verified && (
+                          <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] flex items-center justify-center flex-shrink-0">
+                            ✓
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-ink/60 mt-0.5 truncate">
+                        📍 {p.area}
+                        {p.upazila && p.upazila !== p.area ? `, ${p.upazila}` : ''}
+                      </p>
+                      <div className="flex items-center gap-1 flex-wrap mt-1.5">
+                        {shown.map((s) => (
+                          <span key={s.id} className="text-[10px] px-2 py-0.5 rounded-full bg-[#EEF1F8] text-ink/60">
+                            {s.icon} {s.label}
+                          </span>
+                        ))}
+                        {extra > 0 && <span className="text-[10px] text-ink/45">+{num(extra)}</span>}
+                        {p.experience_years ? (
+                          <span className="text-[10px] text-ink/45 ml-1">
+                            · {num(p.experience_years)} {t.exp}
+                          </span>
+                        ) : null}
+                        {!p.is_available && (
+                          <span className="text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full">{t.unavailable}</span>
+                        )}
+                      </div>
+                    </div>
+                  </a>
+                );
+              })}
+            </section>
+          </main>
+        </>
+      );
+    }
     const [{ data: subcats }, { data: links }, { data: approved }] = await Promise.all([
       supabase
         .from('subcategories')
@@ -295,7 +394,12 @@ export default async function CategoryPage({ params, searchParams }) {
               <span className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-[#EEF1F8]">{label.icon}</span>
               <h1 className="text-xl md:text-3xl font-semibold leading-snug">{pageHeading}</h1>
             </div>
-            <p className="text-ink/60 text-sm mt-2">{category.slug === 'teacher' ? t.whichSubject : t.whichService}</p>
+                        <a
+              href={`/post/new?category=${category.slug}`}
+              className="mt-4 inline-block bg-marigold text-ink font-semibold text-sm px-5 py-2.5 rounded-full"
+            >
+              {lang === 'bn' ? '+ প্রোফাইল খুলুন' : '+ Open Profile'}
+            </a>
           </div>
 
           <section className="pb-16 grid grid-cols-3 sm:grid-cols-4 gap-2.5">
