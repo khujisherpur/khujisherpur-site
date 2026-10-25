@@ -37,11 +37,8 @@ export default function ProfilePage() {
     const { data } = await supabase.auth.getUser();
     setUser(data.user);
     if (data.user) {
-      const { data: prof } = await supabase
-        .from('users')
-        .select('name, phone')
-        .eq('id', data.user.id)
-        .maybeSingle();
+      const { data: rows } = await supabase.rpc('get_my_account');
+      const prof = (rows && rows[0]) || null;
       const n = prof?.name || '';
       const p = prof?.phone || '';
       setName(n);
