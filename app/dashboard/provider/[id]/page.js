@@ -10,6 +10,7 @@ import { cleanPhone, isValidBdPhone } from '../../../../lib/format';
 import { splitProfileInfo } from '../../../../lib/profileInfo';
 import DescriptionHelper from '../../../../components/DescriptionHelper';
 import { checkDescription } from '../../../../lib/descriptionCheck';
+import { syncAccountAvatar } from '../../../../lib/syncAvatar';
 
 // যেসব ক্যাটাগরিতে বিষয়/সেবা বাছাই থাকে
 const SUBCAT_CATEGORIES = ['service-provider', 'teacher'];
@@ -326,6 +327,9 @@ export default function EditProviderPage({ params }) {
         const oldPath = extractStoragePath(currentPhotoUrl);
         if (oldPath) await supabase.storage.from('images').remove([oldPath]);
       }
+
+      // নতুন ছবি দিলে অ্যাকাউন্টের ছবিও সেটাই হবে (আলাদা কপি)
+      if (newPhoto) await syncAccountAvatar(user.id, newPhoto);
 
       setSaved(true);
     } catch (err) {
