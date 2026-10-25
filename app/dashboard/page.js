@@ -33,6 +33,7 @@ const text = {
     renew: 'রিনিউ করুন (৩০ দিন)',
     views: 'ভিউ',
     statProfiles: 'প্রোফাইল',
+    statUnread: 'নতুন বার্তা',
     statPosts: 'পোস্ট',
     statViews: 'মোট ভিউ',
     favorites: 'সংরক্ষিত',
@@ -76,6 +77,7 @@ const text = {
     renew: 'Renew (30 days)',
     views: 'views',
     statProfiles: 'Profiles',
+    statUnread: 'New messages',
     statPosts: 'Posts',
     statViews: 'Total views',
     favorites: 'Saved',
@@ -125,10 +127,33 @@ export default function DashboardPage() {
   const [providers, setProviders] = useState([]);
   const [listings, setListings] = useState([]);
   const [ban, setBan] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [unread, setUnread] = useState(0);
 
-  useEffect(() => {
+    useEffect(() => {
     init();
   }, []);
+
+  async function refreshUnread(uid) {
+    const { data: rows } = await supabase
+      .from('conversations')
+      .select('owner_id, owner_unread, starter_unread')
+      .or(`owner_id.eq.${uid},starter_id.eq.${uid}`);
+    setUnread(
+      (rows || []).reduce((s, r) => s + (r.owner_id === uid ? r.owner_unread : r.starter_unread), 0)
+    );
+  }
+
+  useEffect(() => {
+    if (!user) return;
+    const h = () => refreshUnread(user.id);
+    window.addEventListener('pageshow', h);
+    window.addEventListener('focus', h);
+    return () => {
+      window.removeEventListener('pageshow', h);
+      window.removeEventListener('focus', h);
+    };
+  }, [user]);
 
   async function init() {
     // getSession ব্রাউজারের সেভ করা লগইন পড়ে, ইন্টারনেটে যায় না, তাই দ্রুত।
@@ -145,6 +170,13 @@ export default function DashboardPage() {
       ]);
       setBan(b || null);
       setProfile(prof || null);
+       supabase
+        .from('users')
+        .select('avatar_url')
+        .eq('id', uid)
+        .maybeSingle()
+        .then(({ data: pic }) => setAvatarUrl(pic?.avatar_url || ''));
+      refreshUnread(uid);
     }
     setLoading(false);
   }
@@ -288,26 +320,39 @@ export default function DashboardPage() {
 
         {/* Profile header */}
         <section className="bg-gradient-to-br from-[#0F4D3A] to-[#1C8A4C] rounded-2xl p-4 text-white shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="w-14 h-14 rounded-full bg-white/15 border border-white/30 flex items-center justify-center text-2xl font-semibold flex-shrink-0">
-              {displayName.charAt(0).toUpperCase()}
-            </span>
-            <div className="min-w-0">
+          <a href="/dashboard/profile" className="flex items-center gap-3">
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt=""
+                className="w-14 h-14 rounded-full object-cover border border-white/40 flex-shrink-0"
+              />
+            ) : (
+              <span className="w-14 h-14 rounded-full bg-white/15 border border-white/30 flex items-center justify-center text-2xl font-semibold flex-shrink-0">
+                {displayName.charAt(0).toUpperCase()}
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
               <p className="text-[11px] text-white/70">{t.myPosts}</p>
               <p className="font-semibold text-lg leading-tight truncate">{displayName}</p>
               <p className="text-xs text-white/70 truncate">{user.email}</p>
             </div>
-          </div>
+            <span className="text-white/60 text-xl flex-shrink-0">›</span>
+          </a>
           <div className="grid grid-cols-3 gap-2 mt-4">
-            {[
-              { label: t.statProfiles, value: providers.length },
+           {[
+              { label: t.statUnread, value: unread, href: '/dashboard/messages', hot: unread > 0 },
               { label: t.statPosts, value: listings.length },
               { label: t.statViews, value: totalViews },
             ].map((s) => (
-              <div key={s.label} className="bg-white/10 rounded-xl py-2.5 text-center">
+              <a
+                key={s.label}
+                href={s.href}
+                className={`${s.hot ? 'bg-red-500/80' : 'bg-white/10'} rounded-xl py-2.5 text-center block`}
+              >
                 <p className="text-xl font-semibold font-numeric">{s.value}</p>
                 <p className="text-[10px] text-white/70">{s.label}</p>
-              </div>
+              </a>
             ))}
           </div>
         </section>
@@ -337,13 +382,6 @@ export default function DashboardPage() {
             <span className="text-sm font-medium leading-tight">{t.favorites}</span>
           </a>
           <a
-            href="/dashboard/profile"
-            className="bg-white border border-ink/10 rounded-xl p-3 flex items-center gap-2.5 active:bg-paper"
-          >
-            <span className="w-9 h-9 rounded-lg bg-[#EEF1F8] flex items-center justify-center flex-shrink-0">👤</span>
-            <span className="text-sm font-medium leading-tight">{t.myProfile}</span>
-          </a>
-          <a
             href="/dashboard/donor"
             className="bg-white border border-ink/10 rounded-xl p-3 flex items-center gap-2.5 active:bg-paper"
           >
@@ -353,6 +391,7 @@ export default function DashboardPage() {
           <a
             href="/dashboard/blood-requests"
             className="bg-white border border-ink/10 rounded-xl p-3 flex items-center gap-2.5 active:bg-paper"
+            className="col-span-2 bg-white border border-ink/10 rounded-xl p-3 flex items-center gap-2.5 active:bg-paper"
           >
             <span className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">📋</span>
             <span className="text-sm font-medium leading-tight">{t.bloodRequests}</span>
