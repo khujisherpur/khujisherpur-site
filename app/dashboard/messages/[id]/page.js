@@ -20,6 +20,7 @@ export default function ConversationPage({ params }) {
   const [me, setMe] = useState(null);
   const [conv, setConv] = useState(null);
   const [msgs, setMsgs] = useState([]);
+  const [people, setPeople] = useState({});
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -41,6 +42,11 @@ export default function ConversationPage({ params }) {
       .order('created_at', { ascending: true });
     setConv(c);
     setMsgs(m || []);
+    const { data: ppl } = await supabase
+      .from('users')
+      .select('id, name, avatar_url')
+      .in('id', [c.owner_id, c.starter_id]);
+    setPeople(Object.fromEntries((ppl || []).map((p) => [p.id, p])));
     const unread = uid === c.owner_id ? c.owner_unread : uid === c.starter_id ? c.starter_unread : 0;
         if (unread > 0) {
       const { error: rpcErr } = await supabase.rpc('mark_conversation_read', { p_id: convId });
@@ -132,6 +138,18 @@ export default function ConversationPage({ params }) {
   // অপর পক্ষ কখন শেষবার পড়েছে, আর আমার শেষ বার্তা কোনটা
   const otherReadAt = me.id === conv.owner_id ? conv.starter_last_read : conv.owner_last_read;
   const lastMine = [...msgs].reverse().find((m) => m.sender_id === me.id);
+  const otherId = me.id === conv.owner_id ? conv.starter_id : conv.owner_id;
+  const other = people[otherId] || {};
+  const otherName = other.name || 'ব্যবহারকারী';
+  const otherAvatar = (
+    other.avatar_url ? (
+      <img src={other.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+    ) : (
+      <span className="w-8 h-8 rounded-full bg-[#EEF1F8] text-green-dark text-sm font-semibold flex items-center justify-center flex-shrink-0">
+        {otherName.charAt(0).toUpperCase()}
+      </span>
+    )
+  );
 
   return (
     <>
@@ -139,6 +157,10 @@ export default function ConversationPage({ params }) {
       <main className="max-w-2xl mx-auto px-4 pt-4">
         <a href="/dashboard/messages" className="text-sm text-ink/60 inline-block mb-2">← আমার বার্তা</a>
         <a
+        <div className="flex items-center gap-2.5 mb-3">
+          {otherAvatar}
+          <p className="font-semibold text-sm truncate">{otherName}</p>
+        </div>
           href={postHref}
           className="block bg-white border border-ink/10 rounded-xl px-3 py-2.5 mb-3"
         >
@@ -151,7 +173,8 @@ export default function ConversationPage({ params }) {
             const mine = m.sender_id === me.id;
             const seen = otherReadAt && new Date(otherReadAt) >= new Date(m.created_at);
             return (
-              <div key={m.id} className={mine ? 'flex justify-end' : 'flex justify-start'}>
+               <div key={m.id} className={mine ? 'flex justify-end' : 'flex justify-start items-end gap-2'}>
+                {!mine && otherAvatar}
                 <div
                   className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm whitespace-pre-line break-words ${
                     mine ? 'bg-green text-white rounded-br-sm' : 'bg-white border border-ink/10 rounded-bl-sm'
