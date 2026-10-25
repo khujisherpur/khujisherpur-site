@@ -11,6 +11,7 @@ export default function AuthButton({ lang = 'bn', variant = 'default' }) {
   const isLight = variant === 'light';
   const [user, setUser] = useState(null);
   const [name, setName] = useState('');
+  const [avatar, setAvatar] = useState('');
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [panelStyle, setPanelStyle] = useState({});
@@ -51,9 +52,14 @@ export default function AuthButton({ lang = 'bn', variant = 'default' }) {
     setLoading(false);
   }
 
-  async function loadName(userId) {
-    const { data } = await supabase.from('users').select('name').eq('id', userId).single();
+    async function loadName(userId) {
+    const { data } = await supabase
+      .from('users')
+      .select('name, avatar_url')
+      .eq('id', userId)
+      .single();
     setName(data?.name || '');
+    setAvatar(data?.avatar_url || '');
   }
 
   async function handleLogout() {
@@ -113,11 +119,15 @@ export default function AuthButton({ lang = 'bn', variant = 'default' }) {
         onClick={toggleOpen}
         className="flex flex-col items-center gap-0.5 px-1"
       >
-        <span className={`w-8 h-8 rounded-full text-sm flex items-center justify-center flex-shrink-0 ${
-          isLight ? 'bg-white text-green font-semibold' : 'bg-green text-white'
-        }`}>
-          {initial}
-        </span>
+         {avatar ? (
+          <img src={avatar} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-white/60" />
+        ) : (
+          <span className={`w-8 h-8 rounded-full text-sm flex items-center justify-center flex-shrink-0 ${
+            isLight ? 'bg-white text-green font-semibold' : 'bg-green text-white'
+          }`}>
+            {initial}
+          </span>
+        )}
         <span className={`text-[10px] font-medium max-w-[64px] truncate leading-none ${
           isLight ? 'text-white/90' : 'text-ink/70'
         }`}>
@@ -131,10 +141,19 @@ export default function AuthButton({ lang = 'bn', variant = 'default' }) {
           style={panelStyle}
           className="bg-white border border-ink/10 shadow-lg z-50 overflow-hidden rounded-md"
         >
-          <div className="px-4 py-3 border-b border-ink/10">
-            <p className="text-sm font-medium truncate text-ink">{name}</p>
-            <p className="text-xs text-ink/50 truncate">{user.email}</p>
-          </div>
+                    <a href="/dashboard/profile" className="flex items-center gap-2.5 px-4 py-3 border-b border-ink/10 hover:bg-paper">
+            {avatar ? (
+              <img src={avatar} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+            ) : (
+              <span className="w-9 h-9 rounded-full bg-green text-white text-sm flex items-center justify-center flex-shrink-0">
+                {initial}
+              </span>
+            )}
+            <span className="min-w-0">
+              <span className="block text-sm font-medium truncate text-ink">{name}</span>
+              <span className="block text-xs text-ink/50 truncate">{user.email}</span>
+            </span>
+          </a>
           <a
             href="/dashboard"
             className="block px-4 py-2.5 text-sm text-ink hover:bg-paper transition-colors"
