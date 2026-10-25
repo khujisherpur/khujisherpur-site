@@ -41,7 +41,7 @@ export default function DonorsTab() {
     const ids = list.map((x) => x.user_id).filter(Boolean);
 
     const [u, emailRes] = await Promise.all([
-      ids.length ? supabase.from('users').select('*').in('id', ids) : Promise.resolve({ data: [] }),
+      ids.length ? supabase.rpc('admin_list_users', { uids: ids }) : Promise.resolve({ data: [] }),
       ids.length ? supabase.rpc('admin_user_info', { uids: ids }) : Promise.resolve({ data: [] }),
     ]);
     const emailMap = Object.fromEntries((emailRes.data || []).map((e) => [e.id, e.email]));
