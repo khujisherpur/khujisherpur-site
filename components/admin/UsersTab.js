@@ -81,7 +81,7 @@ export default function UsersTab({ currentUserId, currentRole }) {
     setLoading(true);
     setError('');
     const [u, b, l, p] = await Promise.all([
-      supabase.from('users').select('*'),
+      supabase.rpc('admin_list_users'),
       supabase.from('banned_users').select('user_id, reason, banned_at'),
       supabase.from('listings').select('user_id'),
       supabase.from('providers').select('user_id'),
