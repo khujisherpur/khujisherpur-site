@@ -103,8 +103,8 @@ export default function ProfilePage() {
     const oldPath = extractStoragePath(oldUrl);
     if (oldPath) {
       const { data: removed, error: rmErr } = await supabase.storage.from('images').remove([oldPath]);
-      if (rmErr || !removed || removed.length === 0) {
-        setError('ছবি সেভ হয়েছে, কিন্তু পুরোনো ছবি স্টোরেজ থেকে মোছা যায়নি');
+       if (rmErr || !removed || removed.length === 0) {
+        setError('পুরোনো ছবি মোছা যায়নি। পথ: ' + oldPath + (rmErr ? ' | ' + rmErr.message : ' | কোনো ফাইল মেলেনি'));
       }
     }
     return true;
