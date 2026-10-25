@@ -135,7 +135,7 @@ export default function ProfilePage() {
     }
     setAvatarUrl(pub.publicUrl);
     setPhotoSaved(true);
-    setTimeout(() => setPhotoSaved(false), 3000);
+    setTimeout(() => setPhotoSaved(false), 5000);
   }
 
   async function removeAvatar() {
@@ -257,7 +257,11 @@ export default function ProfilePage() {
               </button>
             )}
           </div>
-        {photoSaved && <p className="text-xs text-green mt-3">✓ ছবি সেভ হয়েছে</p>}
+                  {photoSaved && (
+            <p className="text-sm text-green bg-green/10 rounded-lg px-3 py-2 mt-3 font-medium">
+              ✓ ছবি সেভ হয়েছে
+            </p>
+          )}
         </div>
 
         <form
