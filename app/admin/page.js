@@ -71,11 +71,8 @@ export default function AdminPage() {
     }
     setUser(authUser);
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', authUser.id)
-      .single();
+    const { data: profRows } = await supabase.rpc('get_my_account');
+    const profile = (profRows && profRows[0]) || null;
 
     setRole(profile?.role || 'user');
 
