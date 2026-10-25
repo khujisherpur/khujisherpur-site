@@ -119,7 +119,7 @@ export default function ReviewSection({ providerId, ownerId }) {
   async function load() {
     const { data } = await supabase
       .from('reviews')
-      .select('id, rating, comment, created_at, edited_at, user_id, reply, replied_at, users(name)')
+      .select('id, rating, comment, created_at, edited_at, user_id, reply, replied_at, users(name, avatar_url)')
       .eq('provider_id', providerId)
       .order('created_at', { ascending: false });
     const list = data || [];
@@ -128,7 +128,7 @@ export default function ReviewSection({ providerId, ownerId }) {
     if (list.length) {
       const { data: rep } = await supabase
         .from('review_replies')
-        .select('id, review_id, user_id, body, created_at, edited_at, users(name)')
+        .select('id, review_id, user_id, body, created_at, edited_at, users(name, avatar_url)')
         .in('review_id', list.map((r) => r.id))
         .order('created_at', { ascending: true });
       const map = {};
@@ -252,10 +252,14 @@ export default function ReviewSection({ providerId, ownerId }) {
 
   const btn = 'text-xs text-ink/55 font-medium hover:text-ink';
 
-  function Avatar({ name, small }) {
+    function Avatar({ name, src, small }) {
+    const box = small ? 'w-7 h-7' : 'w-9 h-9';
+    if (src) {
+      return <img src={src} alt="" className={`${box} rounded-full object-cover flex-shrink-0`} />;
+    }
     return (
       <span
-        className={`${small ? 'w-7 h-7 text-xs' : 'w-9 h-9 text-sm'} rounded-full bg-[#EEF1F8] text-green-dark font-semibold flex items-center justify-center flex-shrink-0`}
+        className={`${box} ${small ? 'text-xs' : 'text-sm'} rounded-full bg-[#EEF1F8] text-green-dark font-semibold flex items-center justify-center flex-shrink-0`}
       >
         {name.charAt(0).toUpperCase()}
       </span>
@@ -391,7 +395,7 @@ export default function ReviewSection({ providerId, ownerId }) {
           return (
             <div key={r.id} className="border-t border-ink/5 pt-5 first:border-0 first:pt-0">
               <div className="flex items-start gap-3">
-                <Avatar name={name} />
+               <Avatar name={name} src={r.users?.avatar_url} />
                 <div className="min-w-0 flex-1">
                   <div className="bg-paper rounded-2xl px-3.5 py-2.5">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -469,7 +473,7 @@ export default function ReviewSection({ providerId, ownerId }) {
                         const editingReply = editing && editing.type === 'reply' && editing.id === p.id;
                         return (
                           <div key={p.id} className="flex items-start gap-2">
-                            <Avatar name={pn} small />
+                           <Avatar name={pn} src={p.users?.avatar_url} small />
                             <div className="min-w-0 flex-1">
                               <div className="bg-paper rounded-2xl px-3 py-2">
                                 <p className="text-xs font-semibold">
