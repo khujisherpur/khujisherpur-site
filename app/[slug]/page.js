@@ -7,7 +7,7 @@ import { getLang } from '../../lib/getLang';
 import { upazilaList } from '../../lib/locations';
 import { toBn } from '../../lib/format';
 import { getServicesFor, providerHref, subcategoryIcons } from '../../lib/services';
-import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../lib/site';
+import { SITE_NAME, categoryOgImage } from '../../lib/site';
 import SiteHeader from '../../components/SiteHeader';
 
 const text = {
@@ -39,6 +39,12 @@ const getSubcategory = cache(async (slug) => {
     .eq('is_active', true)
     .maybeSingle();
   return data || null;
+});
+
+// সাব-ক্যাটাগরি যে ক্যাটাগরির অধীনে তার slug (মেটাডেটা ও পেজ একই কোয়েরি ভাগ করে)
+const getOwnerCatSlug = cache(async (categoryId) => {
+  const { data } = await supabase.from('categories').select('slug').eq('id', categoryId).maybeSingle();
+  return data?.slug || null;
 });
 
 // এই সেবা যাঁরা অতিরিক্ত সেবা হিসেবে দেন তাঁদের আইডি (মেটাডেটা ও পেজ একই কোয়েরি ভাগ করে)
@@ -98,6 +104,10 @@ export async function generateMetadata({ params, searchParams }) {
           : `শেরপুরের ${name} সেবাদাতা — এলাকা, অভিজ্ঞতা ও রিভিউসহ। সরাসরি কল করুন।`
       : `${name} service providers in Sherpur district — area, experience and reviews. Call directly.`;
 
+  // শিক্ষকের বিষয় হলে শিক্ষকের ছবি, বাকি সব সেবায় সেবাদাতার ছবি
+  const ownerSlug = await getOwnerCatSlug(sub.category_id);
+  const ogImage = categoryOgImage(ownerSlug === 'teacher' ? 'teacher' : 'service-provider');
+
   return {
     title,
     description,
@@ -112,9 +122,9 @@ export async function generateMetadata({ params, searchParams }) {
       siteName: SITE_NAME,
       type: 'website',
       locale: lang === 'bn' ? 'bn_BD' : 'en_US',
-      images: [DEFAULT_OG_IMAGE],
+      images: [ogImage],
     },
-    twitter: { card: 'summary_large_image', title, description, images: [DEFAULT_OG_IMAGE] },
+    twitter: { card: 'summary_large_image', title, description, images: [ogImage] },
   };
 }
 
@@ -148,12 +158,8 @@ export default async function SubcategoryPage({ params, searchParams }) {
   const icon = subcategoryIcons[subcategory.slug] || '🛠️';
   const base = `/${subcategory.slug}`;
   // শিক্ষকের বিষয় হলে প্রোফাইল যোগ ও ফেরার লিংক শিক্ষকের ক্যাটাগরিতে যায়
-  const { data: ownerCat } = await supabase
-    .from('categories')
-    .select('slug')
-    .eq('id', subcategory.category_id)
-    .maybeSingle();
-  const catSlug = ownerCat?.slug === 'teacher' ? 'teacher' : 'service-provider';
+  const ownerSlug = await getOwnerCatSlug(subcategory.category_id);
+  const catSlug = ownerSlug === 'teacher' ? 'teacher' : 'service-provider';
   const countWord = catSlug === 'teacher' && lang === 'bn' ? ' জন শিক্ষক' : t.countWord;
 
   return (
