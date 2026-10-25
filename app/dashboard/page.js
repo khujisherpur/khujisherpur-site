@@ -141,7 +141,7 @@ export default function DashboardPage() {
       const [, { data: b }, { data: prof }] = await Promise.all([
         loadMyPosts(uid),
         supabase.from('banned_users').select('reason').eq('user_id', uid).maybeSingle(),
-        supabase.from('users').select('name, role').eq('id', uid).maybeSingle(),
+        supabase.rpc('get_my_account').then((r) => ({ data: (r.data && r.data[0]) || null })),
       ]);
       setBan(b || null);
       setProfile(prof || null);
