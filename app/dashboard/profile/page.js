@@ -99,9 +99,14 @@ export default function ProfilePage() {
       .update({ avatar_url: newUrl })
       .eq('id', user.id)
       .select('id');
-    if (err || !updated || updated.length === 0) return false;
+        if (err || !updated || updated.length === 0) return false;
     const oldPath = extractStoragePath(oldUrl);
-    if (oldPath) await supabase.storage.from('images').remove([oldPath]);
+    if (oldPath) {
+      const { data: removed, error: rmErr } = await supabase.storage.from('images').remove([oldPath]);
+      if (rmErr || !removed || removed.length === 0) {
+        setError('ছবি সেভ হয়েছে, কিন্তু পুরোনো ছবি স্টোরেজ থেকে মোছা যায়নি');
+      }
+    }
     return true;
   }
 
