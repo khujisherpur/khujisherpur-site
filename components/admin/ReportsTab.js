@@ -52,11 +52,20 @@ export default function ReportsTab() {
   async function load() {
     setLoading(true);
     setError('');
-    const { data, error: err } = await supabase
+        const { data: repRows, error: err } = await supabase
       .from('reports')
-      .select('id, target_type, target_id, reason, status, created_at, users(name, phone)')
+      .select('id, target_type, target_id, reason, status, created_at, reported_by')
       .order('created_at', { ascending: false })
       .limit(200);
+    let data = repRows;
+    if (!err && repRows && repRows.length) {
+      const ids = [...new Set(repRows.map((r) => r.reported_by).filter(Boolean))];
+      const { data: people } = ids.length
+        ? await supabase.rpc('admin_list_users', { uids: ids })
+        : { data: [] };
+      const byId = Object.fromEntries((people || []).map((p) => [p.id, p]));
+      data = repRows.map((r) => ({ ...r, users: byId[r.reported_by] || null }));
+    }
     if (err) {
       setError('রিপোর্ট লোড করা যায়নি: ' + err.message);
       setLoading(false);
