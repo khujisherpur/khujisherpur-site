@@ -58,6 +58,7 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState('');
   const [pendingFile, setPendingFile] = useState(null);
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoSaved, setPhotoSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -133,6 +134,8 @@ export default function ProfilePage() {
       return;
     }
     setAvatarUrl(pub.publicUrl);
+    setPhotoSaved(true);
+    setTimeout(() => setPhotoSaved(false), 3000);
   }
 
   async function removeAvatar() {
@@ -254,6 +257,7 @@ export default function ProfilePage() {
               </button>
             )}
           </div>
+        {photoSaved && <p className="text-xs text-green mt-3">✓ ছবি সেভ হয়েছে</p>}
         </div>
 
         <form
