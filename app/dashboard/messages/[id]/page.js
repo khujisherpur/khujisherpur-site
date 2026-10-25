@@ -154,13 +154,13 @@ export default function ConversationPage({ params }) {
   return (
     <>
       <SiteHeader lang="bn" simple />
-      <main className="max-w-2xl mx-auto px-4 pt-4">
+        <main className="max-w-2xl mx-auto px-4 pt-4">
         <a href="/dashboard/messages" className="text-sm text-ink/60 inline-block mb-2">← আমার বার্তা</a>
-        <a
         <div className="flex items-center gap-2.5 mb-3">
           {otherAvatar}
           <p className="font-semibold text-sm truncate">{otherName}</p>
         </div>
+        <a
           href={postHref}
           className="block bg-white border border-ink/10 rounded-xl px-3 py-2.5 mb-3"
         >
