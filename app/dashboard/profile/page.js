@@ -16,6 +16,28 @@ function PageShell({ children }) {
   );
 }
 
+async function compressImage(blob, maxSide = 400, targetKB = 100) {
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+    const toBlob = (q) => new Promise((r) => canvas.toBlob(r, 'image/jpeg', q));
+    let q = 0.85;
+    let out = await toBlob(q);
+    while (out && out.size > targetKB * 1024 && q > 0.4) {
+      q -= 0.1;
+      out = await toBlob(q);
+    }
+    return out || blob;
+  } catch (e) {
+    return blob;
+  }
+}
 const normName = (s) => s.trim().replace(/\s+/g, ' ');
 const normPhone = (s) => (s.trim() ? cleanPhone(s) : '');
 
@@ -88,9 +110,10 @@ export default function ProfilePage() {
     setPhotoBusy(true);
     setError(null);
     const path = `${user.id}/avatar-${Date.now()}.jpg`;
+    const small = await compressImage(blob);
     const { error: upErr } = await supabase.storage
       .from('images')
-      .upload(path, blob, { contentType: 'image/jpeg' });
+      .upload(path, small, { contentType: 'image/jpeg' });
     if (upErr) {
       setPhotoBusy(false);
       setError('ছবি আপলোড করা যায়নি। ছবি ছোট করে বা ইন্টারনেট চেক করে আবার চেষ্টা করুন');
