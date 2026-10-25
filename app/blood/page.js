@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { getLang } from '../../lib/getLang';
 import { toBn, timeAgo } from '../../lib/format';
 import { formatBloodDate } from '../../lib/bloodFormat';
-import { SITE_NAME, DEFAULT_OG_IMAGE } from '../../lib/site';
+import { SITE_NAME, categoryOgImage } from '../../lib/site';
 import SiteHeader from '../../components/SiteHeader';
 
 // ৩ দিনের পুরোনো অনুরোধ আর দেখানো হবে না (ডাটাবেসও মুছে ফেলে)
@@ -115,6 +115,9 @@ export async function generateMetadata() {
         : 'শেরপুরে A+, B+, O+ সহ যেকোনো গ্রুপের রক্ত লাগলে অনুরোধ পোস্ট করুন, রক্তদাতা হতে নিবন্ধন করুন — মিলে যাওয়া ডোনাররা নোটিফিকেশন পান।'
       : 'Post an urgent blood request in Sherpur or register as a donor. Matching donors get notified.';
 
+  // এই পাতার নিজস্ব শেয়ার-ছবি (public/og/blood.jpg)
+  const ogImage = categoryOgImage('blood');
+
   return {
     title,
     description,
@@ -126,9 +129,9 @@ export async function generateMetadata() {
       siteName: SITE_NAME,
       type: 'website',
       locale: lang === 'bn' ? 'bn_BD' : 'en_US',
-      images: [DEFAULT_OG_IMAGE],
+      images: [ogImage],
     },
-    twitter: { card: 'summary_large_image', title, description, images: [DEFAULT_OG_IMAGE] },
+    twitter: { card: 'summary_large_image', title, description, images: [ogImage] },
   };
 }
 
