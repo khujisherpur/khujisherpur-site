@@ -10,6 +10,7 @@ export default function MessagesPage() {
   const [me, setMe] = useState(null);
   const [convs, setConvs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [people, setPeople] = useState({});
 
   const load = useCallback(async () => {
     const { data } = await supabase.auth.getSession();
@@ -18,10 +19,16 @@ export default function MessagesPage() {
     if (u) {
       const { data: rows } = await supabase
         .from('conversations')
-        .select('id, kind, ref_title, owner_id, last_message, last_message_at, owner_unread, starter_unread')
+        .select('id, kind, ref_title, owner_id, starter_id, last_message, last_message_at, owner_unread, starter_unread')
         .or(`owner_id.eq.${u.id},starter_id.eq.${u.id}`)
         .order('last_message_at', { ascending: false });
-      setConvs(rows || []);
+      const list = rows || [];
+      setConvs(list);
+      const otherIds = [...new Set(list.map((c) => (c.owner_id === u.id ? c.starter_id : c.owner_id)))];
+      if (otherIds.length) {
+        const { data: ppl } = await supabase.from('users').select('id, name, avatar_url').in('id', otherIds);
+        setPeople(Object.fromEntries((ppl || []).map((p) => [p.id, p])));
+      }
     }
     setLoading(false);
   }, []);
@@ -88,29 +95,38 @@ export default function MessagesPage() {
           {convs.map((c) => {
             const mine = c.owner_id === me.id;
             const unread = mine ? c.owner_unread : c.starter_unread;
+            const other = people[mine ? c.starter_id : c.owner_id] || {};
+            const otherName = other.name || 'ব্যবহারকারী';
             return (
               <a
                 key={c.id}
                 href={`/dashboard/messages/${c.id}`}
-                className="block bg-white rounded-xl border border-ink/10 p-3 active:bg-paper"
+                className="flex gap-3 bg-white rounded-xl border border-ink/10 p-3 active:bg-paper"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-medium text-sm line-clamp-1">{c.ref_title}</p>
-                  {unread > 0 && (
-                    <span className="bg-red-500 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0">
-                      {unread}
-                    </span>
-                  )}
+                {other.avatar_url ? (
+                  <img src={other.avatar_url} alt="" className="w-11 h-11 rounded-full object-cover flex-shrink-0" />
+                ) : (
+                  <span className="w-11 h-11 rounded-full bg-[#EEF1F8] text-green-dark font-semibold flex items-center justify-center flex-shrink-0">
+                    {otherName.charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium text-sm line-clamp-1">{otherName}</p>
+                    {unread > 0 && (
+                      <span className="bg-red-500 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0">
+                        {unread}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-ink/40 mt-0.5 line-clamp-1">
+                    {c.kind === 'provider' ? 'প্রোফাইল' : c.kind === 'blood' ? 'রক্তের অনুরোধ' : 'পোস্ট'}: {c.ref_title}
+                  </p>
+                  <p className={`text-xs mt-1 line-clamp-1 ${unread > 0 ? 'text-ink font-medium' : 'text-ink/60'}`}>
+                    {c.last_message}
+                  </p>
+                  <p className="text-[10px] text-ink/30 mt-1">{timeAgo(c.last_message_at, 'bn')}</p>
                 </div>
-                <p className="text-[11px] text-ink/40 mt-0.5">
-                  {mine ? '📥 আপনার পোস্টে বার্তা' : '📤 আপনি বার্তা পাঠিয়েছেন'}
-                  {' · '}
-                  {c.kind === 'provider' ? 'প্রোফাইল' : c.kind === 'blood' ? 'রক্তের অনুরোধ' : 'পোস্ট'}
-                </p>
-                <p className={`text-xs mt-1 line-clamp-1 ${unread > 0 ? 'text-ink font-medium' : 'text-ink/60'}`}>
-                  {c.last_message}
-                </p>
-                <p className="text-[10px] text-ink/30 mt-1">{timeAgo(c.last_message_at, 'bn')}</p>
               </a>
             );
           })}
