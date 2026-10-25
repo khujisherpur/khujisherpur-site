@@ -4,6 +4,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import BottomNav from '../../../components/BottomNav';
 import PageSkeleton from '../../../components/PageSkeleton';
+import ImageCropper from '../../../components/ImageCropper';
 import { cleanPhone, isValidBdPhone } from '../../../lib/format';
 
 function PageShell({ children }) {
@@ -18,12 +19,23 @@ function PageShell({ children }) {
 const normName = (s) => s.trim().replace(/\s+/g, ' ');
 const normPhone = (s) => (s.trim() ? cleanPhone(s) : '');
 
+function extractStoragePath(publicUrl) {
+  if (!publicUrl) return null;
+  const marker = '/images/';
+  const idx = publicUrl.indexOf(marker);
+  if (idx === -1) return null;
+  return publicUrl.slice(idx + marker.length);
+}
+
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
   const [name, setName] = useState('');
   const [savedName, setSavedName] = useState('');
   const [phone, setPhone] = useState('');
   const [savedPhone, setSavedPhone] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [pendingFile, setPendingFile] = useState(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -37,7 +49,10 @@ export default function ProfilePage() {
     const { data } = await supabase.auth.getUser();
     setUser(data.user);
     if (data.user) {
-      const { data: rows } = await supabase.rpc('get_my_account');
+      const [{ data: rows }, { data: pic }] = await Promise.all([
+        supabase.rpc('get_my_account'),
+        supabase.from('users').select('avatar_url').eq('id', data.user.id).maybeSingle(),
+      ]);
       const prof = (rows && rows[0]) || null;
       const n = prof?.name || '';
       const p = prof?.phone || '';
@@ -45,8 +60,64 @@ export default function ProfilePage() {
       setSavedName(n);
       setPhone(p);
       setSavedPhone(p);
+      setAvatarUrl(pic?.avatar_url || '');
     }
     setLoading(false);
+  }
+
+  function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (file) setPendingFile(file);
+    e.target.value = '';
+  }
+
+  async function saveAvatar(newUrl, oldUrl) {
+    const { data: updated, error: err } = await supabase
+      .from('users')
+      .update({ avatar_url: newUrl })
+      .eq('id', user.id)
+      .select('id');
+    if (err || !updated || updated.length === 0) return false;
+    const oldPath = extractStoragePath(oldUrl);
+    if (oldPath) await supabase.storage.from('images').remove([oldPath]);
+    return true;
+  }
+
+  async function handleCropComplete(blob) {
+    setPendingFile(null);
+    setPhotoBusy(true);
+    setError(null);
+    const path = `${user.id}/avatar-${Date.now()}.jpg`;
+    const { error: upErr } = await supabase.storage
+      .from('images')
+      .upload(path, blob, { contentType: 'image/jpeg' });
+    if (upErr) {
+      setPhotoBusy(false);
+      setError('ছবি আপলোড করা যায়নি। ছবি ছোট করে বা ইন্টারনেট চেক করে আবার চেষ্টা করুন');
+      return;
+    }
+    const { data: pub } = supabase.storage.from('images').getPublicUrl(path);
+    const ok = await saveAvatar(pub.publicUrl, avatarUrl);
+    setPhotoBusy(false);
+    if (!ok) {
+      await supabase.storage.from('images').remove([path]);
+      setError('ছবি সেভ করা যায়নি, একটু পরে আবার চেষ্টা করুন');
+      return;
+    }
+    setAvatarUrl(pub.publicUrl);
+  }
+
+  async function removeAvatar() {
+    if (!avatarUrl || !confirm('ছবিটা সরিয়ে ফেলতে চান?')) return;
+    setPhotoBusy(true);
+    setError(null);
+    const ok = await saveAvatar(null, avatarUrl);
+    setPhotoBusy(false);
+    if (!ok) {
+      setError('ছবি সরানো যায়নি, একটু পরে আবার চেষ্টা করুন');
+      return;
+    }
+    setAvatarUrl('');
   }
 
   async function handleSave(e) {
@@ -107,24 +178,60 @@ export default function ProfilePage() {
   }
 
   const changed = normName(name) !== savedName || normPhone(phone) !== savedPhone;
+  const initial = (name.trim() || user.email || '?').charAt(0).toUpperCase();
 
   return (
     <PageShell>
       <main className="max-w-xl mx-auto px-4 py-5">
+        {pendingFile && (
+          <ImageCropper
+            file={pendingFile}
+            shape="circle"
+            onCancel={() => setPendingFile(null)}
+            onComplete={handleCropComplete}
+          />
+        )}
+
         <a href="/dashboard" className="text-sm text-ink/60 inline-block mb-3">← আমার অ্যাকাউন্ট</a>
         <h1 className="text-xl font-semibold mb-4">আমার প্রোফাইল</h1>
 
+        <div className="bg-white border border-ink/10 border-t-4 border-t-green rounded-xl p-5 mb-4 text-center">
+          <div className="relative w-28 h-28 mx-auto">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="w-28 h-28 rounded-full object-cover border-4 border-white shadow" />
+            ) : (
+              <span className="w-28 h-28 rounded-full bg-[#EEF1F8] text-green-dark text-4xl font-semibold flex items-center justify-center border-4 border-white shadow">
+                {initial}
+              </span>
+            )}
+            {photoBusy && (
+              <span className="absolute inset-0 rounded-full bg-white/70 flex items-center justify-center text-xs text-ink/60">
+                অপেক্ষা করুন...
+              </span>
+            )}
+          </div>
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <label className="text-sm bg-green text-white px-4 py-2 rounded-full cursor-pointer">
+              {avatarUrl ? '📷 ছবি বদলান' : '📷 ছবি যোগ করুন'}
+              <input type="file" accept="image/*" onChange={handleFileSelect} disabled={photoBusy} className="hidden" />
+            </label>
+            {avatarUrl && (
+              <button
+                type="button"
+                onClick={removeAvatar}
+                disabled={photoBusy}
+                className="text-sm border border-red-300 text-red-600 px-4 py-2 rounded-full disabled:opacity-50"
+              >
+                সরান
+              </button>
+            )}
+          </div>
+        </div>
+
         <form
           onSubmit={handleSave}
-          className="bg-white border border-ink/10 border-t-4 border-t-green rounded-xl p-5 space-y-4"
+          className="bg-white border border-ink/10 rounded-xl p-5 space-y-4"
         >
-          <div className="flex items-center gap-3">
-            <span className="w-14 h-14 rounded-full bg-[#EEF1F8] text-green-dark text-2xl font-semibold flex items-center justify-center flex-shrink-0">
-              {(name.trim() || user.email || '?').charAt(0).toUpperCase()}
-            </span>
-            <p className="text-xs text-ink/50">নামের প্রথম অক্ষর আপনার ছবির জায়গায় দেখা যায়।</p>
-          </div>
-
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">আপনার নাম</label>
             <input
@@ -139,9 +246,6 @@ export default function ProfilePage() {
               className="w-full border border-ink/20 rounded-lg px-3 py-2.5 outline-none focus:border-green"
               placeholder="যেমন: রহিম উদ্দিন"
             />
-            <p className="text-[11px] text-ink/45 mt-1.5">
-              এই নাম আপনার অ্যাকাউন্ট পেজে দেখা যায়। ডোনার হিসেবে দেওয়া নাম আলাদা, সেটা ডোনার নিবন্ধনে থাকে।
-            </p>
           </div>
 
           <div>
