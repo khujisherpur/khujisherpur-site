@@ -58,6 +58,11 @@ export default function AdminPage() {
   const [savingSubcat, setSavingSubcat] = useState(false);
 
   useEffect(() => {
+    // নোটিফিকেশনের লিংক (/admin?tab=mod_posts) থেকে সরাসরি ঠিক ট্যাবে খোলা
+    try {
+      const wanted = new URLSearchParams(window.location.search).get('tab');
+      if (wanted && sidebarItems.some((i) => i.key === wanted)) setActiveTab(wanted);
+    } catch (e) {}
     init();
   }, []);
 
