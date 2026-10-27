@@ -144,7 +144,7 @@ export default async function HomePage() {
       .select('id, name, slug, area, photo_url, created_at, primary_subcategory_id, is_verified, categories(slug)')
       .eq('status', 'approved')
       .order('created_at', { ascending: false })
-      .limit(6),
+      .limit(16),
     supabase
       .from('listings')
       .select('id, title, area, upazila, owner_name, price_or_salary, photos, posted_at, categories(slug)')
@@ -161,8 +161,8 @@ export default async function HomePage() {
     return s ? `${s.icon} ${s.label}` : categoryLabels[p.categories?.slug]?.[lang].name || '';
   };
 
-  // সাম্প্রতিক পোস্ট: শুধু পোস্ট (সেবাদাতারা নিজেদের আলাদা অংশে আছে), সর্বোচ্চ ৪০টা
-  const recentItems = (recentListings || []).map((l) => ({
+  // সাম্প্রতিক পোস্ট: পোস্ট ও নতুন সেবাদাতা একসঙ্গে, নতুন আগে; সর্বোচ্চ ৪০টা
+  const listingItems = (recentListings || []).map((l) => ({
     id: l.id, type: 'listing', title: l.title, area: l.area, upazila: l.upazila,
     price: l.price_or_salary, image: l.photos?.[0] || null, date: l.posted_at,
     slug: l.categories?.slug,
@@ -170,6 +170,15 @@ export default async function HomePage() {
     owner: l.categories?.slug === 'job' ? l.owner_name : null,
     badge: categoryLabels[l.categories?.slug]?.[lang].name || '', href: `/listing/${l.id}`,
   }));
+  const providerItems = (recentProviders || []).map((p) => ({
+    id: p.id, type: 'provider', title: p.name, area: p.area, upazila: null,
+    price: null, image: p.photo_url || null, date: p.created_at,
+    slug: p.categories?.slug, owner: null, verified: !!p.is_verified,
+    badge: providerBadge(p), href: providerHref(p, svc[p.id]),
+  }));
+  const recentItems = [...listingItems, ...providerItems]
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 40);
 
     const bloodItems = (bloodRows || []).map((r) => ({
     id: r.id, type: 'blood', group: r.blood_group, bags: r.bags_needed,
@@ -476,7 +485,10 @@ export default async function HomePage() {
                           {formatPrice(item.price, lang)}
                         </p>
                       )}
-                      <p className="text-sm font-medium leading-snug line-clamp-2 mt-1">{item.title}</p>
+                      <p className="text-sm font-medium leading-snug line-clamp-2 mt-1">
+                        {item.title}
+                        {item.verified && <span className="text-blue-500 text-xs ml-1" title="Verified">✓</span>}
+                      </p>
                       {item.owner && (
                         <p className="text-[11px] text-ink/60 mt-1 line-clamp-1">🏢 {item.owner}</p>
                       )}
