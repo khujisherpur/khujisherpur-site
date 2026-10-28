@@ -8,7 +8,9 @@ import { upazilaList } from '../../lib/locations';
 import { toBn } from '../../lib/format';
 import { getServicesFor, providerHref, subcategoryIcons } from '../../lib/services';
 import { SITE_NAME, categoryOgImage } from '../../lib/site';
+import { getServiceContent } from '../../lib/seoContent';
 import SiteHeader from '../../components/SiteHeader';
+import SeoIntro from '../../components/SeoIntro';
 
 const text = {
   bn: {
@@ -86,17 +88,22 @@ export async function generateMetadata({ params, searchParams }) {
   const filtered = !!cleanUpazila(searchParams?.upazila);
   const canonical = `/${params.slug}`;
 
+  // নির্দিষ্ট সেবার নিজস্ব টাইটেল/মেটা থাকলে (lib/seoContent.js) সেটাই বাংলায় ব্যবহার হয়
+  const custom = lang === 'bn' ? getServiceContent(params.slug) : null;
+
   // সংখ্যা ৩-এর কম হলে বলা হয় না (কম সংখ্যা দেখালে উল্টো ক্লিক কমে); ফিল্টার করা পাতায় গোনাই হয় না
   let n = 0;
-  if (!filtered && lang === 'bn') n = await countProviders(sub.id);
+  if (!filtered && lang === 'bn' && !custom?.description) n = await countProviders(sub.id);
   const fmt = n >= 3 ? toBn(n) : null;
 
-  const title =
-    lang === 'bn'
+  const title = custom?.title
+    ? `${custom.title} | খুঁজি শেরপুর`
+    : lang === 'bn'
       ? `শেরপুরের ${name} — ফোন নম্বর ও রিভিউ | খুঁজি শেরপুর`
       : `${name} in Sherpur — phone numbers & reviews | Khuji Sherpur`;
-  const description =
-    lang === 'bn'
+  const description = custom?.description
+    ? custom.description
+    : lang === 'bn'
       ? fmt
         ? `শেরপুরে ${fmt} জন ${name} — এলাকা, অভিজ্ঞতা ও রিভিউসহ। সরাসরি কল করুন।`
         : /শিক্ষক|টিউটর/.test(name)
@@ -155,6 +162,8 @@ export default async function SubcategoryPage({ params, searchParams }) {
   const svc = await getServicesFor(items, lang);
 
   const name = lang === 'bn' ? subcategory.name_bn : subcategory.name_en || subcategory.name_bn;
+  // h1: মানুষ যেভাবে খোঁজে সেভাবে — "শেরপুরে এসি টেকনিশিয়ান"
+  const pageHeading = lang === 'bn' ? `শেরপুরে ${name}` : `${name} in Sherpur`;
   const icon = subcategoryIcons[subcategory.slug] || '🛠️';
   const base = `/${subcategory.slug}`;
   // শিক্ষকের বিষয় হলে প্রোফাইল যোগ ও ফেরার লিংক শিক্ষকের ক্যাটাগরিতে যায়
@@ -165,7 +174,7 @@ export default async function SubcategoryPage({ params, searchParams }) {
   return (
     <>
       <SiteHeader lang={lang} />
-      <main className="max-w-4xl mx-auto px-4">
+      <main className="max-w-4xl mx-auto px-4 pb-8">
         <div className="pt-5 pb-4">
           <a href={`/category/${catSlug}`} className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
           <div className="flex items-center gap-3 mt-3">
@@ -173,7 +182,7 @@ export default async function SubcategoryPage({ params, searchParams }) {
               {icon}
             </span>
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl md:text-2xl font-semibold leading-tight truncate">{name}</h1>
+              <h1 className="text-xl md:text-2xl font-semibold leading-snug">{pageHeading}</h1>
               <p className="text-xs text-ink/50 mt-0.5">
                 {num(items.length)}
                 {countWord}
@@ -206,7 +215,7 @@ export default async function SubcategoryPage({ params, searchParams }) {
           })}
         </div>
 
-        <section className="pb-16 space-y-3">
+        <section className="pb-8 space-y-3">
           {items.length === 0 && (
             <div className="text-center py-12">
               <p className="text-4xl mb-2">{activeUpazila ? '🔎' : '📭'}</p>
@@ -281,6 +290,9 @@ export default async function SubcategoryPage({ params, searchParams }) {
             );
           })}
         </section>
+
+        {/* বাংলা লেখা ও FAQ: শুধু ফিল্টারহীন পেজে (ফিল্টার পেজ noindex) */}
+        {!activeUpazila && <SeoIntro lang={lang} content={getServiceContent(subcategory.slug)} />}
       </main>
     </>
   );
