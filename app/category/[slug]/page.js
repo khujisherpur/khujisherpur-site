@@ -9,7 +9,9 @@ import { upazilaList } from '../../../lib/locations';
 import { formatPrice, parsePrice, timeAgo, toBn } from '../../../lib/format';
 import { subcategoryIcons, getServicesFor, providerHref } from '../../../lib/services';
 import { SITE_NAME, categoryOgImage } from '../../../lib/site';
+import { getCategoryContent } from '../../../lib/seoContent';
 import SiteHeader from '../../../components/SiteHeader';
+import SeoIntro from '../../../components/SeoIntro';
 
 const FILTER_KEYS = ['type', 'upazila', 'sort', 'sub'];
 // শিক্ষকের জন্য আলাদা বিষয়-ক্যাটাগরি বন্ধ রেখে সব শিক্ষক এক তালিকায় দেখানো হবে।
@@ -21,7 +23,7 @@ const SEO_TITLES = {
   rent: 'শেরপুরে বাসা ভাড়া, দোকান ও মেস ভাড়ার বিজ্ঞাপন',
   job: 'শেরপুরে চাকরির খবর ও নতুন জব বিজ্ঞপ্তি',
   'buy-sell': 'শেরপুরে কেনাবেচা — নতুন ও পুরোনো পণ্য',
-  'agri-product': 'শেরপুরে কৃষিপণ্য কেনাবেচা',
+  'agri-product': 'শেরপুরে কৃষিপণ্য কেনাবেচা — ধান, সবজি, সার ও বীজ',
   teacher: 'শেরপুরে প্রাইভেট টিউটর ও টিউশন',
   venue: 'শেরপুরে কমিউনিটি সেন্টার ও ভেন্যু ভাড়া',
   ambulance: 'শেরপুরে অ্যাম্বুলেন্স — ফোন নম্বরসহ',
@@ -42,6 +44,10 @@ const SEO_DESCS = {
     n
       ? `শেরপুরে ${n}টি পণ্য বিক্রির বিজ্ঞাপন — নতুন ও ব্যবহৃত, দাম ও ছবিসহ।`
       : 'শেরপুরে নতুন ও ব্যবহৃত পণ্য কেনাবেচা — দাম ও ছবিসহ।',
+  'agri-product': () =>
+    'শেরপুরের কৃষকের ধান, সবজি, ফল, সার ও বীজের বিজ্ঞাপন। উপজেলা বেছে সরাসরি যোগাযোগ করুন।',
+  ambulance: () =>
+    'শেরপুরের পাঁচ উপজেলার অ্যাম্বুলেন্স সেবাদাতার ফোন নম্বর এক জায়গায়। উপজেলা বেছে সরাসরি কল করুন।',
   teacher: (n) =>
     n
       ? `শেরপুরে ${n} জন প্রাইভেট শিক্ষক ও টিউটর — বিষয়, ক্লাস ও এলাকা অনুযায়ী খুঁজুন, সরাসরি কল করুন।`
@@ -254,6 +260,8 @@ export default async function CategoryPage({ params, searchParams }) {
   const name = label[lang].name;
   // পেজের মূল শিরোনাম (h1): তালিকায় থাকলে গুগল-বান্ধব পুরো শিরোনাম, না থাকলে ক্যাটাগরির নাম
   const pageHeading = PAGE_HEADINGS[lang]?.[category.slug] || name;
+  // পেজের নিচের বাংলা লেখা ও FAQ (lib/seoContent.js)
+  const seoContent = getCategoryContent(category.slug);
 
   // পুরোনো লিংক (?sub=electrician) নতুন তালিকায় নিয়ে যাই (শুধু নিরাপদ slug হলে)
   if (isServiceProvider && activeSub) {
@@ -265,7 +273,7 @@ export default async function CategoryPage({ params, searchParams }) {
 
   // সেবাদাতা: সাব-ক্যাটাগরি বাছাইয়ের পেজ
   if (isServiceProvider) {
-        if (category.slug === 'teacher' && TEACHER_FLAT_LIST) {
+    if (category.slug === 'teacher' && TEACHER_FLAT_LIST) {
       const { data: teachers } = await supabase
         .from('providers')
         .select('id, slug, name, area, upazila, is_available, photo_url, experience_years, primary_subcategory_id, is_verified')
@@ -279,7 +287,7 @@ export default async function CategoryPage({ params, searchParams }) {
       return (
         <>
           <SiteHeader lang={lang} />
-          <main className="max-w-4xl mx-auto px-4">
+          <main className="max-w-4xl mx-auto px-4 pb-8">
             <div className="py-6">
               <a href="/" className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
               <div className="flex items-center gap-3 mt-3">
@@ -297,7 +305,7 @@ export default async function CategoryPage({ params, searchParams }) {
               </a>
             </div>
 
-            <section className="pb-16 space-y-3">
+            <section className="pb-8 space-y-3">
               {list.length === 0 && (
                 <div className="text-center py-12">
                   <p className="text-4xl mb-2">📭</p>
@@ -357,6 +365,8 @@ export default async function CategoryPage({ params, searchParams }) {
                 );
               })}
             </section>
+
+            <SeoIntro lang={lang} content={seoContent} />
           </main>
         </>
       );
@@ -394,7 +404,7 @@ export default async function CategoryPage({ params, searchParams }) {
               <span className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-[#EEF1F8]">{label.icon}</span>
               <h1 className="text-xl md:text-3xl font-semibold leading-snug">{pageHeading}</h1>
             </div>
-                        <a
+            <a
               href={`/post/new?category=${category.slug}`}
               className="mt-4 inline-block bg-marigold text-ink font-semibold text-sm px-5 py-2.5 rounded-full"
             >
@@ -473,7 +483,7 @@ export default async function CategoryPage({ params, searchParams }) {
   return (
     <>
       <SiteHeader lang={lang} />
-      <main className="max-w-4xl mx-auto px-4">
+      <main className="max-w-4xl mx-auto px-4 pb-8">
         <div className="pt-5 pb-4">
           <a href="/" className="text-sm text-ink/50 hover:text-ink">{t.home}</a>
 
@@ -544,7 +554,7 @@ export default async function CategoryPage({ params, searchParams }) {
           )}
         </div>
 
-        <section className="pb-16 space-y-3">
+        <section className="pb-8 space-y-3">
           {items.length === 0 && (
             <div className="text-center py-12">
               <p className="text-4xl mb-2">{hasFilter ? '🔎' : '📭'}</p>
@@ -643,6 +653,9 @@ export default async function CategoryPage({ params, searchParams }) {
                 </a>
               ))}
         </section>
+
+        {/* বাংলা লেখা ও FAQ: শুধু ফিল্টারহীন পেজে (ফিল্টার পেজ noindex) */}
+        {!hasFilter && <SeoIntro lang={lang} content={seoContent} />}
       </main>
     </>
   );
