@@ -9,6 +9,7 @@ import { categoryLabels } from '../../../lib/categoryLabels';
 import DescriptionHelper from '../../../components/DescriptionHelper';
 import { checkDescription } from '../../../lib/descriptionCheck';
 import { cleanPhone, isValidBdPhone } from '../../../lib/format';
+import { syncAccountAvatar } from '../../../lib/syncAvatar';
 
 // প্রোফাইল লিংকের প্রিভিউতে দেখানো ঠিকানা (https:// ছাড়া)
 const SITE_HOST = 'khujisherpur.com';
@@ -403,6 +404,8 @@ function NewPostForm() {
             throw linkError;
           }
         }
+            // প্রোফাইলে ছবি দিলে অ্যাকাউন্টের ছবিও সেটাই হবে (আলাদা কপি)
+        if (providerPhoto) await syncAccountAvatar(user.id, providerPhoto);
       } else {
         let photoUrls = [];
         if (listingPhotos.length > 0) {
