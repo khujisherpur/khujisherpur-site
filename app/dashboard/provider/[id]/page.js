@@ -11,6 +11,7 @@ import { splitProfileInfo } from '../../../../lib/profileInfo';
 import DescriptionHelper from '../../../../components/DescriptionHelper';
 import { checkDescription } from '../../../../lib/descriptionCheck';
 import { syncAccountAvatar } from '../../../../lib/syncAvatar';
+import { compressImage } from '../../../../lib/compressImage';
 
 // যেসব ক্যাটাগরিতে বিষয়/সেবা বাছাই থাকে
 const SUBCAT_CATEGORIES = ['service-provider', 'teacher'];
@@ -209,7 +210,8 @@ export default function EditProviderPage({ params }) {
     setRemovePhoto(false);
   }
 
-  async function uploadBlob(blob) {
+    async function uploadBlob(originalBlob) {
+    const blob = await compressImage(originalBlob);
     const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
     const { error: uploadError } = await supabase.storage.from('images').upload(path, blob, {
       contentType: 'image/jpeg',
