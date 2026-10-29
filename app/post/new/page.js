@@ -10,6 +10,7 @@ import DescriptionHelper from '../../../components/DescriptionHelper';
 import { checkDescription } from '../../../lib/descriptionCheck';
 import { cleanPhone, isValidBdPhone } from '../../../lib/format';
 import { syncAccountAvatar } from '../../../lib/syncAvatar';
+import { compressImage } from '../../../lib/compressImage';
 
 // প্রোফাইল লিংকের প্রিভিউতে দেখানো ঠিকানা (https:// ছাড়া)
 const SITE_HOST = 'khujisherpur.com';
@@ -306,7 +307,8 @@ function NewPostForm() {
     setListingPhotos((prev) => prev.filter((_, i) => i !== index));
   }
 
-  async function uploadBlob(blob) {
+    async function uploadBlob(originalBlob) {
+    const blob = await compressImage(originalBlob);
     const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
     const { error: uploadError } = await supabase.storage.from('images').upload(path, blob, {
       contentType: 'image/jpeg',
