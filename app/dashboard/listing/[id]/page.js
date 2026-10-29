@@ -6,6 +6,7 @@ import ImageCropper from '../../../../components/ImageCropper';
 import SiteHeader from '../../../../components/SiteHeader';
 import PageSkeleton from '../../../../components/PageSkeleton';
 import { cleanPhone, isValidBdPhone } from '../../../../lib/format';
+import { compressImage } from '../../../../lib/compressImage';
 
 const MAX_PHOTOS = 3;
 
@@ -146,7 +147,8 @@ export default function EditListingPage({ params }) {
     });
   }
 
-  async function uploadBlob(blob) {
+    async function uploadBlob(originalBlob) {
+    const blob = await compressImage(originalBlob);
     const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
     const { error: uploadError } = await supabase.storage.from('images').upload(path, blob, {
       contentType: 'image/jpeg',
