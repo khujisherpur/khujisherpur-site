@@ -30,7 +30,15 @@ const content = {
         p: 'আপনি যে কোনো সময় ড্যাশবোর্ড থেকে নিজের পোস্ট বা প্রোফাইল এডিট বা ডিলিট করতে পারবেন। সম্পূর্ণ অ্যাকাউন্ট মুছে ফেলতে চাইলে আমাদের সাথে যোগাযোগ করুন।',
       },
       {
-        h: '৬. যোগাযোগ',
+        h: '৬. বার্তা ও নোটিফিকেশন',
+        p: 'সাইটের বার্তা ফিচারে আপনি যে বার্তা পাঠান বা পান, সেগুলো আমাদের ডাটাবেসে সংরক্ষিত থাকে এবং কথোপকথনের দুই পক্ষ দেখতে পায়। নতুন বার্তা এলে আপনি অনুমতি দিয়ে থাকলে আপনার ফোনে নোটিফিকেশন পাঠানো হয়। ব্রাউজারের সেটিংস থেকে যে কোনো সময় এই অনুমতি বন্ধ করা যায়।',
+      },
+      {
+        h: '৭. ছবি',
+        p: 'আপনার আপলোড করা ছবি (অ্যাকাউন্ট, প্রোফাইল, পোস্ট ও বার্তার ছবি) আমাদের সার্ভারে সংরক্ষিত থাকে। প্রোফাইল ও পোস্টের ছবি সবার জন্য প্রকাশ্য। আপলোডের সময় ছবি ছোট করে সংরক্ষণ করা হয়।',
+      },
+      {
+        h: '৮. যোগাযোগ',
         p: 'প্রাইভেসি সংক্রান্ত কোনো প্রশ্ন থাকলে আমাদের ইমেইল করুন: khujisherpur@gmail.com',
       },
     ],
@@ -61,7 +69,15 @@ const content = {
         p: 'You can edit or delete your own posts or profiles from your dashboard at any time. Contact us if you wish to delete your entire account.',
       },
       {
-        h: '6. Contact',
+        h: '6. Messages & Notifications',
+        p: 'Messages you send or receive through the messaging feature are stored in our database and are visible to both people in the conversation. If you have allowed notifications, we send a notification to your phone when a new message arrives. You can turn this permission off at any time from your browser settings.',
+      },
+      {
+        h: '7. Photos',
+        p: 'Photos you upload (account, profile, post and message photos) are stored on our servers. Profile and post photos are public. Photos are resized to a smaller size when uploaded.',
+      },
+      {
+        h: '8. Contact',
         p: 'For any privacy-related questions, email us at: khujisherpur@gmail.com',
       },
     ],
