@@ -140,6 +140,18 @@ export default async function ProviderProfile({
   const otherServices = services.filter((s) => !s.primary);
 
   const { items: related, svc } = await getRelated(provider, lang);
+
+  // প্রোফাইলে ছবি না থাকলে মালিকের অ্যাকাউন্টের ছবি
+  let accountPhoto = null;
+  if (!provider.photo_url && provider.user_id) {
+    const { data: owner } = await supabase
+      .from('users')
+      .select('avatar_url')
+      .eq('id', provider.user_id)
+      .maybeSingle();
+    accountPhoto = owner?.avatar_url || null;
+  }
+  const photoSrc = provider.photo_url || accountPhoto;
   const relatedTitle = `${t.more} ${services.find((s) => s.primary)?.label || ''}`.trim();
 
   return (
@@ -160,9 +172,9 @@ export default async function ProviderProfile({
         <div className="px-5 pb-6">
           {/* ছবি */}
           <div className="-mt-14 flex justify-center">
-            {provider.photo_url ? (
+                {photoSrc ? (
               <div className="rounded-full border-4 border-white shadow">
-                <PhotoLightbox src={provider.photo_url} alt={provider.name} size="w-28 h-28" />
+              <PhotoLightbox src={photoSrc} alt={provider.name} size="w-28 h-28" />
               </div>
             ) : (
               <div className="w-28 h-28 rounded-full bg-[#EEF1F8] border-4 border-white shadow flex items-center justify-center text-4xl text-green-dark font-semibold">
