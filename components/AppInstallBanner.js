@@ -45,9 +45,9 @@ export default function AppInstallBanner() {
   return (
     <div
       className={
-        'fixed top-2 inset-x-2 md:max-w-md md:mx-auto z-50 bg-green text-white rounded-2xl shadow-xl ' +
+        'fixed bottom-2 inset-x-2 md:max-w-md md:mx-auto z-50 bg-green text-white rounded-2xl shadow-xl ' +
         'px-3 py-2.5 flex items-center gap-3 transition-all duration-500 ' +
-        (vis ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0')
+        (vis ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0')
       }
     >
       <img src="/icon-192.png" alt="" className="w-10 h-10 rounded-lg bg-white" />
