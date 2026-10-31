@@ -349,6 +349,10 @@ function NewPostForm() {
       const descProblem = checkDescription(form.description);
       if (descProblem) { setError(descProblem); return; }
     }
+    if (['rent', 'buy-sell', 'job'].includes(category.slug)) {
+      const descProblem = checkDescription(form.description, category.slug);
+      if (descProblem) { setError(descProblem); return; }
+    }
     if (category.slug === 'job' && form.deadline && form.deadline < todayStr) {
       setError('আবেদনের শেষ তারিখ আজকের আগের হতে পারবে না');
       return;
@@ -1166,6 +1170,13 @@ function NewPostForm() {
               kind={isTeacher ? 'teacher' : isAmbulance ? 'ambulance' : 'service'}
               context={{ name: form.name, subject: primarySubcatName, area: form.area, years: form.experienceYears }}
             />
+          ) : isRent || isBuySell ? (
+            <DescriptionHelper
+              value={form.description}
+              onChange={(v) => updateField('description', v)}
+              kind={isRent ? 'rent' : 'buy-sell'}
+              context={{ title: form.title, area: form.area, rentType: form.rentType, bedrooms: form.bedrooms }}
+            />
           ) : (
           <div>
             <label className="block text-sm mb-1.5 text-ink/70">বিবরণ</label>
@@ -1436,15 +1447,12 @@ function NewPostForm() {
                 </div>
               )}
             </div>
-          <div>
-            <label className="block text-sm mb-1.5 text-ink/70">বিবরণ</label>
-            <textarea
-              required rows={4} maxLength={2000} value={form.description}
-              onChange={(e) => updateField('description', e.target.value)}
-              className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green resize-none bg-white"
-              placeholder="বিস্তারিত লিখুন..."
-            />
-          </div>
+          <DescriptionHelper
+            value={form.description}
+            onChange={(v) => updateField('description', v)}
+            kind="job"
+            context={{ title: form.title, ownerName: form.ownerName, area: form.area }}
+          />
             <div>
               <label className="block text-sm mb-1.5 text-ink/70">ছবি (ঐচ্ছিক, সর্বোচ্চ ৩টা)</label>
               <div className="flex gap-2 flex-wrap">
