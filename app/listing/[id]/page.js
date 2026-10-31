@@ -438,7 +438,8 @@ export default async function ListingDetailPage({ params }) {
     .sort((a, b) => Number(b.upazila === listing.upazila) - Number(a.upazila === listing.upazila))
     .slice(0, 8);
 
-  // স্ট্রাকচার্ড ডেটা: চাকরির জন্য JobPosting (প্রতিষ্ঠানের নাম থাকলে ও মেয়াদ না ফুরোলে), বাকিদের জন্য Product
+  // স্ট্রাকচার্ড ডেটা: শুধু চাকরির জন্য JobPosting (প্রতিষ্ঠানের নাম থাকলে ও মেয়াদ না ফুরোলে)।
+  // ব্যবহারকারীর পোস্ট দোকানের পণ্য নয়, তাই Product ডেটা দেওয়া হয় না (Google ডেলিভারি/রিটার্ন নীতি চায়, যা এখানে নেই)
   const numericPrice = parsePrice(listing.price_or_salary);
   let jsonLd = null;
 
@@ -483,24 +484,6 @@ export default async function ListingDetailPage({ params }) {
           : {}),
       };
     }
-  } else {
-    jsonLd = {
-      '@context': 'https://schema.org',
-      '@type': 'Product',
-      name: listing.title,
-      description: (parsed.body || listing.title).slice(0, 500),
-      ...(photos[0] ? { image: photos } : {}),
-      ...(numericPrice
-        ? {
-            offers: {
-              '@type': 'Offer',
-              priceCurrency: 'BDT',
-              price: numericPrice,
-              availability: 'https://schema.org/InStock',
-            },
-          }
-        : {}),
-    };
   }
 
   // গুগল ফলাফলে লিংকের নিচে দেখানো পথ: হোম › ক্যাটাগরি › পোস্ট
