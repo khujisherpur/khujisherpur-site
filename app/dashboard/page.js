@@ -2,7 +2,6 @@
 import MyAnalytics from '../../components/MyAnalytics';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { clearPushSubscription } from '../../lib/pushCleanup';
 import NotificationBell from '../../components/NotificationBell';
 import BottomNav from '../../components/BottomNav';
 import SiteHeader from '../../components/SiteHeader';
@@ -260,7 +259,6 @@ export default function DashboardPage() {
   }
 
   async function handleLogout() {
-    await clearPushSubscription();
     await supabase.auth.signOut();
     window.location.href = '/';
   }
