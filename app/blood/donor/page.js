@@ -84,9 +84,21 @@ function BloodDonorForm() {
     };
 
     try {
-      const { error } = existingDonor
-        ? await supabase.from('blood_donors').update(payload).eq('id', existingDonor.id)
-        : await supabase.from('blood_donors').insert(payload);
+            let error = null;
+      if (existingDonor) {
+        const res = await supabase
+          .from('blood_donors')
+          .update(payload)
+          .eq('id', existingDonor.id)
+          .select('id');
+        error = res.error;
+        if (!error && (!res.data || res.data.length === 0)) {
+          error = { message: 'সেভ করা যায়নি। আপনার এই প্রোফাইল বদলের অনুমতি নেই।' };
+        }
+      } else {
+        const res = await supabase.from('blood_donors').insert(payload);
+        error = res.error;
+      }
 
       if (error) {
         console.error('donor save error', error);
@@ -103,10 +115,12 @@ function BloodDonorForm() {
 
   async function toggleActive() {
     setError(null);
-    const { error } = await supabase
+        const { data: updated, error: upErr } = await supabase
       .from('blood_donors')
       .update({ is_active: !existingDonor.is_active })
-      .eq('id', existingDonor.id);
+      .eq('id', existingDonor.id)
+      .select('id');
+    const error = upErr || (!updated || updated.length === 0 ? { message: 'স্ট্যাটাস বদলানো যায়নি। অনুমতি নেই।' } : null);
     if (error) {
       console.error('donor toggle error', error);
       setError(friendlyError(error));
