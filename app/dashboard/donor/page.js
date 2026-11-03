@@ -34,6 +34,7 @@ export default function DonorDashboardPage() {
   const [newRequests, setNewRequests] = useState([]);
   const [history, setHistory] = useState([]);
   const [toggling, setToggling] = useState(false);
+  const [togglingPublic, setTogglingPublic] = useState(false);
   const [busyId, setBusyId] = useState(null);
 
   useEffect(() => {
@@ -94,6 +95,22 @@ export default function DonorDashboardPage() {
       return;
     }
     setDonorProfile({ ...donorProfile, is_active: next });
+  }
+
+  async function togglePublic() {
+    setTogglingPublic(true);
+    const next = !donorProfile.is_public;
+    const { data: updated, error } = await supabase
+      .from('blood_donors')
+      .update({ is_public: next })
+      .eq('user_id', user.id)
+      .select('user_id');
+    setTogglingPublic(false);
+    if (error || !updated || updated.length === 0) {
+      alert('বদলানো যায়নি' + (error ? ': ' + error.message : ''));
+      return;
+    }
+    setDonorProfile({ ...donorProfile, is_public: next });
   }
 
   async function handleDonate(requestId) {
@@ -233,6 +250,35 @@ export default function DonorDashboardPage() {
           >
             <span
               className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${active ? 'translate-x-5' : ''}`}
+            />
+          </button>
+        </section>
+
+        {/* Public profile */}
+        <section className="bg-white border border-ink/10 rounded-xl p-3 mt-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              {donorProfile.is_public ? '👁 প্রোফাইল তালিকায় দেখানো হচ্ছে' : '🔒 প্রোফাইল তালিকায় দেখানো হচ্ছে না'}
+            </p>
+            <p className="text-xs text-ink/50 mt-0.5">
+              {donorProfile.is_public
+                ? 'নাম, গ্রুপ, এলাকা ও ফোন নম্বর সবাই দেখতে পাচ্ছে। (সক্রিয় থাকলে)'
+                : 'চালু করলে রক্তদাতা তালিকায় আপনার নাম, গ্রুপ, এলাকা ও ফোন নম্বর সবাই দেখবে।'}
+            </p>
+            {donorProfile.is_public && active && (
+              <a href={`/blood/donors/${donorProfile.slug || donorProfile.id}`} className="text-xs text-green underline">আমার পাবলিক প্রোফাইল দেখুন</a>
+            )}
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!donorProfile.is_public}
+            onClick={togglePublic}
+            disabled={togglingPublic}
+            className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 disabled:opacity-50 ${donorProfile.is_public ? 'bg-green' : 'bg-ink/20'}`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${donorProfile.is_public ? 'translate-x-5' : ''}`}
             />
           </button>
         </section>
