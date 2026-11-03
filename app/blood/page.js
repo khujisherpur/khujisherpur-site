@@ -18,7 +18,14 @@ const text = {
     requestBtn: 'অনুরোধ করুন',
     becomeDonor: '❤️ ডোনার হতে চান?', becomeDonorDesc: 'নিবন্ধন করুন, কারো প্রয়োজন হলে নোটিফিকেশন পাবেন',
     donorBtn: 'নিবন্ধন করুন',
-    donorList: '🩸 রক্তদাতা তালিকা', donorListDesc: 'গ্রুপ ও এলাকা দিয়ে খুঁজে সরাসরি যোগাযোগ করুন', donorListBtn: 'রক্তদাতা দেখুন', donorsCount: 'জন রক্তদাতা তালিকায়',
+    heroBadge: 'রক্তদাতা নেটওয়ার্ক',
+    heroSub: 'শেরপুরের স্বেচ্ছাসেবী রক্তদাতা আর জরুরি অনুরোধ — সব এক জায়গায়।',
+    statDonors: 'রক্তদাতা', statRequests: 'সক্রিয় অনুরোধ',
+    reqTitle: 'রক্তের অনুরোধ', reqDesc: 'গ্রুপ, ব্যাগ ও হাসপাতাল জানান। মিলে যাওয়া ডোনাররা নোটিফিকেশন পাবেন।', reqBtn: 'অনুরোধ করুন',
+    regTitle: 'ডোনার নিবন্ধন', regDesc: 'রক্ত দিতে চাইলে যুক্ত হন। প্রয়োজনে আপনাকে জানানো হবে।', regBtn: 'নিবন্ধন করুন',
+    listTitle: 'ডোনার তালিকা', listDesc: 'গ্রুপ ও এলাকা দিয়ে খুঁজে সরাসরি যোগাযোগ করুন।', listBtn: 'তালিকা দেখুন',
+    quickGroup: 'গ্রুপ অনুযায়ী রক্তদাতা খুঁজুন', latestDonors: 'সদ্য যুক্ত রক্তদাতা', seeAll: 'সব দেখুন',
+    ready: 'প্রস্তুত',
     activeRequests: 'সক্রিয় রক্তের অনুরোধ',
     noRequests: 'এই মুহূর্তে কোনো সক্রিয় অনুরোধ নেই।',
     bags: 'ব্যাগ',
@@ -30,7 +37,14 @@ const text = {
     requestBtn: 'Request Now',
     becomeDonor: '❤️ Want to be a Donor?', becomeDonorDesc: 'Register and get notified when needed',
     donorBtn: 'Register',
-    donorList: '🩸 Donor List', donorListDesc: 'Search by group and area and contact directly', donorListBtn: 'Browse Donors', donorsCount: 'donors listed',
+    heroBadge: 'Donor network',
+    heroSub: 'Volunteer blood donors and urgent requests in Sherpur, all in one place.',
+    statDonors: 'Donors', statRequests: 'Active requests',
+    reqTitle: 'Blood Request', reqDesc: 'Share the group, bags and hospital. Matching donors get notified.', reqBtn: 'Request Now',
+    regTitle: 'Donor Registration', regDesc: 'Join to give blood. You will be notified when needed.', regBtn: 'Register',
+    listTitle: 'Donor List', listDesc: 'Search by group and area and contact directly.', listBtn: 'Browse List',
+    quickGroup: 'Find donors by blood group', latestDonors: 'Recently joined donors', seeAll: 'See all',
+    ready: 'Ready',
     activeRequests: 'Active Blood Requests',
     noRequests: 'No active requests right now.',
     bags: 'bags',
@@ -142,25 +156,49 @@ function safeJsonLd(obj) {
   return JSON.stringify(obj).replace(/</g, '\\u003c');
 }
 
+const GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+const ICONS = {
+  drop: 'M12 2.5c3.2 4 6 7.2 6 10.5a6 6 0 1 1-12 0c0-3.3 2.8-6.5 6-10.5z',
+  heart: 'M12 21s-7.5-4.6-9.5-9.2C1 8 3.2 4.5 6.7 4.5c2 0 3.5 1 5.3 3 1.8-2 3.3-3 5.3-3 3.5 0 5.7 3.5 4.2 7.3C19.5 16.4 12 21 12 21z',
+  users: 'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm7 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3.3 3.1-6 7-6s7 2.7 7 6H2zm14.5-5.8c3 .3 5.5 2.3 5.5 5.8h-4.2c0-2.2-.5-4-1.3-5.8z',
+};
+
+function Icon({ name, className = 'w-6 h-6' }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d={ICONS[name]} />
+    </svg>
+  );
+}
+
 export default async function BloodPage() {
   const lang = getLang();
   const t = text[lang];
   const faqList = faqs[lang];
   const num = (n) => (lang === 'bn' ? toBn(n) : n);
 
-  const { data: requests } = await supabase
-    .from('blood_requests')
-    .select('id, title, blood_group, bags_needed, hospital_or_area, hemoglobin, donation_date, created_at')
-    .eq('status', 'active')
-    .gte('created_at', sinceISO())
-    .order('created_at', { ascending: false })
-    .limit(50);
-
-  const { count: donorCount } = await supabase
-    .from('blood_donors')
-    .select('id', { count: 'exact', head: true })
-    .eq('is_public', true)
-    .eq('is_active', true);
+  const [{ data: requests }, { count: donorCount }, { data: latest }] = await Promise.all([
+    supabase
+      .from('blood_requests')
+      .select('id, title, blood_group, bags_needed, hospital_or_area, hemoglobin, donation_date, created_at')
+      .eq('status', 'active')
+      .gte('created_at', sinceISO())
+      .order('created_at', { ascending: false })
+      .limit(50),
+    supabase
+      .from('blood_donors')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_public', true)
+      .eq('is_active', true),
+    supabase
+      .from('blood_donors')
+      .select('id, slug, name, blood_group, area')
+      .eq('is_public', true)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(8),
+  ]);
 
   const faqJsonLd = {
     '@context': 'https://schema.org',
@@ -172,68 +210,130 @@ export default async function BloodPage() {
     })),
   };
 
+  const actions = [
+    { href: '/blood/request', icon: 'drop', title: t.reqTitle, desc: t.reqDesc, btn: t.reqBtn, tone: 'from-[#B91C1C] to-[#EF4444]' },
+    { href: '/blood/donor', icon: 'heart', title: t.regTitle, desc: t.regDesc, btn: t.regBtn, tone: 'from-[#0E5C33] to-[#1C8A4C]' },
+    { href: '/blood/donors', icon: 'users', title: t.listTitle, desc: t.listDesc, btn: t.listBtn, tone: 'from-[#1B2A4A] to-[#33497A]' },
+  ];
+
   return (
     <>
     <SiteHeader lang={lang} />
+
+    {/* হিরো */}
+    <section className="relative overflow-hidden bg-gradient-to-br from-[#3B0A12] via-[#7F1D1D] to-[#C62828] text-white">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="absolute -right-10 -top-6 w-64 h-64 text-white/[0.07] rotate-12">
+        <path d={ICONS.drop} />
+      </svg>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="absolute -left-12 bottom-0 w-44 h-44 text-white/[0.05] -rotate-12">
+        <path d={ICONS.drop} />
+      </svg>
+      <div className="relative max-w-2xl mx-auto px-4 pt-5 pb-16">
+        <a href="/" className="inline-block text-sm text-white/70 hover:text-white">{t.home}</a>
+        <span className="mt-4 inline-flex items-center gap-1.5 bg-white/15 border border-white/20 rounded-full px-3 py-1 text-xs font-medium">
+          <Icon name="drop" className="w-3.5 h-3.5 text-red-200" /> {t.heroBadge}
+        </span>
+        <h1 className="mt-3 text-2xl md:text-4xl font-bold leading-snug">{t.title}</h1>
+        <p className="mt-2 text-sm md:text-base text-white/80 max-w-md">{t.heroSub}</p>
+
+        <div className="mt-5 flex gap-3">
+          <div className="bg-white/10 border border-white/15 rounded-xl px-4 py-2.5 min-w-[110px]">
+            <p className="text-2xl font-bold leading-none">{num(donorCount || 0)}</p>
+            <p className="text-[11px] text-white/70 mt-1">{t.statDonors}</p>
+          </div>
+          <div className="bg-white/10 border border-white/15 rounded-xl px-4 py-2.5 min-w-[110px]">
+            <p className="text-2xl font-bold leading-none">{num((requests || []).length)}</p>
+            <p className="text-[11px] text-white/70 mt-1">{t.statRequests}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <main className="max-w-2xl mx-auto px-4">
-      <a href="/" className="inline-block mt-5 text-sm text-ink/50 hover:text-ink">{t.home}</a>
-
-      <div className="flex items-center gap-3 mt-3 mb-8">
-        <span className="text-3xl">🩸</span>
-        <h1 className="text-xl md:text-3xl font-semibold leading-snug">{t.title}</h1>
+      {/* তিন প্রবেশপথ */}
+      <div className="-mt-10 relative grid grid-cols-1 gap-3">
+        {actions.map((a) => (
+          <a
+            key={a.href}
+            href={a.href}
+            className="group flex items-center gap-4 bg-white rounded-2xl border border-ink/10 shadow-sm p-4 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+          >
+            <span className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${a.tone} text-white flex items-center justify-center flex-shrink-0 shadow-md`}>
+              <Icon name={a.icon} className="w-7 h-7" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold text-base">{a.title}</span>
+              <span className="block text-xs text-ink/60 mt-0.5 leading-relaxed">{a.desc}</span>
+            </span>
+            <span className={`bg-gradient-to-br ${a.tone} text-white text-xs font-semibold px-3 py-2 rounded-lg flex-shrink-0 group-hover:opacity-90`}>
+              {a.btn} →
+            </span>
+          </a>
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
-        <div className="bg-white border-2 border-red-200 p-5">
-          <p className="font-semibold">{t.needBlood}</p>
-          <p className="text-sm text-ink/60 mt-1 mb-4">{t.needBloodDesc}</p>
-          <a
-            href="/blood/request"
-            className="block text-center bg-red-500 text-white font-semibold py-2.5 hover:bg-red-600 transition-colors"
-          >
-            {t.requestBtn}
-          </a>
+      {/* গ্রুপ অনুযায়ী খোঁজা */}
+      <section className="mt-8">
+        <h2 className="text-sm font-semibold text-ink/70 mb-2.5">{t.quickGroup}</h2>
+        <div className="grid grid-cols-4 gap-2">
+          {GROUPS.map((g) => (
+            <a
+              key={g}
+              href={`/blood/donors?group=${encodeURIComponent(g)}`}
+              className="text-center bg-white border border-red-100 text-red-600 font-bold py-2.5 rounded-xl hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors"
+            >
+              {g}
+            </a>
+          ))}
         </div>
-        <div className="bg-white border-2 border-green/30 p-5">
-          <p className="font-semibold">{t.becomeDonor}</p>
-          <p className="text-sm text-ink/60 mt-1 mb-4">{t.becomeDonorDesc}</p>
-          <a
-            href="/blood/donor"
-            className="block text-center bg-green text-white font-semibold py-2.5 hover:bg-green-dark transition-colors"
-          >
-            {t.donorBtn}
-          </a>
-        </div>
-      </div>
+      </section>
 
-      {donorCount > 0 && (
-        <a
-          href="/blood/donors"
-          className="flex items-center justify-between gap-3 bg-white border-2 border-red-200 p-4 mb-10 hover:shadow-md transition-shadow"
-        >
-          <span className="min-w-0">
-            <span className="block font-semibold">{t.donorList}</span>
-            <span className="block text-sm text-ink/60 mt-0.5">{t.donorListDesc}</span>
-            <span className="block text-xs text-red-600 mt-1">{num(donorCount)} {t.donorsCount}</span>
-          </span>
-          <span className="bg-red-500 text-white text-sm font-semibold px-3 py-2 flex-shrink-0">{t.donorListBtn} →</span>
-        </a>
+      {/* সদ্য যুক্ত রক্তদাতা */}
+      {latest && latest.length > 0 && (
+        <section className="mt-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">{t.latestDonors}</h2>
+            <a href="/blood/donors" className="text-sm text-red-600 font-medium">{t.seeAll} →</a>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
+            {latest.map((d) => (
+              <a
+                key={d.id}
+                href={`/blood/donors/${d.slug || d.id}`}
+                className="snap-start flex-shrink-0 w-40 bg-white border border-ink/10 rounded-2xl p-3 hover:shadow-md transition-shadow"
+              >
+                <span className="w-11 h-11 rounded-full bg-gradient-to-br from-[#B91C1C] to-[#EF4444] text-white font-bold flex items-center justify-center text-sm shadow">
+                  {d.blood_group}
+                </span>
+                <p className="font-semibold text-sm mt-2 truncate">{d.name}</p>
+                <p className="text-xs text-ink/55 truncate">📍 {d.area || '—'}</p>
+                <span className="inline-block text-[10px] bg-green/10 text-green px-1.5 py-0.5 rounded-full mt-1.5">● {t.ready}</span>
+              </a>
+            ))}
+          </div>
+        </section>
       )}
 
-      <section className="pb-10">
+      {/* সক্রিয় অনুরোধ */}
+      <section className="mt-8 pb-10">
         <h2 className="text-lg font-semibold mb-3">{t.activeRequests}</h2>
         {(!requests || requests.length === 0) && (
-          <p className="text-ink/50 text-sm py-6 text-center">{t.noRequests}</p>
+          <div className="bg-white border border-dashed border-ink/20 rounded-2xl py-10 text-center">
+            <span className="inline-flex w-12 h-12 rounded-full bg-red-50 text-red-300 items-center justify-center mb-2">
+              <Icon name="heart" className="w-6 h-6" />
+            </span>
+            <p className="text-ink/50 text-sm">{t.noRequests}</p>
+          </div>
         )}
-                <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {(requests || []).map((r) => (
             <a
               key={r.id}
               href={`/blood/${r.id}`}
-              className="block bg-white rounded-xl border-2 border-red-200 overflow-hidden hover:shadow-md transition-shadow"
+              className="block bg-white rounded-2xl border border-red-200 overflow-hidden hover:shadow-md transition-shadow"
             >
-              <div className="bg-red-50 px-3 py-1.5">
-                <span className="text-[11px] font-semibold text-red-600">
+              <div className="bg-gradient-to-r from-[#B91C1C] to-[#EF4444] px-3 py-1.5">
+                <span className="text-[11px] font-semibold text-white">
                   🩸 {lang === 'bn' ? 'জরুরি রক্তের অনুরোধ' : 'Urgent Blood Request'}
                 </span>
               </div>
