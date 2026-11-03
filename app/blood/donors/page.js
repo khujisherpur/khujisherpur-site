@@ -39,6 +39,8 @@ export default async function DonorsListPage({ searchParams }) {
 
   const { data, count } = await query;
   const donors = data || [];
+  const { data: totalRaw } = await supabase.rpc('donor_total_count');
+  const total = typeof totalRaw === 'number' ? totalRaw : null;
 
   const chipHref = (g) => {
     const sp = new URLSearchParams();
@@ -62,6 +64,11 @@ export default async function DonorsListPage({ searchParams }) {
           <p className="mt-1.5 text-sm text-white/80">
             রক্তের গ্রুপ ও এলাকা দিয়ে খুঁজুন, তারপর সরাসরি যোগাযোগ করুন।
           </p>
+          {total !== null && (
+            <p className="mt-3 inline-block bg-white/10 border border-white/15 rounded-full px-3 py-1 text-xs">
+              মোট {toBn(total)} জন রক্তদাতা নিবন্ধিত
+            </p>
+          )}
         </div>
       </section>
 
