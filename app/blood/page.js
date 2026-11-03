@@ -178,7 +178,7 @@ export default async function BloodPage() {
   const faqList = faqs[lang];
   const num = (n) => (lang === 'bn' ? toBn(n) : n);
 
-  const [{ data: requests }, { count: donorCount }, { data: latest }] = await Promise.all([
+  const [{ data: requests }, { count: donorCount }, { data: latest }, { data: totalDonorsRaw }] = await Promise.all([
     supabase
       .from('blood_requests')
       .select('id, title, blood_group, bags_needed, hospital_or_area, hemoglobin, donation_date, created_at')
@@ -198,7 +198,9 @@ export default async function BloodPage() {
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(8),
+    supabase.rpc('donor_total_count'),
   ]);
+  const totalDonors = typeof totalDonorsRaw === 'number' ? totalDonorsRaw : donorCount || 0;
 
   const faqJsonLd = {
     '@context': 'https://schema.org',
@@ -238,7 +240,7 @@ export default async function BloodPage() {
 
         <div className="mt-5 flex gap-3">
           <div className="bg-white/10 border border-white/15 rounded-xl px-4 py-2.5 min-w-[110px]">
-            <p className="text-2xl font-bold leading-none">{num(donorCount || 0)}</p>
+            <p className="text-2xl font-bold leading-none">{num(totalDonors)}</p>
             <p className="text-[11px] text-white/70 mt-1">{t.statDonors}</p>
           </div>
           <div className="bg-white/10 border border-white/15 rounded-xl px-4 py-2.5 min-w-[110px]">
