@@ -18,6 +18,7 @@ const text = {
     requestBtn: 'অনুরোধ করুন',
     becomeDonor: '❤️ ডোনার হতে চান?', becomeDonorDesc: 'নিবন্ধন করুন, কারো প্রয়োজন হলে নোটিফিকেশন পাবেন',
     donorBtn: 'নিবন্ধন করুন',
+    donorList: '🩸 রক্তদাতা তালিকা', donorListDesc: 'গ্রুপ ও এলাকা দিয়ে খুঁজে সরাসরি যোগাযোগ করুন', donorListBtn: 'রক্তদাতা দেখুন', donorsCount: 'জন রক্তদাতা তালিকায়',
     activeRequests: 'সক্রিয় রক্তের অনুরোধ',
     noRequests: 'এই মুহূর্তে কোনো সক্রিয় অনুরোধ নেই।',
     bags: 'ব্যাগ',
@@ -29,6 +30,7 @@ const text = {
     requestBtn: 'Request Now',
     becomeDonor: '❤️ Want to be a Donor?', becomeDonorDesc: 'Register and get notified when needed',
     donorBtn: 'Register',
+    donorList: '🩸 Donor List', donorListDesc: 'Search by group and area and contact directly', donorListBtn: 'Browse Donors', donorsCount: 'donors listed',
     activeRequests: 'Active Blood Requests',
     noRequests: 'No active requests right now.',
     bags: 'bags',
@@ -154,6 +156,12 @@ export default async function BloodPage() {
     .order('created_at', { ascending: false })
     .limit(50);
 
+  const { count: donorCount } = await supabase
+    .from('blood_donors')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_public', true)
+    .eq('is_active', true);
+
   const faqJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
@@ -197,6 +205,20 @@ export default async function BloodPage() {
           </a>
         </div>
       </div>
+
+      {donorCount > 0 && (
+        <a
+          href="/blood/donors"
+          className="flex items-center justify-between gap-3 bg-white border-2 border-red-200 p-4 mb-10 hover:shadow-md transition-shadow"
+        >
+          <span className="min-w-0">
+            <span className="block font-semibold">{t.donorList}</span>
+            <span className="block text-sm text-ink/60 mt-0.5">{t.donorListDesc}</span>
+            <span className="block text-xs text-red-600 mt-1">{num(donorCount)} {t.donorsCount}</span>
+          </span>
+          <span className="bg-red-500 text-white text-sm font-semibold px-3 py-2 flex-shrink-0">{t.donorListBtn} →</span>
+        </a>
+      )}
 
       <section className="pb-10">
         <h2 className="text-lg font-semibold mb-3">{t.activeRequests}</h2>
