@@ -23,7 +23,7 @@ function friendlyError(err) {
   if (/jwt|token|session/i.test(msg)) {
     return 'আপনার সেশনের মেয়াদ শেষ। আবার লগইন করুন';
   }
-  return 'কিছু একটা সমস্যা হয়েছে, একটু পরে আবার চেষ্টা করুন';
+  return 'কিছু একটা সমস্যা হয়েছে, একটু পরে আবার চেষ্টা করুন' + (msg ? ' [' + (code || '') + ' ' + msg.slice(0, 140) + ']' : '');
 }
 
 function BloodDonorForm() {
