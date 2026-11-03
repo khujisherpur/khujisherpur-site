@@ -1,20 +1,33 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 import { cache } from 'react';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { supabase } from '../../../../lib/supabaseClient';
 import { cleanPhone, waLink } from '../../../../lib/format';
 import SiteHeader from '../../../../components/SiteHeader';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// লিংকের অংশ: নাম-কোড (যেমন রহিম-x7k2p)। পুরোনো UUID লিংকও চলবে।
+const SLUG_RE = /^[a-z0-9\u0980-\u09FF-]{1,80}$/i;
+
+function decodeParam(raw) {
+  try {
+    return decodeURIComponent(String(raw || ''));
+  } catch {
+    return '';
+  }
+}
+
 // RLS-এর কারণে শুধু পাবলিক ও সক্রিয় ডোনারই পাওয়া যাবে
-const getDonor = cache(async (id) => {
-  if (typeof id !== 'string' || !UUID_RE.test(id)) return null;
+const getDonor = cache(async (raw) => {
+  const key = decodeParam(raw);
+  const byId = UUID_RE.test(key);
+  if (!byId && !SLUG_RE.test(key)) return null;
   const { data } = await supabase
     .from('blood_donors')
-    .select('id, name, blood_group, phone, area, created_at')
-    .eq('id', id)
+    .select('id, slug, name, blood_group, phone, area, created_at')
+    .eq(byId ? 'id' : 'slug', key)
     .eq('is_public', true)
     .eq('is_active', true)
     .maybeSingle();
@@ -42,8 +55,12 @@ function Row({ label, children }) {
 }
 
 export default async function DonorProfilePage({ params }) {
-  if (typeof params.id !== 'string' || !UUID_RE.test(params.id)) notFound();
+  const key = decodeParam(params.id);
+  if (!UUID_RE.test(key) && !SLUG_RE.test(key)) notFound();
   const donor = await getDonor(params.id);
+
+  // পুরোনো UUID লিংক এলে সুন্দর লিংকে পাঠানো
+  if (donor && donor.slug && key !== donor.slug) redirect(`/blood/donors/${donor.slug}`);
 
   if (!donor) {
     return (
