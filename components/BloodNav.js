@@ -34,7 +34,9 @@ export default function BloodNav() {
     { key: 'profile', href: profileHref, icon: '🩸', label: 'প্রোফাইল', active: pathname.startsWith('/dashboard/donor') },
   ];
 
-  return (
+    return (
+    <>
+    <div className="h-24" aria-hidden="true" />
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-red-100 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
       <div className="max-w-2xl mx-auto grid grid-cols-5">
         {items.map((item) => {
@@ -62,7 +64,8 @@ export default function BloodNav() {
           );
         })}
       </div>
-      <div className="pb-[env(safe-area-inset-bottom)]" />
+            <div className="pb-[env(safe-area-inset-bottom)]" />
     </nav>
+    </>
   );
 }
