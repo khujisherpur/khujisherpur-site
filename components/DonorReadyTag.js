@@ -1,10 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { readyDate, fmtBnDate } from '../lib/donor';
+import { readyDate } from '../lib/donor';
 
-const bn = (n) => Number(n).toLocaleString('bn-BD');
-
-export default function DonorReadyTag({ lastDonatedAt }) {
+export default function DonorReadyTag({ lastDonatedAt, lang = 'bn' }) {
   const [now, setNow] = useState(null);
 
   useEffect(() => {
@@ -13,13 +11,18 @@ export default function DonorReadyTag({ lastDonatedAt }) {
     return () => clearInterval(t);
   }, []);
 
+  const isBn = lang === 'bn';
+  const num = (n) => (isBn ? Number(n).toLocaleString('bn-BD') : String(n));
+  const fmt = (d) =>
+    new Date(d).toLocaleDateString(isBn ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
   const ready = readyDate(lastDonatedAt);
   const left = ready ? ready.getTime() - (now ?? Date.now()) : 0;
 
   if (!ready || left <= 0) {
     return (
       <span className="inline-block text-[10px] bg-green/10 text-green px-1.5 py-0.5 rounded-full mt-1">
-        ● প্রস্তুত
+        ● {isBn ? 'প্রস্তুত' : 'Ready'}
       </span>
     );
   }
@@ -30,9 +33,12 @@ export default function DonorReadyTag({ lastDonatedAt }) {
   return (
     <span className="block mt-1">
       <span className="inline-block text-[10px] bg-amber-100 text-amber-800 font-semibold px-1.5 py-0.5 rounded-full">
-        ⏳ বিশ্রামে{now ? ` · আর ${bn(d)} দিন ${bn(h)} ঘণ্টা` : ''}
+        ⏳ {isBn ? 'বিশ্রামে' : 'Resting'}
+        {now ? (isBn ? ` · আর ${num(d)} দিন ${num(h)} ঘণ্টা` : ` · ${d}d ${h}h left`) : ''}
       </span>
-      <span className="block text-[10px] text-ink/50 mt-0.5">প্রস্তুত হবে: {fmtBnDate(ready)}</span>
+      <span className="block text-[10px] text-ink/50 mt-0.5">
+        {isBn ? 'প্রস্তুত হবে' : 'Ready on'}: {fmt(ready)}
+      </span>
     </span>
   );
 }
