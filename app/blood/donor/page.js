@@ -35,10 +35,39 @@ function BloodDonorForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-
+  const [invite, setInvite] = useState(null);
+  const [myOrg, setMyOrg] = useState(null);
+  const [orgBusy, setOrgBusy] = useState(false);
   useEffect(() => {
     init();
   }, []);
+
+    useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get('org');
+    if (!p || !/^[0-9a-f-]{36}$/i.test(p)) return;
+    supabase
+      .from('blood_orgs')
+      .select('id, name')
+      .eq('id', p)
+      .eq('is_approved', true)
+      .maybeSingle()
+      .then(({ data }) => setInvite(data || null));
+  }, []);
+
+  useEffect(() => {
+    const id = existingDonor && existingDonor.org_id;
+    if (!id) {
+      setMyOrg(null);
+      return;
+    }
+    supabase
+      .from('blood_orgs')
+      .select('id, name')
+      .eq('id', id)
+      .eq('is_approved', true)
+      .maybeSingle()
+      .then(({ data }) => setMyOrg(data || null));
+  }, [existingDonor]);
 
   async function init() {
     try {
@@ -47,7 +76,7 @@ function BloodDonorForm() {
       if (data.user) {
         const { data: donor } = await supabase
           .from('blood_donors')
-          .select('id, name, blood_group, phone, area, upazila, is_active, is_public')
+          .select('id, name, blood_group, phone, area, upazila, is_active, is_public, org_id')
           .eq('user_id', data.user.id)
           .maybeSingle();
         if (donor) {
@@ -98,7 +127,9 @@ function BloodDonorForm() {
           error = { message: 'সেভ করা যায়নি। আপনার এই প্রোফাইল বদলের অনুমতি নেই।' };
         }
       } else {
-        const res = await supabase.from('blood_donors').insert(payload);
+          const res = await supabase
+          .from('blood_donors')
+          .insert(invite ? { ...payload, org_id: invite.id } : payload);
         error = res.error;
       }
 
@@ -131,13 +162,35 @@ function BloodDonorForm() {
     }
   }
 
+   async function changeOrg(orgId) {
+    if (orgBusy || !existingDonor) return;
+    setOrgBusy(true);
+    setError(null);
+    const { data: updated, error: err } = await supabase
+      .from('blood_donors')
+      .update({ org_id: orgId })
+      .eq('id', existingDonor.id)
+      .select('id');
+    setOrgBusy(false);
+    if (err || !updated || updated.length === 0) {
+      setError(friendlyError(err || { message: 'সংস্থা বদলানো যায়নি।' }));
+      return;
+    }
+    init();
+  }
+
   if (loading) return <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>;
 
   if (!user) {
     return (
       <main className="max-w-md mx-auto px-4 py-20 text-center">
         <p className="text-ink/70 mb-4">ডোনার হতে হলে আগে লগইন করুন।</p>
-        <a href="/login?next=%2Fblood%2Fdonor" className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5">লগইন করুন</a>
+          <a
+          href={`/login?next=${encodeURIComponent('/blood/donor' + (invite ? '?org=' + invite.id : ''))}`}
+          className="inline-block bg-marigold text-ink font-semibold px-5 py-2.5"
+        >
+          লগইন করুন
+        </a>
       </main>
     );
   }
@@ -177,6 +230,40 @@ function BloodDonorForm() {
           </p>
           <button type="button" onClick={toggleActive} className="text-sm border border-ink/20 px-3 py-1.5 hover:bg-white">
             {existingDonor.is_active ? 'নিষ্ক্রিয় করুন' : 'সক্রিয় করুন'}
+          </button>
+        </div>
+      )}
+
+            {invite && !existingDonor && (
+        <p className="text-sm bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-4">
+          🏥 আপনি <strong>{invite.name}</strong>-এর সদস্য হয়ে নিবন্ধন করছেন।
+        </p>
+      )}
+
+      {existingDonor && invite && existingDonor.org_id !== invite.id && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 flex items-center justify-between gap-3">
+          <p className="text-sm text-red-700">🏥 {invite.name}-এর সদস্য হতে চান?</p>
+          <button
+            type="button"
+            onClick={() => changeOrg(invite.id)}
+            disabled={orgBusy}
+            className="text-sm bg-red-500 text-white px-3 py-1.5 rounded-lg flex-shrink-0 disabled:opacity-50"
+          >
+            সদস্য হোন
+          </button>
+        </div>
+      )}
+
+      {existingDonor && myOrg && (
+        <div className="bg-white border border-ink/10 rounded-xl p-3 mb-4 flex items-center justify-between gap-3">
+          <p className="text-sm">🏥 আপনি <strong>{myOrg.name}</strong>-এর সদস্য</p>
+          <button
+            type="button"
+            onClick={() => changeOrg(null)}
+            disabled={orgBusy}
+            className="text-sm border border-ink/20 px-3 py-1.5 rounded-lg flex-shrink-0 disabled:opacity-50"
+          >
+            সংস্থা ছাড়ুন
           </button>
         </div>
       )}
