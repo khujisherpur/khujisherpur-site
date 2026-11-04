@@ -230,6 +230,15 @@ export default function DonorDashboardPage() {
           </div>
         </section>
 
+         {!donorProfile.upazila && (
+          <a
+            href="/blood/donor"
+            className="block mt-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl p-3"
+          >
+            📍 আপনার উপজেলা দেওয়া নেই। লিডারবোর্ডে আসতে <span className="font-semibold underline">উপজেলা দিন</span>
+          </a>
+        )}
+
         <DonorCountdown lastDonatedAt={lastDonation} />
 
         {/* Availability */}
