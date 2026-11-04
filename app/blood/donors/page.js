@@ -43,7 +43,7 @@ export default async function DonorsListPage({ searchParams }) {
   if (donors.length > 0) {
     const { data: stats } = await supabase
       .from('public_donor_stats')
-      .select('donor_id, upazila, site_count, last_donated_at')
+      .select('donor_id, upazila, site_count, last_donated_at, org_name')
       .in('donor_id', donors.map((d) => d.id));
     const byId = new Map((stats || []).map((s) => [s.donor_id, s]));
     donors = donors.map((d) => {
@@ -51,6 +51,7 @@ export default async function DonorsListPage({ searchParams }) {
       return {
         ...d,
         upazila: s?.upazila || null,
+        org_name: s?.org_name || null,
         site_count: s?.site_count || 0,
         last_donated_at: s?.last_donated_at || null,
       };
@@ -166,6 +167,9 @@ export default async function DonorsListPage({ searchParams }) {
                   <span className="inline-block text-[10px] bg-red-50 text-red-700 font-semibold px-1.5 py-0.5 rounded-full mt-1">
                     {badgeFor(d.site_count).icon} {badgeFor(d.site_count).name}
                   </span>
+                    {d.org_name && (
+                    <span className="block text-[11px] text-ink/60 mt-1 truncate">🏥 {d.org_name}</span>
+                  )}
                   <DonorReadyTag lastDonatedAt={d.last_donated_at} />
                 </span>
               </a>
