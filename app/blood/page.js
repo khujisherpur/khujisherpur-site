@@ -217,7 +217,7 @@ export default async function BloodPage() {
     const [{ data: top }, { data: latestStats }] = await Promise.all([
     supabase
       .from('public_donor_stats')
-      .select('donor_id, slug, name, blood_group, phone, area, upazila, site_count')
+      .select('donor_id, slug, name, blood_group, phone, area, upazila, site_count, org_name')
       .gt('site_count', 0)
       .order('site_count', { ascending: false })
       .order('last_donated_at', { ascending: false })
@@ -225,11 +225,24 @@ export default async function BloodPage() {
     latest && latest.length > 0
       ? supabase
           .from('public_donor_stats')
-          .select('donor_id, last_donated_at, upazila, site_count')
+          .select('donor_id, last_donated_at, upazila, site_count, org_name')
           .in('donor_id', latest.map((d) => d.id))
       : Promise.resolve({ data: [] }),
   ]);
-  const statById = new Map((latestStats || []).map((s) => [s.donor_id, s]));
+    const statById = new Map((latestStats || []).map((s) => [s.donor_id, s]));
+
+  const { data: orgsRaw } = await supabase
+    .from('blood_orgs')
+    .select('id, name, upazila, logo_url')
+    .eq('is_approved', true)
+    .order('created_at', { ascending: false })
+    .limit(8);
+  const orgList = orgsRaw || [];
+  const { data: orgStats } =
+    orgList.length > 0
+      ? await supabase.from('public_org_stats').select('org_id, member_count').in('org_id', orgList.map((o) => o.id))
+      : { data: [] };
+  const orgCount = new Map((orgStats || []).map((s) => [s.org_id, Number(s.member_count) || 0]));
   const faqJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
@@ -324,9 +337,12 @@ export default async function BloodPage() {
                       <span className="inline-block text-[10px] bg-red-50 text-red-700 font-semibold px-1.5 py-0.5 rounded-full mt-0.5">
                         {b.icon} {lang === 'bn' ? b.name : b.en}
                       </span>
-                      <span className="block text-xs text-ink/55 truncate">
+                         <span className="block text-xs text-ink/55 truncate">
                         📍 {[r.area, r.upazila].filter(Boolean).join(', ') || '—'}
                       </span>
+                      {r.org_name && (
+                        <span className="block text-[11px] text-ink/60 truncate">🏥 {r.org_name}</span>
+                      )}
                     </span>
                   </a>
                   <span className="text-center flex-shrink-0">
@@ -357,6 +373,36 @@ export default async function BloodPage() {
         shareText={t.shareText}
         copiedText={t.inviteCopied}
       />
+
+            {/* রক্ত সংস্থা */}
+      {orgList.length > 0 && (
+        <section className="mt-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">🏥 {t.orgTitle}</h2>
+            <a href="/blood/orgs" className="text-sm text-red-600 font-medium">{t.seeAll} →</a>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
+            {orgList.map((o) => (
+              <a
+                key={o.id}
+                href={`/blood/orgs/${o.id}`}
+                className="snap-start flex-shrink-0 w-40 bg-white border border-ink/10 rounded-2xl p-3 text-center hover:shadow-md transition-shadow"
+              >
+                {o.logo_url ? (
+                  <img src={o.logo_url} alt="" className="w-14 h-14 rounded-full object-cover border border-ink/10 mx-auto bg-white" />
+                ) : (
+                  <span className="w-14 h-14 rounded-full bg-red-50 text-red-600 text-2xl flex items-center justify-center mx-auto">🩸</span>
+                )}
+                <p className="font-semibold text-sm mt-2 line-clamp-2 leading-snug">{o.name}</p>
+                {o.upazila && <p className="text-[11px] text-ink/50 mt-0.5 truncate">📍 {o.upazila}</p>}
+                <span className="inline-block text-[10px] bg-red-50 text-red-700 font-semibold px-2 py-0.5 rounded-full mt-1.5">
+                  👥 {num(orgCount.get(o.id) || 0)} {lang === 'bn' ? 'জন সদস্য' : 'members'}
+                </span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* গ্রুপ অনুযায়ী খোঁজা */}
       <section className="mt-8">
@@ -394,8 +440,11 @@ export default async function BloodPage() {
                     <span className="min-w-0">
                       <span className="block font-semibold truncate">{d.name}</span>
                       <span className="block text-xs text-ink/60 truncate">
-                        📍 {[d.area, s?.upazila].filter(Boolean).join(', ') || '—'}
+                     📍 {[d.area, s?.upazila].filter(Boolean).join(', ') || '—'}
                       </span>
+                      {s?.org_name && (
+                        <span className="block text-[11px] text-ink/60 truncate">🏥 {s.org_name}</span>
+                      )}
                       <span className="inline-block text-[10px] bg-red-50 text-red-700 font-semibold px-1.5 py-0.5 rounded-full mt-1">
                         {b.icon} {lang === 'bn' ? b.name : b.en}
                       </span>
