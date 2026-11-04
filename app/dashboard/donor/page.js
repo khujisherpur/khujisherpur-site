@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
 import PageSkeleton from '../../../components/PageSkeleton';
-
+import DonorCountdown from '../../../components/DonorCountdown';
+import DonorBadges from '../../../components/DonorBadges';
+import ExternalDonationForm from '../../../components/ExternalDonationForm';
 const fmtNum = (n) => Number(n).toLocaleString('bn-BD');
 
 function fmtDate(d) {
@@ -65,7 +67,7 @@ export default function DonorDashboardPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('blood_donations')
-        .select('id, donated_at, blood_request_id, blood_requests(patient_name, hospital_or_area, blood_group)')
+        .select('id, donated_at, blood_request_id, is_external, blood_requests(patient_name, hospital_or_area, blood_group)')
         .eq('donor_user_id', userId)
         .order('donated_at', { ascending: false }),
       supabase.from('blood_request_dismissals').select('blood_request_id').eq('donor_user_id', userId),
@@ -190,8 +192,8 @@ export default function DonorDashboardPage() {
   }
 
   const active = !!donorProfile.is_active;
-  const lastDonation = history[0]?.donated_at;
-
+    const lastDonation = history[0]?.donated_at;
+  const siteCount = history.filter((h) => !h.is_external).length;
   return (
     <PageShell>
       <main className="max-w-2xl mx-auto px-4 py-5">
@@ -227,6 +229,8 @@ export default function DonorDashboardPage() {
             </div>
           </div>
         </section>
+
+        <DonorCountdown lastDonatedAt={lastDonation} />
 
         {/* Availability */}
         <section className="bg-white border border-ink/10 rounded-xl p-3 mt-4 flex items-center justify-between gap-3">
@@ -337,8 +341,11 @@ export default function DonorDashboardPage() {
           </div>
         </section>
 
+        <DonorBadges count={siteCount} />
+        <ExternalDonationForm userId={user.id} onSaved={() => loadData(user.id, donorProfile.blood_group)} />
+
         {/* History */}
-        <section className="mt-8">
+          <section id="history" className="mt-8">
           <h2 className="text-base font-semibold mb-3">
             আমার রক্তদানের ইতিহাস <span className="text-ink/40 font-numeric">({fmtNum(history.length)})</span>
           </h2>
@@ -356,7 +363,7 @@ export default function DonorDashboardPage() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-sm leading-tight">
-                    {h.blood_requests?.hospital_or_area || 'তথ্য পাওয়া যায়নি'}
+                 {h.is_external ? 'সাইটের বাইরে দেওয়া রক্তদান' : (h.blood_requests?.hospital_or_area || 'তথ্য পাওয়া যায়নি')}
                   </p>
                   <p className="text-xs text-ink/60 mt-0.5">
                     {h.blood_requests?.patient_name ? `রোগী: ${h.blood_requests.patient_name}` : ''}
