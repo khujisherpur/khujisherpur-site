@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import SiteHeader from '../../../components/SiteHeader';
-import BottomNav from '../../../components/BottomNav';
 import PageSkeleton from '../../../components/PageSkeleton';
 
 const fmtNum = (n) => Number(n).toLocaleString('bn-BD');
@@ -186,8 +185,7 @@ export default function DonorDashboardPage() {
             </a>
           </div>
         </main>
-        <BottomNav activeTab="account" />
-      </PageShell>
+       </PageShell>
     );
   }
 
@@ -375,9 +373,7 @@ export default function DonorDashboardPage() {
             ))}
           </div>
         </section>
-
-        <BottomNav activeTab="account" />
-        <div className="h-16" />
+       <div className="h-24" />
       </main>
     </PageShell>
   );
