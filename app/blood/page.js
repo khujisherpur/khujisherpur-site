@@ -2,11 +2,13 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 import { supabase } from '../../lib/supabaseClient';
 import { getLang } from '../../lib/getLang';
-import { toBn, timeAgo } from '../../lib/format';
+import { toBn, timeAgo, cleanPhone } from '../../lib/format';
 import { formatBloodDate } from '../../lib/bloodFormat';
 import { SITE_NAME, categoryOgImage } from '../../lib/site';
 import SiteHeader from '../../components/SiteHeader';
 import DonorReadyTag from '../../components/DonorReadyTag';
+import ShareInvite from '../../components/ShareInvite';
+import { badgeFor } from '../../lib/donor';
 // ৩ দিনের পুরোনো অনুরোধ আর দেখানো হবে না (ডাটাবেসও মুছে ফেলে)
 const EXPIRY_DAYS = 3;
 const sinceISO = () => new Date(Date.now() - EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -24,7 +26,11 @@ const text = {
     reqTitle: 'রক্তের অনুরোধ', reqDesc: 'গ্রুপ, ব্যাগ ও হাসপাতাল জানান। মিলে যাওয়া ডোনাররা নোটিফিকেশন পাবেন।', reqBtn: 'অনুরোধ করুন',
     regTitle: 'ডোনার নিবন্ধন', regDesc: 'রক্ত দিতে চাইলে যুক্ত হন। প্রয়োজনে আপনাকে জানানো হবে।', regBtn: 'নিবন্ধন করুন',
     listTitle: 'ডোনার তালিকা', listDesc: 'গ্রুপ ও এলাকা দিয়ে খুঁজে সরাসরি যোগাযোগ করুন।', listBtn: 'তালিকা দেখুন',
-    topTitle: 'সেরা রক্তদাতা', topDesc: 'শেরপুর জেলার সর্বাধিক রক্তদানকারীদের তালিকা, উপজেলা অনুযায়ী।', topBtn: 'দেখুন',
+    orgTitle: 'রক্ত সংস্থা', orgDesc: 'শেরপুরের রক্তদাতা সংস্থাগুলোর নাম, ঠিকানা ও ফোন নম্বর।', orgBtn: 'দেখুন',
+    topBoard: 'শেরপুরের সেরা রক্তদাতাগণ (LEADERBOARD)', seeAllShort: 'সবাই', times: 'বার', donationLbl: 'রক্তদান', call: 'কল',
+    inviteSmall: 'বন্ধুদের ইনভাইট করুন', inviteTitle: 'শেরপুরের বন্ধুদের সাথে শেয়ার করুন',
+    inviteDesc: 'রক্তদাতার সংখ্যা বাড়িয়ে মানুষের পাশে থাকুন', inviteCopied: 'কপি হয়েছে',
+    shareText: 'শেরপুরে রক্ত লাগলে বা রক্ত দিতে চাইলে খুঁজি শেরপুর-এ যুক্ত হোন।',
     quickGroup: 'গ্রুপ অনুযায়ী রক্তদাতা খুঁজুন', latestDonors: 'সদ্য যুক্ত রক্তদাতা', seeAll: 'সব দেখুন',
     ready: 'প্রস্তুত',
     activeRequests: 'সক্রিয় রক্তের অনুরোধ',
@@ -44,7 +50,11 @@ const text = {
     reqTitle: 'Blood Request', reqDesc: 'Share the group, bags and hospital. Matching donors get notified.', reqBtn: 'Request Now',
     regTitle: 'Donor Registration', regDesc: 'Join to give blood. You will be notified when needed.', regBtn: 'Register',
     listTitle: 'Donor List', listDesc: 'Search by group and area and contact directly.', listBtn: 'Browse List',
-    topTitle: 'Top Donors', topDesc: 'Sherpur district\'s most frequent donors, by upazila.', topBtn: 'View',
+    orgTitle: 'Blood Organizations', orgDesc: 'Names, addresses and phone numbers of blood organizations in Sherpur.', orgBtn: 'View',
+    topBoard: 'Top Blood Donors of Sherpur (LEADERBOARD)', seeAllShort: 'All', times: 'times', donationLbl: 'donations', call: 'Call',
+    inviteSmall: 'Invite friends', inviteTitle: 'Share with your friends in Sherpur',
+    inviteDesc: 'Grow the donor community and stand by people in need', inviteCopied: 'Copied',
+    shareText: 'Need blood or want to donate in Sherpur? Join Khuji Sherpur.',
     quickGroup: 'Find donors by blood group', latestDonors: 'Recently joined donors', seeAll: 'See all',
     ready: 'Ready',
     activeRequests: 'Active Blood Requests',
@@ -195,7 +205,7 @@ export default async function BloodPage() {
       .eq('is_active', true),
     supabase
       .from('blood_donors')
-      .select('id, slug, name, blood_group, area')
+      .select('id, slug, name, blood_group, phone, area')
       .eq('is_public', true)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -204,14 +214,22 @@ export default async function BloodPage() {
   ]);
     const totalDonors = typeof totalDonorsRaw === 'number' ? totalDonorsRaw : donorCount || 0;
 
-  const { data: latestStats } =
+    const [{ data: top }, { data: latestStats }] = await Promise.all([
+    supabase
+      .from('public_donor_stats')
+      .select('donor_id, slug, name, blood_group, phone, area, upazila, site_count')
+      .gt('site_count', 0)
+      .order('site_count', { ascending: false })
+      .order('last_donated_at', { ascending: false })
+      .limit(5),
     latest && latest.length > 0
-      ? await supabase
+      ? supabase
           .from('public_donor_stats')
-          .select('donor_id, last_donated_at')
+          .select('donor_id, last_donated_at, upazila, site_count')
           .in('donor_id', latest.map((d) => d.id))
-      : { data: [] };
-  const lastById = new Map((latestStats || []).map((s) => [s.donor_id, s.last_donated_at]));
+      : Promise.resolve({ data: [] }),
+  ]);
+  const statById = new Map((latestStats || []).map((s) => [s.donor_id, s]));
   const faqJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
@@ -226,7 +244,7 @@ export default async function BloodPage() {
     { href: '/blood/request', icon: 'drop', title: t.reqTitle, desc: t.reqDesc, btn: t.reqBtn, tone: 'from-[#B91C1C] to-[#EF4444]' },
     { href: '/blood/donor', icon: 'heart', title: t.regTitle, desc: t.regDesc, btn: t.regBtn, tone: 'from-[#0E5C33] to-[#1C8A4C]' },
     { href: '/blood/donors', icon: 'users', title: t.listTitle, desc: t.listDesc, btn: t.listBtn, tone: 'from-[#1B2A4A] to-[#33497A]' },
-    { href: '/blood/leaderboard', icon: 'heart', title: t.topTitle, desc: t.topDesc, btn: t.topBtn, tone: 'from-[#B45309] to-[#F59E0B]' },
+    { href: '/blood/orgs', icon: 'users', title: t.orgTitle, desc: t.orgDesc, btn: t.orgBtn, tone: 'from-[#B45309] to-[#F59E0B]' },
   ];
 
   return (
@@ -285,6 +303,61 @@ export default async function BloodPage() {
         ))}
       </div>
 
+            {/* লিডারবোর্ড */}
+      {top && top.length > 0 && (
+        <section className="mt-8 bg-white border border-red-100 rounded-2xl p-4">
+          <div className="flex items-center justify-between gap-2 pb-3 border-b border-ink/10">
+            <h2 className="font-semibold leading-snug">🏆 {t.topBoard}</h2>
+            <a href="/blood/leaderboard" className="text-sm text-red-600 font-semibold flex-shrink-0">{t.seeAllShort} →</a>
+          </div>
+          <div className="space-y-2.5 mt-3">
+            {top.map((r, i) => {
+              const b = badgeFor(r.site_count);
+              return (
+                <div key={r.donor_id} className="flex items-center gap-2.5 bg-paper border border-ink/10 rounded-2xl p-3">
+                  <a href={`/blood/donors/${r.slug || r.donor_id}`} className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <span className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-lg flex-shrink-0">
+                      {['🥇', '🥈', '🥉'][i] || b.icon}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block font-semibold text-sm truncate">{r.name}</span>
+                      <span className="inline-block text-[10px] bg-red-50 text-red-700 font-semibold px-1.5 py-0.5 rounded-full mt-0.5">
+                        {b.icon} {lang === 'bn' ? b.name : b.en}
+                      </span>
+                      <span className="block text-xs text-ink/55 truncate">
+                        📍 {[r.area, r.upazila].filter(Boolean).join(', ') || '—'}
+                      </span>
+                    </span>
+                  </a>
+                  <span className="text-center flex-shrink-0">
+                    <span className="block text-sm font-bold text-red-600">{num(r.site_count)} {t.times}</span>
+                    <span className="block text-[10px] text-ink/50">{t.donationLbl}</span>
+                  </span>
+                  <span className="w-9 h-9 rounded-full bg-red-50 text-red-600 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                    {r.blood_group}
+                  </span>
+                  <a
+                    href={`tel:${cleanPhone(r.phone)}`}
+                    aria-label="call"
+                    className="w-10 h-10 rounded-full bg-green text-white flex items-center justify-center flex-shrink-0"
+                  >
+                    📞
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <ShareInvite
+        small={t.inviteSmall}
+        title={t.inviteTitle}
+        desc={t.inviteDesc}
+        shareText={t.shareText}
+        copiedText={t.inviteCopied}
+      />
+
       {/* গ্রুপ অনুযায়ী খোঁজা */}
       <section className="mt-8">
         <h2 className="text-sm font-semibold text-ink/70 mb-2.5">{t.quickGroup}</h2>
@@ -308,21 +381,36 @@ export default async function BloodPage() {
             <h2 className="text-lg font-semibold">{t.latestDonors}</h2>
             <a href="/blood/donors" className="text-sm text-red-600 font-medium">{t.seeAll} →</a>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
-            {latest.map((d) => (
-              <a
-                key={d.id}
-                href={`/blood/donors/${d.slug || d.id}`}
-                className="snap-start flex-shrink-0 w-40 bg-white border border-ink/10 rounded-2xl p-3 hover:shadow-md transition-shadow"
-              >
-                <span className="w-11 h-11 rounded-full bg-gradient-to-br from-[#B91C1C] to-[#EF4444] text-white font-bold flex items-center justify-center text-sm shadow">
-                  {d.blood_group}
-                </span>
-                <p className="font-semibold text-sm mt-2 truncate">{d.name}</p>
-                <p className="text-xs text-ink/55 truncate">📍 {d.area || '—'}</p>
-                <DonorReadyTag lastDonatedAt={lastById.get(d.id) || null} />
-              </a>
-            ))}
+                    <div className="space-y-3">
+            {latest.map((d) => {
+              const s = statById.get(d.id);
+              const b = badgeFor(s?.site_count || 0);
+              return (
+                <div key={d.id} className="bg-white border border-ink/10 rounded-2xl p-3 flex items-center gap-3 hover:shadow-md transition-shadow">
+                  <a href={`/blood/donors/${d.slug || d.id}`} className="flex items-center gap-3 min-w-0 flex-1">
+                    <span className="w-12 h-12 rounded-full bg-gradient-to-br from-[#B91C1C] to-[#EF4444] text-white font-bold flex items-center justify-center flex-shrink-0 shadow">
+                      {d.blood_group}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block font-semibold truncate">{d.name}</span>
+                      <span className="block text-xs text-ink/60 truncate">
+                        📍 {[d.area, s?.upazila].filter(Boolean).join(', ') || '—'}
+                      </span>
+                      <span className="inline-block text-[10px] bg-red-50 text-red-700 font-semibold px-1.5 py-0.5 rounded-full mt-1">
+                        {b.icon} {lang === 'bn' ? b.name : b.en}
+                      </span>
+                      <DonorReadyTag lang={lang} lastDonatedAt={s?.last_donated_at || null} />
+                    </span>
+                  </a>
+                  <a
+                    href={`tel:${cleanPhone(d.phone)}`}
+                    className="bg-gradient-to-br from-[#B91C1C] to-[#EF4444] text-white text-sm font-medium px-3 py-2 rounded-xl flex-shrink-0"
+                  >
+                    📞 {t.call}
+                  </a>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
