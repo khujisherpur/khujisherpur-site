@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic';
 import { supabase } from '../../../lib/supabaseClient';
 import { cleanPhone, toBn } from '../../../lib/format';
 import SiteHeader from '../../../components/SiteHeader';
-
+import DonorReadyTag from '../../../components/DonorReadyTag';
+import { badgeFor, isResting } from '../../../lib/donor';
 export const metadata = {
   title: 'রক্তদাতা তালিকা — খুঁজি শেরপুর',
   description: 'শেরপুরের স্বেচ্ছাসেবী রক্তদাতাদের তালিকা। রক্তের গ্রুপ ও এলাকা দিয়ে খুঁজুন।',
@@ -38,7 +39,28 @@ export default async function DonorsListPage({ searchParams }) {
   if (q) query = query.or(`name.ilike.%${q}%,area.ilike.%${q}%`);
 
   const { data, count } = await query;
-  const donors = data || [];
+    let donors = data || [];
+  if (donors.length > 0) {
+    const { data: stats } = await supabase
+      .from('public_donor_stats')
+      .select('donor_id, upazila, site_count, last_donated_at')
+      .in('donor_id', donors.map((d) => d.id));
+    const byId = new Map((stats || []).map((s) => [s.donor_id, s]));
+    donors = donors.map((d) => {
+      const s = byId.get(d.id);
+      return {
+        ...d,
+        upazila: s?.upazila || null,
+        site_count: s?.site_count || 0,
+        last_donated_at: s?.last_donated_at || null,
+      };
+    });
+    // প্রস্তুতরা আগে, বিশ্রামে থাকারা পরে
+    donors = [
+      ...donors.filter((d) => !isResting(d.last_donated_at)),
+      ...donors.filter((d) => isResting(d.last_donated_at)),
+    ];
+  }
   const { data: totalRaw } = await supabase.rpc('donor_total_count');
   const total = typeof totalRaw === 'number' ? totalRaw : null;
 
@@ -138,8 +160,13 @@ export default async function DonorsListPage({ searchParams }) {
                 </span>
                 <span className="min-w-0">
                   <span className="block font-semibold truncate">{d.name}</span>
-                  <span className="block text-xs text-ink/60 truncate">📍 {d.area || '—'}</span>
-                  <span className="inline-block text-[10px] bg-green/10 text-green px-1.5 py-0.5 rounded-full mt-1">● প্রস্তুত</span>
+                  <span className="block text-xs text-ink/60 truncate">
+                    📍 {[d.area, d.upazila].filter(Boolean).join(', ') || '—'}
+                  </span>
+                  <span className="inline-block text-[10px] bg-red-50 text-red-700 font-semibold px-1.5 py-0.5 rounded-full mt-1">
+                    {badgeFor(d.site_count).icon} {badgeFor(d.site_count).name}
+                  </span>
+                  <DonorReadyTag lastDonatedAt={d.last_donated_at} />
                 </span>
               </a>
               <a
