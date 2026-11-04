@@ -5,6 +5,7 @@ import { notFound, redirect } from 'next/navigation';
 import { supabase } from '../../../../lib/supabaseClient';
 import { cleanPhone, waLink } from '../../../../lib/format';
 import SiteHeader from '../../../../components/SiteHeader';
+import { badgeFor, isResting, readyDate, fmtBnDate } from '../../../../lib/donor';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
