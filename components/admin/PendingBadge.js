@@ -15,6 +15,8 @@ export default function PendingBadge({ type }) {
         q = supabase.from('providers').select('id', { count: 'exact', head: true }).eq('status', 'pending');
       } else if (type === 'reports') {
         q = supabase.from('reports').select('id', { count: 'exact', head: true }).eq('status', 'open');
+      } else if (type === 'orgs') {
+        q = supabase.from('blood_orgs').select('id', { count: 'exact', head: true }).eq('is_approved', false);
       } else {
         return;
       }
