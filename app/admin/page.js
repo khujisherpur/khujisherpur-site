@@ -32,7 +32,7 @@ const sidebarItems = [
   { key: 'banners', icon: navIcon('🖼️', 'ব্যানার'), label: 'ব্যানার ব্যবস্থাপনা', enabled: true },
   { key: 'users', icon: navIcon('👥', 'ইউজার'), label: 'ব্যবহারকারী ব্যবস্থাপনা', enabled: true },   
   { key: 'donors', icon: navIcon('🩸', 'রক্তদাতা'), label: 'রক্তদাতা ব্যবস্থাপনা', enabled: true },
-  { key: 'orgs', icon: navIcon('🏥', 'সংস্থা'), label: 'রক্ত সংস্থা ব্যবস্থাপনা', enabled: true },
+  { key: 'orgs', icon: navIcon('🏥', 'সংস্থা', 'orgs'), label: 'রক্ত সংস্থা ব্যবস্থাপনা', enabled: true },
   { key: 'categories', icon: navIcon('📁', 'ক্যাটাগরি'), label: 'ক্যাটাগরি ব্যবস্থাপনা', enabled: true },
   { key: 'settings', icon: navIcon('⚙️', 'সেটিংস'), label: 'সাইট সেটিংস', enabled: true },
 ];
