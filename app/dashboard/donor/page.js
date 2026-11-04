@@ -351,6 +351,9 @@ export default function DonorDashboardPage() {
         </section>
 
         <DonorBadges count={siteCount} />
+                <a href="/blood/leaderboard" className="block mt-4 text-center text-sm font-semibold text-red-600 bg-white border border-red-100 rounded-xl py-3">
+          🏆 শেরপুরের সেরা রক্তদাতাদের তালিকা দেখুন
+        </a>
         <ExternalDonationForm userId={user.id} onSaved={() => loadData(user.id, donorProfile.blood_group)} />
 
         {/* History */}
