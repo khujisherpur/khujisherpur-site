@@ -47,7 +47,6 @@ const getDonor = cache(async (raw) => {
     org_id: stats?.org_id || null,
     org_name: stats?.org_name || null,
   };
-  };
 });
 
 export async function generateMetadata({ params }) {
