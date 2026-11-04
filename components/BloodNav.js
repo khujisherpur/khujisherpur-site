@@ -8,7 +8,7 @@ const LINKS = {
   home: '/blood',
   donors: '/blood/donors',
   create: '/blood/request',
-  requests: '/blood',
+  requests: '/blood#requests',
   profile: '/dashboard/donor',
 };
 
