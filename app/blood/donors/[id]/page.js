@@ -6,7 +6,7 @@ import { supabase } from '../../../../lib/supabaseClient';
 import { cleanPhone, waLink } from '../../../../lib/format';
 import SiteHeader from '../../../../components/SiteHeader';
 import { badgeFor, isResting, readyDate, fmtBnDate } from '../../../../lib/donor';
-
+import DonorReadyTag from '../../../../components/DonorReadyTag';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // লিংকের অংশ: নাম-কোড (যেমন রহিম-x7k2p)। পুরোনো UUID লিংকও চলবে।
@@ -107,10 +107,7 @@ export default async function DonorProfilePage({ params }) {
             <div className="min-w-0">
               <p className="text-[11px] text-white/70">স্বেচ্ছাসেবী রক্তদাতা</p>
               <h1 className="font-semibold text-lg leading-tight break-words">{donor.name}</h1>
-                            <div className="flex flex-wrap gap-1.5 mt-1">
-                <span className="inline-block text-[10px] bg-white/20 px-2 py-0.5 rounded-full">
-                  {resting ? `● বিশ্রামে, ${fmtBnDate(ready)} থেকে প্রস্তুত` : '● রক্তদানে প্রস্তুত'}
-                </span>
+                <div className="flex flex-wrap gap-1.5 mt-1">
                 <span className="inline-block text-[10px] bg-white text-red-600 font-semibold px-2 py-0.5 rounded-full">
                   {badge.icon} {badge.name}
                 </span>
@@ -121,11 +118,14 @@ export default async function DonorProfilePage({ params }) {
           <div className="p-5">
             <div className="space-y-3 text-sm">
               <Row label="রক্তের গ্রুপ">{donor.blood_group}</Row>
-                            <Row label="ঠিকানা">
+                 <Row label="ঠিকানা">
                 {[donor.area, donor.upazila].filter(Boolean).join(', ') || '—'}
               </Row>
               <Row label="সর্বশেষ রক্তদান">
                 {donor.last_donated_at ? fmtBnDate(donor.last_donated_at) : 'এখনো কোনো দান নেই'}
+              </Row>
+                <Row label="অবস্থা">
+                <DonorReadyTag lastDonatedAt={donor.last_donated_at} />
               </Row>
               <Row label="মোট দান">
                 <span className="font-numeric">{total.toLocaleString('bn-BD')} বার</span>
