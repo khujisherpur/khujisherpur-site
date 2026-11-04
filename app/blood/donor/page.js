@@ -5,6 +5,7 @@ import { cleanPhone, isValidBdPhone } from '../../../lib/format';
 import SiteHeader from '../../../components/SiteHeader';
 
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const upazilas = ['শেরপুর সদর', 'নকলা', 'নালিতাবাড়ী', 'ঝিনাইগাতী', 'শ্রীবরদী'];
 
 // কাঁচা ইংরেজি এরর বদলে বাংলা বার্তা; ডাটাবেস ট্রিগারের নিজের বাংলা বার্তা (সাসপেন্ড, সীমা) সরাসরি দেখাই
 function friendlyError(err) {
@@ -30,7 +31,7 @@ function BloodDonorForm() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [existingDonor, setExistingDonor] = useState(null);
-  const [form, setForm] = useState({ name: '', bloodGroup: 'A+', phone: '', area: '', isPublic: true });
+  const [form, setForm] = useState({ name: '', bloodGroup: 'A+', phone: '', area: '', upazila: '', isPublic: true });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -46,12 +47,12 @@ function BloodDonorForm() {
       if (data.user) {
         const { data: donor } = await supabase
           .from('blood_donors')
-          .select('id, name, blood_group, phone, area, is_active, is_public')
+          .select('id, name, blood_group, phone, area, upazila, is_active, is_public')
           .eq('user_id', data.user.id)
           .maybeSingle();
         if (donor) {
           setExistingDonor(donor);
-          setForm({ name: donor.name, bloodGroup: donor.blood_group, phone: donor.phone, area: donor.area || '', isPublic: !!donor.is_public });
+          setForm({ name: donor.name, bloodGroup: donor.blood_group, phone: donor.phone, area: donor.area || '', upazila: donor.upazila || '', isPublic: !!donor.is_public });
         }
       }
     } catch (err) {
@@ -80,6 +81,7 @@ function BloodDonorForm() {
       blood_group: form.bloodGroup,
       phone: cleanPhone(form.phone),
       area: form.area.trim(),
+      upazila: form.upazila,
       is_public: !!form.isPublic,
     };
 
@@ -210,13 +212,25 @@ function BloodDonorForm() {
           />
         </div>
 
+          <div>
+          <label className="block text-sm mb-1.5 text-ink/70">উপজেলা</label>
+          <select
+            required value={form.upazila}
+            onChange={(e) => updateField('upazila', e.target.value)}
+            className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green bg-white"
+          >
+            <option value="" disabled>উপজেলা বেছে নিন</option>
+            {upazilas.map((u) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+
         <div>
           <label className="block text-sm mb-1.5 text-ink/70">এলাকা</label>
           <input
             type="text" required maxLength={100} value={form.area}
             onChange={(e) => updateField('area', e.target.value)}
             className="w-full border border-ink/20 px-3 py-2.5 outline-none focus:border-green"
-            placeholder="যেমন: শেরপুর সদর"
+            placeholder="যেমন: গ্রাম, মহল্লা বা ইউনিয়ন"
           />
         </div>
 
