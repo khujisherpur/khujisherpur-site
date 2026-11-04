@@ -35,7 +35,7 @@ const getDonor = cache(async (raw) => {
   if (!data) return null;
   const { data: stats } = await supabase
     .from('public_donor_stats')
-    .select('site_count, external_count, last_donated_at, upazila')
+    .select('site_count, external_count, last_donated_at, upazila, org_id, org_name')
     .eq('donor_id', data.id)
     .maybeSingle();
   return {
@@ -44,6 +44,9 @@ const getDonor = cache(async (raw) => {
     external_count: stats?.external_count || 0,
     last_donated_at: stats?.last_donated_at || null,
     upazila: stats?.upazila || null,
+    org_id: stats?.org_id || null,
+    org_name: stats?.org_name || null,
+  };
   };
 });
 
@@ -121,6 +124,11 @@ export default async function DonorProfilePage({ params }) {
                  <Row label="ঠিকানা">
                 {[donor.area, donor.upazila].filter(Boolean).join(', ') || '—'}
               </Row>
+                {donor.org_name && (
+                <Row label="সংস্থা">
+                  <a href={`/blood/orgs/${donor.org_id}`} className="text-red-600 underline">🏥 {donor.org_name}</a>
+                </Row>
+              )}
               <Row label="সর্বশেষ রক্তদান">
                 {donor.last_donated_at ? fmtBnDate(donor.last_donated_at) : 'এখনো কোনো দান নেই'}
               </Row>
