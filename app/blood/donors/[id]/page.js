@@ -31,8 +31,20 @@ const getDonor = cache(async (raw) => {
     .eq(byId ? 'id' : 'slug', key)
     .eq('is_public', true)
     .eq('is_active', true)
+        .maybeSingle();
+  if (!data) return null;
+  const { data: stats } = await supabase
+    .from('public_donor_stats')
+    .select('site_count, external_count, last_donated_at, upazila')
+    .eq('donor_id', data.id)
     .maybeSingle();
-  return data || null;
+  return {
+    ...data,
+    site_count: stats?.site_count || 0,
+    external_count: stats?.external_count || 0,
+    last_donated_at: stats?.last_donated_at || null,
+    upazila: stats?.upazila || null,
+  };
 });
 
 export async function generateMetadata({ params }) {
@@ -75,7 +87,11 @@ export default async function DonorProfilePage({ params }) {
     );
   }
 
-  const wa = waLink(donor.phone);
+    const wa = waLink(donor.phone);
+  const total = donor.site_count + donor.external_count;
+  const badge = badgeFor(donor.site_count);
+  const resting = isResting(donor.last_donated_at);
+  const ready = readyDate(donor.last_donated_at);
 
   return (
     <>
@@ -91,14 +107,34 @@ export default async function DonorProfilePage({ params }) {
             <div className="min-w-0">
               <p className="text-[11px] text-white/70">স্বেচ্ছাসেবী রক্তদাতা</p>
               <h1 className="font-semibold text-lg leading-tight break-words">{donor.name}</h1>
-              <span className="inline-block text-[10px] bg-white/20 px-2 py-0.5 rounded-full mt-1">● রক্তদানে প্রস্তুত</span>
+                            <div className="flex flex-wrap gap-1.5 mt-1">
+                <span className="inline-block text-[10px] bg-white/20 px-2 py-0.5 rounded-full">
+                  {resting ? `● বিশ্রামে, ${fmtBnDate(ready)} থেকে প্রস্তুত` : '● রক্তদানে প্রস্তুত'}
+                </span>
+                <span className="inline-block text-[10px] bg-white text-red-600 font-semibold px-2 py-0.5 rounded-full">
+                  {badge.icon} {badge.name}
+                </span>
+              </div>
             </div>
           </div>
 
           <div className="p-5">
             <div className="space-y-3 text-sm">
               <Row label="রক্তের গ্রুপ">{donor.blood_group}</Row>
-              <Row label="এলাকা">{donor.area || '—'}</Row>
+                            <Row label="ঠিকানা">
+                {[donor.area, donor.upazila].filter(Boolean).join(', ') || '—'}
+              </Row>
+              <Row label="সর্বশেষ রক্তদান">
+                {donor.last_donated_at ? fmtBnDate(donor.last_donated_at) : 'এখনো কোনো দান নেই'}
+              </Row>
+              <Row label="মোট দান">
+                <span className="font-numeric">{total.toLocaleString('bn-BD')} বার</span>
+                {donor.external_count > 0 && (
+                  <span className="text-xs text-ink/50 font-normal">
+                    {' '}(সাইটে {donor.site_count.toLocaleString('bn-BD')}, বাইরে {donor.external_count.toLocaleString('bn-BD')})
+                  </span>
+                )}
+              </Row>
               <Row label="ফোন"><span className="font-numeric">{donor.phone}</span></Row>
             </div>
 
