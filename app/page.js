@@ -231,7 +231,7 @@ export default async function HomePage() {
 
       <main className="max-w-4xl mx-auto">
         {/* Hero */}
-        <section className="bg-gradient-to-b from-[#0F4D3A] to-[#0A3527] px-4 pt-4 pb-8">
+        <section className="bg-gradient-to-b from-[#0F4D3A] to-[#0A3527] px-4 pt-4 pb-10 rounded-b-[28px] shadow-[0_8px_24px_-12px_rgba(10,53,39,0.6)]">
           <div className="relative rounded-2xl overflow-hidden border-4 border-white/50 shadow-md aspect-[12/5] bg-[#0F4D3A]/60">
             {validBanners.length > 0 &&
               validBanners.map((b, i) => (
@@ -326,7 +326,7 @@ export default async function HomePage() {
                   href={categoryHref(c)}
                   target={isExternal ? '_blank' : undefined}
                   rel={isExternal ? 'noopener noreferrer' : undefined}
-                  className={`relative bg-white rounded-xl border-l-4 ${label.color} border-t border-r border-b border-ink/10 p-2 hover:shadow-md transition-shadow overflow-hidden`}
+                   className={`relative bg-white rounded-xl border-l-4 ${label.color} border-t border-r border-b border-ink/10 p-2 shadow-sm hover:shadow-md transition-shadow overflow-hidden`}
                 >
                   <div className="flex items-start justify-between gap-1">
                     <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${label.iconBg}`}>
@@ -339,7 +339,7 @@ export default async function HomePage() {
                     ) : null}
                   </div>
                   <p className="font-semibold text-[11px] mt-1.5 leading-tight line-clamp-1">{label[lang].name}</p>
-                  <p className="text-[9px] text-ink/50 mt-0.5 leading-snug line-clamp-2">{label[lang].desc}</p>
+                  <p className="text-[10px] text-ink/70 mt-0.5 leading-snug line-clamp-2">{label[lang].desc}</p>
                 </a>
               );
             })}
