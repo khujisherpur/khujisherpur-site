@@ -18,7 +18,7 @@ export default async function LeaderboardPage({ searchParams }) {
 
   let q = supabase
     .from('public_donor_stats')
-    .select('donor_id, slug, name, blood_group, area, upazila, site_count, last_donated_at')
+    .select('donor_id, slug, name, blood_group, area, upazila, site_count, last_donated_at, org_name')
     .gt('site_count', 0)
     .order('site_count', { ascending: false })
     .order('last_donated_at', { ascending: false })
@@ -89,8 +89,11 @@ export default async function LeaderboardPage({ searchParams }) {
                     <div className="min-w-0 flex-1">
                       <p className="font-medium leading-tight truncate">{r.name}</p>
                       <p className="text-xs text-ink/50 mt-0.5 truncate">
-                        {[r.area, r.upazila].filter(Boolean).join(', ') || '—'}
+                      {[r.area, r.upazila].filter(Boolean).join(', ') || '—'}
                       </p>
+                      {r.org_name && (
+                        <p className="text-[11px] text-ink/60 mt-0.5 truncate">🏥 {r.org_name}</p>
+                      )}
                       <span className="inline-block text-[10px] bg-red-50 text-red-700 font-semibold px-2 py-0.5 rounded-full mt-1">
                         {b.icon} {b.name}
                       </span>
