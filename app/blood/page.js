@@ -6,7 +6,7 @@ import { toBn, timeAgo } from '../../lib/format';
 import { formatBloodDate } from '../../lib/bloodFormat';
 import { SITE_NAME, categoryOgImage } from '../../lib/site';
 import SiteHeader from '../../components/SiteHeader';
-
+import DonorReadyTag from '../../components/DonorReadyTag';
 // ৩ দিনের পুরোনো অনুরোধ আর দেখানো হবে না (ডাটাবেসও মুছে ফেলে)
 const EXPIRY_DAYS = 3;
 const sinceISO = () => new Date(Date.now() - EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -202,8 +202,16 @@ export default async function BloodPage() {
       .limit(8),
     supabase.rpc('donor_total_count'),
   ]);
-  const totalDonors = typeof totalDonorsRaw === 'number' ? totalDonorsRaw : donorCount || 0;
+    const totalDonors = typeof totalDonorsRaw === 'number' ? totalDonorsRaw : donorCount || 0;
 
+  const { data: latestStats } =
+    latest && latest.length > 0
+      ? await supabase
+          .from('public_donor_stats')
+          .select('donor_id, last_donated_at')
+          .in('donor_id', latest.map((d) => d.id))
+      : { data: [] };
+  const lastById = new Map((latestStats || []).map((s) => [s.donor_id, s.last_donated_at]));
   const faqJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
@@ -312,7 +320,7 @@ export default async function BloodPage() {
                 </span>
                 <p className="font-semibold text-sm mt-2 truncate">{d.name}</p>
                 <p className="text-xs text-ink/55 truncate">📍 {d.area || '—'}</p>
-                <span className="inline-block text-[10px] bg-green/10 text-green px-1.5 py-0.5 rounded-full mt-1.5">● {t.ready}</span>
+                <DonorReadyTag lastDonatedAt={lastById.get(d.id) || null} />
               </a>
             ))}
           </div>
