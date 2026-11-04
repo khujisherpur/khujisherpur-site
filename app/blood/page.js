@@ -320,7 +320,7 @@ export default async function BloodPage() {
       )}
 
       {/* সক্রিয় অনুরোধ */}
-      <section className="mt-8 pb-10">
+        <section id="requests" className="mt-8 pb-10 scroll-mt-4">
         <h2 className="text-lg font-semibold mb-3">{t.activeRequests}</h2>
         {(!requests || requests.length === 0) && (
           <div className="bg-white border border-dashed border-ink/20 rounded-2xl py-10 text-center">
