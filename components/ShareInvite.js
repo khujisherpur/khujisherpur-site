@@ -1,11 +1,11 @@
 'use client';
 import { useState } from 'react';
 
-export default function ShareInvite({ small, title, desc, shareText, copiedText }) {
+export default function ShareInvite({ small, title, desc, shareText, copiedText, shareUrl }) {
   const [copied, setCopied] = useState(false);
 
   async function share() {
-    const url = 'https://khujisherpur.com/blood';
+   const url = shareUrl || 'https://khujisherpur.com/blood';
     try {
       if (navigator.share) {
         await navigator.share({ title, text: shareText, url });
