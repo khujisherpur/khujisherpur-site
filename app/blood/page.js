@@ -24,6 +24,7 @@ const text = {
     reqTitle: 'রক্তের অনুরোধ', reqDesc: 'গ্রুপ, ব্যাগ ও হাসপাতাল জানান। মিলে যাওয়া ডোনাররা নোটিফিকেশন পাবেন।', reqBtn: 'অনুরোধ করুন',
     regTitle: 'ডোনার নিবন্ধন', regDesc: 'রক্ত দিতে চাইলে যুক্ত হন। প্রয়োজনে আপনাকে জানানো হবে।', regBtn: 'নিবন্ধন করুন',
     listTitle: 'ডোনার তালিকা', listDesc: 'গ্রুপ ও এলাকা দিয়ে খুঁজে সরাসরি যোগাযোগ করুন।', listBtn: 'তালিকা দেখুন',
+    topTitle: 'সেরা রক্তদাতা', topDesc: 'শেরপুর জেলার সর্বাধিক রক্তদানকারীদের তালিকা, উপজেলা অনুযায়ী।', topBtn: 'দেখুন',
     quickGroup: 'গ্রুপ অনুযায়ী রক্তদাতা খুঁজুন', latestDonors: 'সদ্য যুক্ত রক্তদাতা', seeAll: 'সব দেখুন',
     ready: 'প্রস্তুত',
     activeRequests: 'সক্রিয় রক্তের অনুরোধ',
@@ -43,6 +44,7 @@ const text = {
     reqTitle: 'Blood Request', reqDesc: 'Share the group, bags and hospital. Matching donors get notified.', reqBtn: 'Request Now',
     regTitle: 'Donor Registration', regDesc: 'Join to give blood. You will be notified when needed.', regBtn: 'Register',
     listTitle: 'Donor List', listDesc: 'Search by group and area and contact directly.', listBtn: 'Browse List',
+    topTitle: 'Top Donors', topDesc: 'Sherpur district\'s most frequent donors, by upazila.', topBtn: 'View',
     quickGroup: 'Find donors by blood group', latestDonors: 'Recently joined donors', seeAll: 'See all',
     ready: 'Ready',
     activeRequests: 'Active Blood Requests',
@@ -216,6 +218,7 @@ export default async function BloodPage() {
     { href: '/blood/request', icon: 'drop', title: t.reqTitle, desc: t.reqDesc, btn: t.reqBtn, tone: 'from-[#B91C1C] to-[#EF4444]' },
     { href: '/blood/donor', icon: 'heart', title: t.regTitle, desc: t.regDesc, btn: t.regBtn, tone: 'from-[#0E5C33] to-[#1C8A4C]' },
     { href: '/blood/donors', icon: 'users', title: t.listTitle, desc: t.listDesc, btn: t.listBtn, tone: 'from-[#1B2A4A] to-[#33497A]' },
+    { href: '/blood/leaderboard', icon: 'heart', title: t.topTitle, desc: t.topDesc, btn: t.topBtn, tone: 'from-[#B45309] to-[#F59E0B]' },
   ];
 
   return (
