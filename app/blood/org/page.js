@@ -25,7 +25,7 @@ function OrgForm() {
     if (data.user) {
       const { data: o } = await supabase
         .from('blood_orgs')
-        .select('id, name, phone, address, upazila, is_approved')
+        .select('id, name, phone, address, upazila, is_approved, logo_url')
         .eq('owner_user_id', data.user.id)
         .maybeSingle();
       if (o) {
@@ -72,8 +72,51 @@ function OrgForm() {
     init();
   }
 
-  if (loading) return <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>;
+    const [logoBusy, setLogoBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
 
+  async function uploadLogo(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file || !org) return;
+    if (!file.type.startsWith('image/')) return setError('শুধু ছবি দিন');
+    if (file.size > 2 * 1024 * 1024) return setError('ছবি ২ MB-এর বেশি হবে না');
+    setLogoBusy(true);
+    setError(null);
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const path = `org-logos/${user.id}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from('images').upload(path, file);
+    if (upErr) {
+      setLogoBusy(false);
+      return setError('লোগো আপলোড হয়নি [' + String(upErr.message || '').slice(0, 120) + ']');
+    }
+    const { data: urlData } = supabase.storage.from('images').getPublicUrl(path);
+    const { data: updated, error: dbErr } = await supabase
+      .from('blood_orgs')
+      .update({ logo_url: urlData.publicUrl })
+      .eq('id', org.id)
+      .select('id');
+    setLogoBusy(false);
+    if (dbErr || !updated || updated.length === 0) {
+      return setError('লোগো সেভ হয়নি [' + String((dbErr && dbErr.message) || 'no rows').slice(0, 120) + ']');
+    }
+    init();
+  }
+
+  async function shareOrgLink() {
+    const url = `https://khujisherpur.com/blood/orgs/${org.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: org.name, text: `${org.name}-এর রক্তদাতা সদস্য হতে লিংকে যান।`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {}
+  }
+
+  if (loading) return <p className="text-center py-20 text-ink/60">লোড হচ্ছে...</p>;
   if (!user) {
     return (
       <main className="max-w-md mx-auto px-4 py-20 text-center">
@@ -97,6 +140,31 @@ function OrgForm() {
         <p className="text-sm bg-green/10 border border-green/20 text-green rounded-xl p-3 mb-4">
           ✅ আপনার সংস্থা তালিকায় দেখানো হচ্ছে।
         </p>
+      )}
+
+            {org && (
+        <div className="bg-white border-2 border-ink/10 p-4 mb-4">
+          <div className="flex items-center gap-3">
+            {org.logo_url ? (
+              <img src={org.logo_url} alt="" className="w-16 h-16 rounded-full object-cover border border-ink/10" />
+            ) : (
+              <span className="w-16 h-16 rounded-full bg-red-50 text-red-600 text-3xl flex items-center justify-center">🩸</span>
+            )}
+            <label className="text-sm border border-ink/20 px-3 py-2 cursor-pointer">
+              {logoBusy ? 'আপলোড হচ্ছে...' : org.logo_url ? 'লোগো বদলান' : 'লোগো দিন'}
+              <input type="file" accept="image/*" onChange={uploadLogo} disabled={logoBusy} className="hidden" />
+            </label>
+          </div>
+          {org.is_approved && (
+            <button
+              type="button"
+              onClick={shareOrgLink}
+              className="w-full mt-3 text-sm font-semibold text-green border border-green/30 rounded-lg py-2.5"
+            >
+              {copied ? '✅ লিংক কপি হয়েছে' : '🔗 সদস্য নিবন্ধনের লিংক শেয়ার করুন'}
+            </button>
+          )}
+        </div>
       )}
 
       <form onSubmit={submit} className="bg-white border-2 border-ink/10 p-6 space-y-4">
