@@ -147,6 +147,20 @@ export default function DonorDashboardPage() {
     setDonorProfile({ ...donorProfile, org_id: null });
   }
 
+    async function toggleMessages() {
+    const next = donorProfile.accepts_messages === false;
+    const { data: updated, error } = await supabase
+      .from('blood_donors')
+      .update({ accepts_messages: next })
+      .eq('user_id', user.id)
+      .select('user_id');
+    if (error || !updated || updated.length === 0) {
+      alert('বদলানো যায়নি' + (error ? ': ' + error.message : ''));
+      return;
+    }
+    setDonorProfile({ ...donorProfile, accepts_messages: next });
+  }
+
   async function handleDonate(requestId) {
     if (!confirm('আপনি কি নিশ্চিত এই অনুরোধে রক্ত দিয়েছেন?')) return;
     setBusyId(requestId);
@@ -313,6 +327,30 @@ export default function DonorDashboardPage() {
           >
             <span
               className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${active ? 'translate-x-5' : ''}`}
+            />
+          </button>
+        </section>
+
+                <section className="bg-white border border-ink/10 rounded-xl p-3 mt-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              {donorProfile.accepts_messages !== false ? '💬 মেসেজ গ্রহণ চালু' : '🔕 মেসেজ গ্রহণ বন্ধ'}
+            </p>
+            <p className="text-xs text-ink/50 mt-0.5">
+              {donorProfile.accepts_messages !== false
+                ? 'রোগীর পরিবার আপনাকে সাইট থেকে মেসেজ পাঠাতে পারবে।'
+                : 'মেসেজ বোতাম দেখাবে না। ফোন নম্বর আগের মতোই দেখা যাবে।'}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={donorProfile.accepts_messages !== false}
+            onClick={toggleMessages}
+            className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 ${donorProfile.accepts_messages !== false ? 'bg-green' : 'bg-ink/20'}`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${donorProfile.accepts_messages !== false ? 'translate-x-5' : ''}`}
             />
           </button>
         </section>
