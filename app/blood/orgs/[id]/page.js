@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { supabase } from '../../../../lib/supabaseClient';
 import { cleanPhone, toBn } from '../../../../lib/format';
 import SiteHeader from '../../../../components/SiteHeader';
+import OrgEditButton from '../../../../components/OrgEditButton';
 import ShareInvite from '../../../../components/ShareInvite';
 import DonorReadyTag from '../../../../components/DonorReadyTag';
 import { badgeFor } from '../../../../lib/donor';
@@ -94,7 +95,12 @@ export default async function OrgPage({ params }) {
               </div>
             </div>
 
-            <div className="mt-5 space-y-2">
+                        <div className="mt-5 space-y-2">
+              <OrgEditButton
+                orgId={org.id}
+                label="✏️ সংস্থার তথ্য এডিট করুন"
+                className="block text-center border border-ink/20 py-3 rounded-xl font-semibold"
+              />
               <a
                 href={`tel:${cleanPhone(org.phone)}`}
                 className="block text-center bg-red-500 text-white font-semibold py-3 rounded-xl"
