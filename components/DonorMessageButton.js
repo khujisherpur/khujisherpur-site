@@ -57,7 +57,7 @@ export default function DonorMessageButton({ donorId, name, compact = false, cla
     setBusy(false);
     if (err) {
       const m = err.message || '';
-      setError(/[\u0980-\u09FF]/.test(m) ? m : 'বার্তা পাঠানো যায়নি, আবার চেষ্টা করুন');
+      setError(/[\u0980-\u09FF]/.test(m) ? m : 'বার্তা পাঠানো যায়নি [' + m.slice(0, 160) + ']');
       return;
     }
     window.location.href = `/dashboard/messages/${data}`;
