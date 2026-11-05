@@ -5,6 +5,7 @@ import { notFound, redirect } from 'next/navigation';
 import { supabase } from '../../../../lib/supabaseClient';
 import { cleanPhone, waLink } from '../../../../lib/format';
 import SiteHeader from '../../../../components/SiteHeader';
+import DonorMessageButton from '../../../../components/DonorMessageButton';
 import { badgeFor, isResting, readyDate, fmtBnDate } from '../../../../lib/donor';
 import DonorReadyTag from '../../../../components/DonorReadyTag';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -35,7 +36,7 @@ const getDonor = cache(async (raw) => {
   if (!data) return null;
   const { data: stats } = await supabase
     .from('public_donor_stats')
-    .select('site_count, external_count, last_donated_at, upazila, org_id, org_name')
+    .select('site_count, external_count, last_donated_at, upazila, org_id, org_name, accepts_messages')
     .eq('donor_id', data.id)
     .maybeSingle();
   return {
@@ -46,6 +47,7 @@ const getDonor = cache(async (raw) => {
     upazila: stats?.upazila || null,
     org_id: stats?.org_id || null,
     org_name: stats?.org_name || null,
+    accepts_messages: stats?.accepts_messages !== false,
   };
 });
 
@@ -152,6 +154,13 @@ export default async function DonorProfilePage({ params }) {
               >
                 📞 কল করুন
               </a>
+               {donor.accepts_messages && (
+                <DonorMessageButton
+                  donorId={donor.id}
+                  name={donor.name}
+                  className="block w-full text-center border-2 border-red-200 text-red-600 font-semibold py-3 rounded-xl"
+                />
+              )}
               {wa && (
                 <a
                   href={wa}
