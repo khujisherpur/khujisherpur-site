@@ -131,9 +131,10 @@ export default function ConversationPage({ params }) {
   const postHref =
     conv.kind === 'provider' ? `/provider/${conv.ref_id}`
     : conv.kind === 'blood' ? `/blood/${conv.ref_id}`
+    : conv.kind === 'donor' ? `/blood/donors/${conv.ref_id}`
     : `/listing/${conv.ref_id}`;
   const kindLabel =
-    conv.kind === 'provider' ? 'প্রোফাইল' : conv.kind === 'blood' ? 'রক্তের অনুরোধ' : 'পোস্ট';
+    conv.kind === 'provider' ? 'প্রোফাইল' : conv.kind === 'blood' ? 'রক্তের অনুরোধ' : conv.kind === 'donor' ? 'রক্তদাতা' : 'পোস্ট';
 
   // অপর পক্ষ কখন শেষবার পড়েছে, আর আমার শেষ বার্তা কোনটা
   const otherReadAt = me.id === conv.owner_id ? conv.starter_last_read : conv.owner_last_read;
