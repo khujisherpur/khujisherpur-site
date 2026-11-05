@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { supabase } from '../../../lib/supabaseClient';
 import { cleanPhone, toBn } from '../../../lib/format';
 import SiteHeader from '../../../components/SiteHeader';
-
+import OrgEditButton from '../../../components/OrgEditButton';
 export const metadata = {
   title: 'রক্ত সংস্থা — খুঁজি শেরপুর',
   description: 'শেরপুরের রক্তদাতা সংস্থাগুলোর নাম, ঠিকানা, ফোন নম্বর ও সদস্য সংখ্যা।',
@@ -44,7 +44,11 @@ export default async function OrgsPage() {
 
         <div className="space-y-3 mt-4">
           {orgs.map((o) => (
-            <div key={o.id} className="bg-white border border-ink/10 rounded-2xl p-3 flex items-center gap-3 hover:shadow-md transition-shadow">
+             <div key={o.id} className="relative bg-white border border-ink/10 rounded-2xl p-3 flex items-center gap-3 hover:shadow-md transition-shadow">
+              <OrgEditButton
+                orgId={o.id}
+                className="absolute -top-2.5 right-3 bg-white border border-ink/20 text-xs px-2.5 py-0.5 rounded-full"
+              />
               <a href={`/blood/orgs/${o.id}`} className="flex items-center gap-3 min-w-0 flex-1">
                 {o.logo_url ? (
                   <img src={o.logo_url} alt="" className="w-14 h-14 rounded-full object-cover border border-ink/10 flex-shrink-0 bg-white" />
