@@ -4,6 +4,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { cleanPhone, toBn } from '../../../lib/format';
 import SiteHeader from '../../../components/SiteHeader';
 import DonorReadyTag from '../../../components/DonorReadyTag';
+import DonorMessageButton from '../../../components/DonorMessageButton';
 import { badgeFor, isResting } from '../../../lib/donor';
 export const metadata = {
   title: 'রক্তদাতা তালিকা — খুঁজি শেরপুর',
@@ -43,7 +44,7 @@ export default async function DonorsListPage({ searchParams }) {
   if (donors.length > 0) {
     const { data: stats } = await supabase
       .from('public_donor_stats')
-      .select('donor_id, upazila, site_count, last_donated_at, org_name')
+      .select('donor_id, upazila, site_count, last_donated_at, org_name, accepts_messages')
       .in('donor_id', donors.map((d) => d.id));
     const byId = new Map((stats || []).map((s) => [s.donor_id, s]));
     donors = donors.map((d) => {
@@ -52,6 +53,7 @@ export default async function DonorsListPage({ searchParams }) {
         ...d,
         upazila: s?.upazila || null,
         org_name: s?.org_name || null,
+        accepts_messages: s ? s.accepts_messages !== false : true,
         site_count: s?.site_count || 0,
         last_donated_at: s?.last_donated_at || null,
       };
@@ -173,6 +175,14 @@ export default async function DonorsListPage({ searchParams }) {
                   <DonorReadyTag lastDonatedAt={d.last_donated_at} />
                 </span>
               </a>
+               {d.accepts_messages && (
+                <DonorMessageButton
+                  donorId={d.id}
+                  name={d.name}
+                  compact
+                  className="w-11 h-11 rounded-xl border-2 border-red-200 text-lg flex-shrink-0"
+                />
+              )}
               <a
                 href={`tel:${cleanPhone(d.phone)}`}
                 className="bg-gradient-to-br from-[#B91C1C] to-[#EF4444] text-white text-sm font-medium px-3 py-2 rounded-xl flex-shrink-0"
