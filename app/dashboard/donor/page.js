@@ -37,10 +37,27 @@ export default function DonorDashboardPage() {
   const [toggling, setToggling] = useState(false);
   const [togglingPublic, setTogglingPublic] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [myOrg, setMyOrg] = useState(null);
+  const [leavingOrg, setLeavingOrg] = useState(false);
 
-  useEffect(() => {
+    useEffect(() => {
     init();
   }, []);
+
+  useEffect(() => {
+    const id = donorProfile && donorProfile.org_id;
+    if (!id) {
+      setMyOrg(null);
+      return;
+    }
+    supabase
+      .from('blood_orgs')
+      .select('id, name')
+      .eq('id', id)
+      .eq('is_approved', true)
+      .maybeSingle()
+      .then(({ data }) => setMyOrg(data || null));
+  }, [donorProfile]);
 
   async function init() {
     const { data } = await supabase.auth.getUser();
@@ -112,6 +129,22 @@ export default function DonorDashboardPage() {
       return;
     }
     setDonorProfile({ ...donorProfile, is_public: next });
+  }
+
+    async function leaveOrg() {
+    if (!confirm('সংস্থা ছেড়ে সাধারণ ডোনার হতে চান?')) return;
+    setLeavingOrg(true);
+    const { data: updated, error } = await supabase
+      .from('blood_donors')
+      .update({ org_id: null })
+      .eq('user_id', user.id)
+      .select('user_id');
+    setLeavingOrg(false);
+    if (error || !updated || updated.length === 0) {
+      alert('সংস্থা ছাড়া যায়নি' + (error ? ': ' + error.message : ''));
+      return;
+    }
+    setDonorProfile({ ...donorProfile, org_id: null });
   }
 
   async function handleDonate(requestId) {
@@ -237,6 +270,25 @@ export default function DonorDashboardPage() {
           >
             📍 আপনার উপজেলা দেওয়া নেই। লিডারবোর্ডে আসতে <span className="font-semibold underline">উপজেলা দিন</span>
           </a>
+        )}
+
+                {myOrg && (
+          <section className="bg-white border border-red-100 rounded-xl p-3 mt-4 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] text-ink/50">আপনি সদস্য</p>
+              <a href={`/blood/orgs/${myOrg.id}`} className="text-sm font-semibold text-red-600 truncate block">
+                🏥 {myOrg.name}
+              </a>
+            </div>
+            <button
+              type="button"
+              onClick={leaveOrg}
+              disabled={leavingOrg}
+              className="text-xs border border-ink/20 px-3 py-1.5 rounded-lg flex-shrink-0 disabled:opacity-50"
+            >
+              সংস্থা ছাড়ুন
+            </button>
+          </section>
         )}
 
         <DonorCountdown lastDonatedAt={lastDonation} />
