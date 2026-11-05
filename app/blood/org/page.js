@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { cleanPhone, isValidBdPhone } from '../../../lib/format';
 import SiteHeader from '../../../components/SiteHeader';
+import { compressImage, removeOtherLogos } from '../../../lib/orgLogo';
 
 const upazilas = ['শেরপুর সদর', 'নকলা', 'নালিতাবাড়ী', 'ঝিনাইগাতী', 'শ্রীবরদী'];
 
@@ -75,17 +76,22 @@ function OrgForm() {
     const [logoBusy, setLogoBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  async function uploadLogo(e) {
+    async function uploadLogo(e) {
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!file || !org) return;
-    if (!file.type.startsWith('image/')) return setError('শুধু ছবি দিন');
-    if (file.size > 2 * 1024 * 1024) return setError('ছবি ২ MB-এর বেশি হবে না');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      return setError('শুধু JPG, PNG বা WebP ছবি দিন');
+    }
     setLogoBusy(true);
     setError(null);
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const path = `org-logos/${user.id}/${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from('images').upload(path, file);
+    const blob = await compressImage(file);
+    if (!blob) {
+      setLogoBusy(false);
+      return setError('ছবিটা ছোট করা যায়নি, অন্য ছবি দিন');
+    }
+    const path = `org-logos/${user.id}/${Date.now()}.jpg`;
+    const { error: upErr } = await supabase.storage.from('images').upload(path, blob, { contentType: 'image/jpeg' });
     if (upErr) {
       setLogoBusy(false);
       return setError('লোগো আপলোড হয়নি [' + String(upErr.message || '').slice(0, 120) + ']');
@@ -96,10 +102,31 @@ function OrgForm() {
       .update({ logo_url: urlData.publicUrl })
       .eq('id', org.id)
       .select('id');
-    setLogoBusy(false);
     if (dbErr || !updated || updated.length === 0) {
+      await supabase.storage.from('images').remove([path]);
+      setLogoBusy(false);
       return setError('লোগো সেভ হয়নি [' + String((dbErr && dbErr.message) || 'no rows').slice(0, 120) + ']');
     }
+    await removeOtherLogos(supabase, user.id, path, org.logo_url);
+    setLogoBusy(false);
+    init();
+  }
+
+  async function deleteLogo() {
+    if (!org || !confirm('লোগো মুছে ফেলতে চান?')) return;
+    setLogoBusy(true);
+    setError(null);
+    const { data: updated, error: dbErr } = await supabase
+      .from('blood_orgs')
+      .update({ logo_url: null })
+      .eq('id', org.id)
+      .select('id');
+    if (dbErr || !updated || updated.length === 0) {
+      setLogoBusy(false);
+      return setError('লোগো মোছা যায়নি [' + String((dbErr && dbErr.message) || 'no rows').slice(0, 120) + ']');
+    }
+    await removeOtherLogos(supabase, user.id, null, org.logo_url);
+    setLogoBusy(false);
     init();
   }
 
@@ -142,7 +169,7 @@ function OrgForm() {
         </p>
       )}
 
-            {org && (
+                  {org && (
         <div className="bg-white border-2 border-ink/10 p-4 mb-4">
           <div className="flex items-center gap-3">
             {org.logo_url ? (
@@ -150,11 +177,32 @@ function OrgForm() {
             ) : (
               <span className="w-16 h-16 rounded-full bg-red-50 text-red-600 text-3xl flex items-center justify-center">🩸</span>
             )}
-            <label className="text-sm border border-ink/20 px-3 py-2 cursor-pointer">
-              {logoBusy ? 'আপলোড হচ্ছে...' : org.logo_url ? 'লোগো বদলান' : 'লোগো দিন'}
-              <input type="file" accept="image/*" onChange={uploadLogo} disabled={logoBusy} className="hidden" />
-            </label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm border border-ink/20 px-3 py-2 cursor-pointer text-center">
+                {logoBusy ? 'অপেক্ষা করুন...' : org.logo_url ? 'লোগো বদলান' : 'লোগো দিন'}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={uploadLogo}
+                  disabled={logoBusy}
+                  className="hidden"
+                />
+              </label>
+              {org.logo_url && (
+                <button
+                  type="button"
+                  onClick={deleteLogo}
+                  disabled={logoBusy}
+                  className="text-xs text-red-600 border border-red-200 px-3 py-1.5 disabled:opacity-50"
+                >
+                  লোগো মুছুন
+                </button>
+              )}
+            </div>
           </div>
+          <p className="text-[11px] text-ink/50 mt-2">
+            ছবি নিজে থেকে ছোট (প্রায় ৫০ KB) হয়ে সেভ হবে। বদলালে বা মুছলে আগের ছবি সাথে সাথে মুছে যাবে।
+          </p>
           {org.is_approved && (
             <button
               type="button"
