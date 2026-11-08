@@ -7,6 +7,7 @@ import { cleanPhone, toBn } from '../../../lib/format';
 import { formatBloodDate } from '../../../lib/bloodFormat';
 import SiteHeader from '../../../components/SiteHeader';
 import MessageButton from '../../../components/MessageButton';
+import BloodShareButton from '../../../components/BloodShareButton';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
@@ -25,10 +26,14 @@ export async function generateMetadata({ params }) {
   const request = await getRequest(params.id);
   const robots = { index: false, follow: false };
   if (!request) return { title: 'পাওয়া যায়নি — খুঁজি শেরপুর', robots };
+  const ogTitle = `🩸 ${request.blood_group} রক্ত প্রয়োজন — খুঁজি শেরপুর`;
+  const ogDesc = `${toBn(request.bags_needed)} ব্যাগ রক্ত, ${request.hospital_or_area || 'শেরপুর'}। বিস্তারিত ও যোগাযোগ দেখুন।`;
   return {
     title: `${request.blood_group} রক্ত প্রয়োজন — খুঁজি শেরপুর`,
-    description: 'শেরপুরে জরুরি রক্তের অনুরোধ।',
+    description: ogDesc,
     robots,
+    openGraph: { title: ogTitle, description: ogDesc, type: 'website', locale: 'bn_BD', images: ['/og/blood.jpg'] },
+    twitter: { card: 'summary_large_image', title: ogTitle, description: ogDesc, images: ['/og/blood.jpg'] },
   };
 }
 
@@ -61,6 +66,11 @@ export default async function BloodRequestDetailPage({ params }) {
   const tooOld = Date.now() - new Date(request.created_at).getTime() > EXPIRY_MS;
   const isActive = request.status === 'active' && !tooOld;
   const statusLabel = request.status === 'fulfilled' ? 'পূরণ হয়েছে' : 'মেয়াদ শেষ';
+    const shareText =
+    `🩸 জরুরি রক্ত প্রয়োজন: ${request.blood_group}, ${toBn(request.bags_needed)} ব্যাগ\n` +
+    `📍 ${request.hospital_or_area}` +
+    (request.donation_date ? `\n📅 ${formatBloodDate(request.donation_date, 'bn')}` : '') +
+    '\nবিস্তারিত ও যোগাযোগ:';
 
   return (
     <>
@@ -130,6 +140,10 @@ export default async function BloodRequestDetailPage({ params }) {
                   </a>
                 )}
                 <MessageButton kind="blood" refId={request.id} ownerId={request.user_id} lang="bn" />
+                 <BloodShareButton
+                  title={`${request.blood_group} রক্ত প্রয়োজন — খুঁজি শেরপুর`}
+                  text={shareText}
+                />
               </div>
             )}
 
