@@ -510,10 +510,12 @@ export default async function HomePage() {
 
         <footer className="border-t border-ink/10 py-6 px-4 text-sm text-ink/60 flex flex-col items-center gap-2 mb-16 md:mb-0">
           <div className="flex gap-4 flex-wrap justify-center">
-            <a href="/terms" className="hover:text-ink">{t.terms}</a>
-            <a href="/privacy" className="hover:text-ink">{t.privacy}</a>
-            <a href="/disclaimer" className="hover:text-ink">{t.disclaimer}</a>
-          </div>
+  <a href="/about" className="hover:text-ink">আমাদের সম্পর্কে</a>
+  <a href="/verification" className="hover:text-ink">ভেরিফিকেশন নীতি</a>
+  <a href="/terms" className="hover:text-ink">{t.terms}</a>
+  <a href="/privacy" className="hover:text-ink">{t.privacy}</a>
+  <a href="/disclaimer" className="hover:text-ink">{t.disclaimer}</a>
+</div>
           <InstallButton />
           {(settings.contact_phone || settings.contact_email || settings.facebook_url) && (
             <div className="flex gap-4 flex-wrap justify-center text-xs">
