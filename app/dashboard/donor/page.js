@@ -39,6 +39,7 @@ export default function DonorDashboardPage() {
   const [busyId, setBusyId] = useState(null);
   const [myOrg, setMyOrg] = useState(null);
   const [leavingOrg, setLeavingOrg] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
     init();
@@ -190,13 +191,30 @@ export default function DonorDashboardPage() {
     loadData(user.id, donorProfile.blood_group);
   }
 
-  async function handleDeleteHistory(id) {
-    if (!confirm('এই এন্ট্রি মুছে ফেলতে চান?')) return;
-    const { error } = await supabase.from('blood_donations').delete().eq('id', id);
-    if (error) {
-      alert('মুছে ফেলা যায়নি: ' + error.message);
+    async function deleteDonorProfile() {
+    if (
+      !confirm(
+        'আপনার ডোনার প্রোফাইল মুছে ফেলতে চান? আপনার নাম, ফোন নম্বর ও রক্তদানের ইতিহাস মুছে যাবে। এটা আর ফেরত পাওয়া যাবে না।'
+      )
+    )
+      return;
+    setDeleting(true);
+    // প্রথমে প্রোফাইল। মুছতে না পারলে ইতিহাস অক্ষত থাকবে
+    const { data: removed, error } = await supabase
+      .from('blood_donors')
+      .delete()
+      .eq('user_id', user.id)
+      .select('user_id');
+    if (error || !removed || removed.length === 0) {
+      setDeleting(false);
+      alert('প্রোফাইল মুছে ফেলা যায়নি' + (error ? ': ' + error.message : ''));
       return;
     }
+    // এরপর রক্তদানের ইতিহাস ও বাদ দেওয়া অনুরোধের তালিকা
+    await supabase.from('blood_donations').delete().eq('donor_user_id', user.id);
+    await supabase.from('blood_request_dismissals').delete().eq('donor_user_id', user.id);
+    window.location.href = '/dashboard';
+  }
     loadData(user.id, donorProfile.blood_group);
   }
 
@@ -481,6 +499,20 @@ export default function DonorDashboardPage() {
               </div>
             ))}
           </div>
+        </section>
+       <section className="mt-10 border border-red-200 rounded-xl p-4">
+          <h2 className="text-sm font-semibold text-red-600">প্রোফাইল মুছে ফেলুন</h2>
+          <p className="text-xs text-ink/60 mt-1 leading-relaxed">
+            আপনার ডোনার প্রোফাইল, ফোন নম্বর ও রক্তদানের ইতিহাস স্থায়ীভাবে মুছে যাবে। শুধু কিছুদিন বিরতি চাইলে উপরের "সক্রিয়" সুইচ বন্ধ করে রাখুন।
+          </p>
+          <button
+            type="button"
+            onClick={deleteDonorProfile}
+            disabled={deleting}
+            className="mt-3 text-sm text-red-600 border border-red-300 rounded-lg px-4 py-2 disabled:opacity-50"
+          >
+            {deleting ? 'মুছছি...' : '🗑️ আমার ডোনার প্রোফাইল মুছুন'}
+          </button>
         </section>
        <div className="h-24" />
       </main>
