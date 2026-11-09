@@ -213,8 +213,16 @@ export default function DonorDashboardPage() {
     // এরপর রক্তদানের ইতিহাস ও বাদ দেওয়া অনুরোধের তালিকা
     await supabase.from('blood_donations').delete().eq('donor_user_id', user.id);
     await supabase.from('blood_request_dismissals').delete().eq('donor_user_id', user.id);
-    window.location.href = '/dashboard';
+        window.location.href = '/dashboard';
   }
+
+  async function handleDeleteHistory(id) {
+    if (!confirm('এই এন্ট্রি মুছে ফেলতে চান?')) return;
+    const { error } = await supabase.from('blood_donations').delete().eq('id', id);
+    if (error) {
+      alert('মুছে ফেলা যায়নি: ' + error.message);
+      return;
+    }
     loadData(user.id, donorProfile.blood_group);
   }
 
