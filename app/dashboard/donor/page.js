@@ -265,7 +265,7 @@ export default function DonorDashboardPage() {
   }
 
   const active = !!donorProfile.is_active;
-    const lastDonation = history[0]?.donated_at;
+  const lastDonation = history[0]?.donated_at;
   const siteCount = history.filter((h) => !h.is_external).length;
   return (
     <PageShell>
