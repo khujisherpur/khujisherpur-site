@@ -181,7 +181,7 @@ export default function UsersTab({ currentUserId, currentRole }) {
     if (!selected || selected.role === newRole) return;
     if (!confirm(`${displayName(selected)}-কে "${roleLabel[newRole]}" বানাতে চান?`)) return;
     setBusy(true);
-    const { error: err } = await supabase.from('users').update({ role: newRole }).eq('id', selected.id);
+    const { error: err } = await supabase.rpc('admin_set_role', { target: selected.id, new_role: newRole });
     setBusy(false);
     if (err) { alert('রোল বদলানো যায়নি: ' + err.message); return; }
     setToast('রোল বদলানো হয়েছে');
@@ -488,8 +488,8 @@ export default function UsersTab({ currentUserId, currentRole }) {
                   {currentRole === 'admin' && !isSelf && (
                     <div className="bg-white rounded-xl border border-ink/10 p-3">
                       <p className="text-xs text-ink/50 mb-2">রোল পরিবর্তন</p>
-                      <div className="grid grid-cols-3 gap-2">
-                        {['user', 'moderator', 'admin'].map((r) => (
+                       <div className="grid grid-cols-2 gap-2">
+                        {['user', 'moderator'].map((r) => (
                           <button
                             key={r}
                             onClick={() => changeRole(r)}
